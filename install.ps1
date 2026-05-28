@@ -111,6 +111,10 @@ function Install-Skill {
     $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
     $destRoot = Join-Path $CodexHome "skills"
     $dest = Join-Path $destRoot "clauder-rstudio-workbench"
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $backup = "${dest}_bak_$stamp"
+    $staging = "${dest}_staging_$stamp"
+    $old = "${dest}_old_$stamp"
 
     if (-not (Test-Path $source)) {
         throw "Skill source not found: $source"
@@ -118,17 +122,50 @@ function Install-Skill {
     if (-not (Test-Path $destRoot) -and -not $DryRun) {
         New-Item -ItemType Directory -Force $destRoot | Out-Null
     }
-    if (Test-Path $dest) {
-        $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $backup = "${dest}_bak_$stamp"
-        Write-Host "Backing up existing skill $dest -> $backup"
-        if (-not $DryRun) {
-            Move-Item -LiteralPath $dest -Destination $backup
+
+    if ($DryRun) {
+        if (Test-Path $dest) {
+            Write-Host "Would copy backup $dest -> $backup"
+            Write-Host "Would stage new skill $source -> $staging"
+            Write-Host "Would replace $dest with staged skill and keep backup"
+        } else {
+            Write-Host "Would stage and install $source -> $dest"
         }
+        return
     }
-    Write-Host "Copying $source -> $dest"
-    if (-not $DryRun) {
-        Copy-Item -LiteralPath $source -Destination $dest -Recurse -Force
+
+    try {
+        Write-Host "Staging new skill $source -> $staging"
+        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+
+        if (Test-Path $dest) {
+            Write-Host "Copying backup $dest -> $backup"
+            Copy-Item -LiteralPath $dest -Destination $backup -Recurse -Force
+            Rename-Item -LiteralPath $dest -NewName (Split-Path -Leaf $old)
+        }
+
+        Move-Item -LiteralPath $staging -Destination $dest
+
+        if (Test-Path $old) {
+            Remove-Item -LiteralPath $old -Recurse -Force
+        }
+        Write-Host "Installed skill to $dest"
+    }
+    catch {
+        Write-Warning "Skill installation failed; attempting restore. Error: $($_.Exception.Message)"
+        if (-not (Test-Path $dest)) {
+            if (Test-Path $old) {
+                Rename-Item -LiteralPath $old -NewName (Split-Path -Leaf $dest)
+            } elseif (Test-Path $backup) {
+                Copy-Item -LiteralPath $backup -Destination $dest -Recurse -Force
+            }
+        }
+        throw
+    }
+    finally {
+        if (Test-Path $staging) {
+            Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -163,7 +200,12 @@ NO_PROXY = "127.0.0.1,localhost"
 
     $content = if (Test-Path $config) { Get-Content -LiteralPath $config -Raw } else { "" }
     $content = Remove-TomlSections $content @("mcp_servers.r-studio", "mcp_servers.r-studio.env")
-    $content = $content.TrimEnd() + "`r`n`r`n" + $block + "`r`n"
+    $content = $content.TrimEnd()
+    if ($content) {
+        $content = $content + "`r`n`r`n" + $block + "`r`n"
+    } else {
+        $content = $block + "`r`n"
+    }
     Set-Content -LiteralPath $config -Value $content -Encoding UTF8
 }
 
@@ -214,6 +256,18 @@ function Configure-ClaudeCode {
         "r-studio", "--", "uvx", "--from", $bridge, "clauder-mcp"
     )
     Invoke-Checked "claude" $addArgs
+    Verify-ClaudeCodeMcp
+}
+
+function Verify-ClaudeCodeMcp {
+    if ($DryRun) { return }
+    Write-Host "+ claude mcp list"
+    $list = & claude mcp list 2>&1
+    $exit = $LASTEXITCODE
+    $list | Out-Host
+    if ($exit -ne 0 -or -not (($list | Out-String) -match 'r-studio')) {
+        throw "Claude Code MCP verification failed: r-studio was not found in 'claude mcp list'."
+    }
 }
 
 function Write-CopilotConfig {

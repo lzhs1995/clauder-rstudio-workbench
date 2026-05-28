@@ -19,7 +19,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell:
 
 ```powershell
-git clone --branch v0.1.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.1.2 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
@@ -65,6 +65,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.1.2` | `v0.2.0-lzhs.1` | Adds safer skill replacement, Claude Code MCP verification, release dates, feature request template, and real smoke transcript. |
 | `v0.1.1` | `v0.2.0-lzhs.1` | Adds installer preflight, troubleshooting, issue templates, and idempotent Codex config rewrite. |
 | `v0.1.0` | `v0.2.0-lzhs.1` | Async progress, async metadata, Copilot CLI setup, Windows multi-session safety. |
 
@@ -102,6 +103,12 @@ After installation:
 5. For long tasks, require visible `Latest progress:` or final progress before claiming MCP async readiness.
 
 For the installer smoke transcript format, see `tests/install_smoke.md`.
+
+Current validation status:
+
+- Local Windows install, reinstall idempotence, and privacy scan have passed.
+- A git-subdirectory MCP runtime smoke has passed when a live RStudio ClaudeR Addin session is available.
+- A clean-VM or colleague-machine validation remains the final gate before broad rollout.
 
 ## Troubleshooting
 
@@ -148,7 +155,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.1.1
+git checkout v0.1.2
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
