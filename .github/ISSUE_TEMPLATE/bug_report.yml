@@ -1,0 +1,69 @@
+name: Bug report
+description: Report installation, MCP connection, async progress, or RStudio session problems.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, access tokens, private data paths, or unpublished research outputs.
+  - type: input
+    id: skill-version
+    attributes:
+      label: Skill version
+      placeholder: v0.1.1
+    validations:
+      required: true
+  - type: input
+    id: clauder-version
+    attributes:
+      label: ClaudeR fork ref
+      placeholder: v0.2.0-lzhs.1
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options:
+        - Codex
+        - Claude Code
+        - GitHub Copilot CLI
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Windows 11, R 4.5.x, RStudio version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Include the exact install command and MCP command, redacting private paths if needed.
+      render: powershell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Include relevant error messages such as `uvx not found`, `Transport closed`, or missing `Latest progress`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics already tried
+      description: Mention whether RStudio Addin is running, whether `list_sessions` works, and whether a short async smoke test passed.
+      render: text

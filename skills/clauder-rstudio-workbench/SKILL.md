@@ -48,4 +48,4 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 
 ## Compatible Release
 
-This skill release `v0.1.0` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.1.1` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.

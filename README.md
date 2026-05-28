@@ -4,6 +4,8 @@ Portable Codex skill and installer for using a patched ClaudeR build as an RStud
 
 This repository pairs with the ClaudeR fork release `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
 
+**Platform status:** v0.1.x is Windows-first. macOS/Linux installation scripts are not included yet.
+
 ## What This Installs
 
 - The patched ClaudeR R package from `https://github.com/lzhs1995/ClaudeR`.
@@ -17,9 +19,9 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell:
 
 ```powershell
-git clone --branch v0.1.0 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.1.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-.\install.ps1 -ConfigureCodex
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
 Then restart Codex and start ClaudeR inside RStudio:
@@ -40,13 +42,30 @@ $clauder 连接Rstudio
 Preview changes without writing files or installing packages:
 
 ```powershell
-.\install.ps1 -DryRun -ConfigureCodex
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DryRun -ConfigureCodex
 ```
+
+## Install Choices
+
+Use one MCP configuration path at a time:
+
+- **Recommended for colleagues:** run this repository's `install.ps1` and pass one explicit configuration switch such as `-ConfigureCodex`.
+- **Alternative for ClaudeR developers:** run `library(ClaudeR); install_cli(..., mcp_from = "local")` from the ClaudeR package.
+
+Do not run both paths blindly. If both are used, the last writer wins and may replace the previous `r-studio` MCP block.
+
+Installer prerequisites:
+
+- Git for Windows: `winget install --id Git.Git -e`
+- uv/uvx: `winget install --id astral-sh.uv -e`
+- R installed with `R.exe` available, or pass `-RExe "C:\Program Files\R\R-x.y.z\bin\R.exe"`.
+- Claude Code CLI is required only when using `-ConfigureClaudeCode`.
 
 ## Compatibility
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.1.1` | `v0.2.0-lzhs.1` | Adds installer preflight, troubleshooting, issue templates, and idempotent Codex config rewrite. |
 | `v0.1.0` | `v0.2.0-lzhs.1` | Async progress, async metadata, Copilot CLI setup, Windows multi-session safety. |
 
 ## MCP Command
@@ -82,10 +101,68 @@ After installation:
 4. Verify `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test.
 5. For long tasks, require visible `Latest progress:` or final progress before claiming MCP async readiness.
 
+For the installer smoke transcript format, see `tests/install_smoke.md`.
+
+## Troubleshooting
+
+### `uvx` is not found
+
+Install uv and restart PowerShell:
+
+```powershell
+winget install --id astral-sh.uv -e
+```
+
+### PowerShell blocks `install.ps1`
+
+Use process-scoped bypass instead of changing machine policy:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
+```
+
+### MCP config does not appear after install
+
+Restart the client. Codex, Claude Code, and Copilot CLI do not reliably hot-load MCP config changes.
+
+### Codex shows `Transport closed`
+
+Treat this as a transport-layer failure until proven otherwise. Check that RStudio is open, `library(ClaudeR); claudeAddin()` is running, and the discovery session appears. If HTTP/Addin is alive but the Codex native wrapper is stale, restart Codex before rerunning a long job.
+
+### Windows opens a second RStudio session and the first one aborts
+
+Do not use an unpatched ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)`. Install `lzhs1995/ClaudeR@v0.2.0-lzhs.1` or later, restart RStudio, then rerun a multi-session safety check before trusting concurrent sessions.
+
+### `Latest progress:` does not appear
+
+Confirm all three layers:
+
+1. The R code includes `clauder_progress(stage, message)` markers.
+2. RStudio has loaded the patched ClaudeR package after reinstall/restart.
+3. The MCP command points to the patched local bridge, not plain `uvx clauder-mcp`.
+
+## Upgrade
+
+To upgrade the skill and reinstall the paired ClaudeR release:
+
+```powershell
+cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git fetch --tags
+git checkout v0.1.1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
+```
+
+If you configured Claude Code or Copilot CLI, pass the corresponding `-Configure...` switch again.
+
 ## What Is Not Included
 
 - No private dissertation scripts or logs.
 - No machine-specific paths.
 - No API keys.
+- No full validation log. Only a short portable smoke transcript is included because the complete validation history contains local project context.
 - No PyPI publication for the forked `clauder-mcp`.
 - No upstream PR bundle; upstream contributions should be split later.
+
+## Agent Metadata
+
+The packaged skill includes `agents/openai.yaml` for Codex skill UI metadata. Claude Code and Copilot CLI use MCP configuration rather than Codex skill metadata in this release.

@@ -4,6 +4,7 @@ param(
     [string]$ClaudeRDir = "$env:USERPROFILE\projects\ClaudeR",
     [string]$CodexHome = "$env:USERPROFILE\.codex",
     [string]$RExe = "",
+    [string]$LogFile = "",
     [switch]$ConfigureCodex,
     [switch]$ConfigureClaudeCode,
     [switch]$ConfigureCopilot,
@@ -12,11 +13,33 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($LogFile) {
+    $logDir = Split-Path -Parent $LogFile
+    if ($logDir -and -not (Test-Path $logDir)) {
+        New-Item -ItemType Directory -Force $logDir | Out-Null
+    }
+    Start-Transcript -Path $LogFile -Append | Out-Null
+}
+
 function Write-Step($Message) {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
+function Test-Executable($Command) {
+    if ($Command -match '[\\/]') {
+        return (Test-Path -LiteralPath $Command)
+    }
+    return [bool](Get-Command $Command -ErrorAction SilentlyContinue)
+}
+
+function Require-Command($Command, $InstallHint) {
+    if (-not (Test-Executable $Command)) {
+        throw "Required command not found: $Command. $InstallHint"
+    }
+}
+
 function Invoke-Checked($Command, $Arguments) {
+    Require-Command $Command "Install it, add it to PATH, or pass an explicit path where supported."
     Write-Host "+ $Command $($Arguments -join ' ')" -ForegroundColor DarkGray
     if ($DryRun) { return }
     & $Command @Arguments
@@ -44,6 +67,25 @@ function Find-RExe {
         Sort-Object FullName -Descending
     if ($candidates) { return $candidates[0].FullName }
     throw "Could not find R.exe. Re-run with -RExe <path-to-R.exe>."
+}
+
+function Test-Prerequisites {
+    Write-Step "Checking prerequisites"
+    Require-Command "git" "Install Git for Windows: winget install --id Git.Git -e"
+
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Require-Command "uvx" "Install uv: winget install --id astral-sh.uv -e"
+    }
+    if ($ConfigureClaudeCode) {
+        Require-Command "claude" "Install Claude Code first, then re-run this installer."
+    }
+
+    $resolvedR = Find-RExe
+    Write-Host "R.exe: $resolvedR"
+    Write-Host "git: $((Get-Command git).Source)"
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Write-Host "uvx: $((Get-Command uvx).Source)"
+    }
 }
 
 function Install-ClaudeR {
@@ -120,9 +162,33 @@ NO_PROXY = "127.0.0.1,localhost"
     if ($DryRun) { return }
 
     $content = if (Test-Path $config) { Get-Content -LiteralPath $config -Raw } else { "" }
-    $content = [regex]::Replace($content, '(?ms)^\[mcp_servers\.r-studio(?:\.env)?\]\r?\n.*?(?=^\[|\z)', '')
+    $content = Remove-TomlSections $content @("mcp_servers.r-studio", "mcp_servers.r-studio.env")
     $content = $content.TrimEnd() + "`r`n`r`n" + $block + "`r`n"
     Set-Content -LiteralPath $config -Value $content -Encoding UTF8
+}
+
+function Remove-TomlSections($Content, [string[]]$SectionNames) {
+    if (-not $Content) { return "" }
+    $lines = $Content -split "\r?\n"
+    $out = New-Object System.Collections.Generic.List[string]
+    $skip = $false
+
+    foreach ($line in $lines) {
+        if ($line -match '^\s*\[([^\]]+)\]\s*$') {
+            $name = $Matches[1]
+            $skip = $SectionNames -contains $name
+            if (-not $skip) {
+                $out.Add($line)
+            }
+            continue
+        }
+
+        if (-not $skip) {
+            $out.Add($line)
+        }
+    }
+
+    return (($out -join "`r`n").TrimEnd())
 }
 
 function Configure-ClaudeCode {
@@ -130,11 +196,16 @@ function Configure-ClaudeCode {
     $claudeJson = Join-Path $env:USERPROFILE ".claude.json"
     Backup-File $claudeJson
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
-    $args = @(
+    $removeArgs = @(
         "mcp", "remove", "r-studio", "-s", "user"
     )
-    Write-Host "+ claude $($args -join ' ')"
-    if (-not $DryRun) { & claude @args | Out-Host }
+    Write-Host "+ claude $($removeArgs -join ' ')"
+    if (-not $DryRun) {
+        & claude @removeArgs | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Existing Claude Code r-studio MCP entry was not removed. Continuing with add."
+        }
+    }
     $addArgs = @(
         "mcp", "add", "--transport", "stdio", "--scope", "user",
         "-e", "USERPROFILE=$env:USERPROFILE",
@@ -180,13 +251,21 @@ function Write-CopilotConfig {
     }
 }
 
-Install-ClaudeR
-Install-Skill
+try {
+    Test-Prerequisites
+    Install-ClaudeR
+    Install-Skill
 
-if ($ConfigureCodex) { Write-CodexConfig }
-if ($ConfigureClaudeCode) { Configure-ClaudeCode }
-if ($ConfigureCopilot) { Write-CopilotConfig }
+    if ($ConfigureCodex) { Write-CodexConfig }
+    if ($ConfigureClaudeCode) { Configure-ClaudeCode }
+    if ($ConfigureCopilot) { Write-CopilotConfig }
 
-Write-Step "Done"
-Write-Host "Restart Codex/Claude/Copilot after MCP configuration changes."
-Write-Host "In RStudio, run: library(ClaudeR); claudeAddin()"
+    Write-Step "Done"
+    Write-Host "Restart Codex/Claude/Copilot after MCP configuration changes."
+    Write-Host "In RStudio, run: library(ClaudeR); claudeAddin()"
+}
+finally {
+    if ($LogFile) {
+        Stop-Transcript | Out-Null
+    }
+}
