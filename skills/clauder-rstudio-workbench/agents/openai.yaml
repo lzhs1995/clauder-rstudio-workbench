@@ -1,0 +1,3 @@
+display_name: ClaudeR RStudio Workbench
+short_description: Connect Codex to RStudio through ClaudeR and run async R jobs safely.
+default_prompt: Connect to RStudio with ClaudeR, verify the MCP route, and use async polling discipline for long R work.
