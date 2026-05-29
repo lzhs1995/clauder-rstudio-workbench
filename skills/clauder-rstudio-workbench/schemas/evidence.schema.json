@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lzhs1995/clauder-rstudio-workbench/schemas/evidence.schema.json",
+  "title": "clauder-rstudio-workbench evidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "parent_evidence_ids",
+    "harness_name",
+    "timestamp_utc",
+    "agent",
+    "decision",
+    "reasons",
+    "artifact_paths",
+    "policy_violations",
+    "exit_code"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "evidence_id": { "type": "string" },
+    "parent_evidence_ids": { "type": "array", "items": { "type": "string" } },
+    "task_key": { "type": ["string", "null"] },
+    "harness_name": { "type": "string" },
+    "timestamp_utc": { "type": "string" },
+    "agent": { "type": "string" },
+    "transport_class": {
+      "type": ["string", "null"],
+      "enum": ["NATIVE_MCP_OK", "MCP_STDIO_OK", "HTTP_ONLY_DIAGNOSTIC", "RSCRIPT_ONLY", "BLOCKED", null]
+    },
+    "session_name": { "type": ["string", "null"] },
+    "pid": { "type": ["string", "integer", "null"] },
+    "job_id": { "type": ["string", "null"] },
+    "io_mode": { "type": ["string", "null"], "enum": ["marshal_small", "durable_files", "hybrid", null] },
+    "decision": { "type": "string" },
+    "reasons": { "type": "array", "items": { "type": "string" } },
+    "artifact_paths": { "type": "array", "items": { "type": "string" } },
+    "policy_violations": { "type": "array", "items": { "type": "string" } },
+    "exit_code": { "type": "integer" },
+    "extra": { "type": "object" }
+  }
+}

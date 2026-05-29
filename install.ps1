@@ -8,6 +8,8 @@ param(
     [switch]$ConfigureCodex,
     [switch]$ConfigureClaudeCode,
     [switch]$ConfigureCopilot,
+    [switch]$SkipHarness,
+    [string]$HarnessPython = "",
     [switch]$DryRun
 )
 
@@ -79,6 +81,10 @@ function Test-Prerequisites {
     if ($ConfigureClaudeCode) {
         Require-Command "claude" "Install Claude Code first, then re-run this installer."
     }
+    if (-not $SkipHarness) {
+        $resolvedPython = Find-HarnessPython
+        Write-Host "Harness Python: $resolvedPython"
+    }
 
     $resolvedR = Find-RExe
     Write-Host "R.exe: $resolvedR"
@@ -86,6 +92,18 @@ function Test-Prerequisites {
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
         Write-Host "uvx: $((Get-Command uvx).Source)"
     }
+}
+
+function Find-HarnessPython {
+    if ($HarnessPython -and (Test-Path -LiteralPath $HarnessPython)) { return $HarnessPython }
+    if ($env:CLAUDER_WORKBENCH_PYTHON -and (Test-Path -LiteralPath $env:CLAUDER_WORKBENCH_PYTHON)) {
+        return $env:CLAUDER_WORKBENCH_PYTHON
+    }
+    $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    throw "Could not find Python for harness. Re-run with -HarnessPython <path> or set CLAUDER_WORKBENCH_PYTHON."
 }
 
 function Install-ClaudeR {
@@ -166,6 +184,22 @@ function Install-Skill {
         if (Test-Path $staging) {
             Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+}
+
+function Install-Harness {
+    if ($SkipHarness) {
+        Write-Step "Skipping harness editable install"
+        return
+    }
+    Write-Step "Installing harness package"
+    $python = Find-HarnessPython
+    $args = @("-m", "pip", "install", "--user", "-e", $PSScriptRoot)
+    Write-Host "+ $python $($args -join ' ')" -ForegroundColor DarkGray
+    if ($DryRun) { return }
+    & $python @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Harness editable install failed with exit code ${LASTEXITCODE}."
     }
 }
 
@@ -309,6 +343,7 @@ try {
     Test-Prerequisites
     Install-ClaudeR
     Install-Skill
+    Install-Harness
 
     if ($ConfigureCodex) { Write-CodexConfig }
     if ($ConfigureClaudeCode) { Configure-ClaudeCode }
