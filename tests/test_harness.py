@@ -9,9 +9,19 @@ from pathlib import Path
 from unittest import mock
 
 from clauder_workbench.artifacts import artifact_ok, check_artifacts, parse_requirement
-from clauder_workbench.cli import _state_is_complete, parse_requirements
+from clauder_workbench.cli import (
+    _job_complete_ok,
+    _p6_durable_violations,
+    _resource_gate_ok,
+    _state_is_complete,
+    build_parser,
+    cmd_async_guard,
+    cmd_completion_check,
+    parse_requirements,
+)
 from clauder_workbench.evidence import build_evidence, stable_task_key, write_evidence
 from clauder_workbench.inflight import archive_inflight, load_inflight, write_inflight
+from clauder_workbench.mcp_client import _retry_if_cold_timeout, extract_job_id
 from clauder_workbench.resource import decide_resource_gate
 from clauder_workbench.transport import classify_transport
 
@@ -177,12 +187,12 @@ class HarnessUnitTests(unittest.TestCase):
         doc = build_evidence("x", "PASS", task_key="abc", parent_evidence_ids=["p1"])
         self.assertIn("evidence_id", doc)
         self.assertEqual(doc["parent_evidence_ids"], ["p1"])
-        self.assertEqual(doc["schema_version"], "0.2.0")
+        self.assertEqual(doc["schema_version"], "0.2.1")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
         self.assertTrue(schema.exists())
-        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.0")
+        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.1")
 
     def test_write_evidence_atomic_creates_json(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -201,6 +211,163 @@ class HarnessUnitTests(unittest.TestCase):
                 archived = archive_inflight(key, "complete")
                 self.assertIsNotNone(archived)
                 self.assertIsNone(load_inflight(key))
+
+    def test_extract_job_id_from_async_text(self) -> None:
+        text = 'Job abc123 started in a background R process. Use get_async_result("abc123") to check status.'
+        self.assertEqual(extract_job_id(text), "abc123")
+
+    def test_resource_gate_requires_matching_task(self) -> None:
+        doc = build_evidence("resource_gate", "increase_by_1", task_key="task-a")
+        self.assertTrue(_resource_gate_ok([doc], "task-a", 60))
+        self.assertFalse(_resource_gate_ok([doc], "task-b", 60))
+
+    def test_job_complete_requires_async_guard_complete_evidence(self) -> None:
+        doc = build_evidence("async_guard", "PASS", task_key="task-a", extra={"archived_path": "archive.json"})
+        self.assertTrue(_job_complete_ok([doc], "task-a"))
+        self.assertFalse(_job_complete_ok([doc], "task-b"))
+
+    def test_p6_durable_violations_small_rdata(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x.RData"
+            p.write_bytes(b"x")
+            req = parse_requirement(f"rdata::{p}")
+            checks = check_artifacts([req])["checks"]
+            self.assertTrue(_p6_durable_violations([req], checks))
+
+    def test_async_guard_pre_submit_and_register_job(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch("clauder_workbench.inflight.INFLIGHT_DIR", Path(td) / "inflight"), mock.patch(
+                "clauder_workbench.inflight.ARCHIVE_DIR", Path(td) / "inflight" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                pre = parser.parse_args(["async-guard", "pre-submit", "--task-key", "task-a"])
+                self.assertEqual(cmd_async_guard(pre), 0)
+                self.assertEqual(load_inflight("task-a")["status"], "pre_submitted")
+                reg = parser.parse_args(["async-guard", "register-job", "--task-key", "task-a", "--job-id", "job123"])
+                self.assertEqual(cmd_async_guard(reg), 0)
+                self.assertEqual(load_inflight("task-a")["job_id"], "job123")
+
+    def test_async_guard_blocks_duplicate_pre_submit(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch("clauder_workbench.inflight.INFLIGHT_DIR", Path(td) / "inflight"), mock.patch(
+                "clauder_workbench.inflight.ARCHIVE_DIR", Path(td) / "inflight" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                pre = parser.parse_args(["async-guard", "pre-submit", "--task-key", "task-a"])
+                self.assertEqual(cmd_async_guard(pre), 0)
+                self.assertEqual(cmd_async_guard(pre), 3)
+
+    def test_async_guard_register_without_presubmit_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch("clauder_workbench.inflight.INFLIGHT_DIR", Path(td) / "inflight"), mock.patch(
+                "clauder_workbench.inflight.ARCHIVE_DIR", Path(td) / "inflight" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                reg = parser.parse_args(["async-guard", "register-job", "--task-key", "task-a", "--job-id", "job123"])
+                self.assertEqual(cmd_async_guard(reg), 3)
+
+    def test_async_guard_register_requires_job_id(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch("clauder_workbench.inflight.INFLIGHT_DIR", Path(td) / "inflight"), mock.patch(
+                "clauder_workbench.inflight.ARCHIVE_DIR", Path(td) / "inflight" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                pre = parser.parse_args(["async-guard", "pre-submit", "--task-key", "task-a"])
+                self.assertEqual(cmd_async_guard(pre), 0)
+                reg = parser.parse_args(["async-guard", "register-job", "--task-key", "task-a"])
+                self.assertEqual(cmd_async_guard(reg), 3)
+
+    def test_cold_start_retry_succeeds_on_second_attempt(self) -> None:
+        calls = {"n": 0}
+
+        async def fake(timeout: float) -> dict[str, object]:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"ok": False, "reason": "TimeoutError: cold start"}
+            return {"ok": True}
+
+        result = _retry_if_cold_timeout(fake, timeout=1, retries=1)
+        self.assertTrue(result["ok"])
+        self.assertEqual(calls["n"], 2)
+        self.assertTrue(result["cold_start_retried"])
+
+    def test_cold_start_retry_does_not_retry_non_timeout(self) -> None:
+        calls = {"n": 0}
+
+        async def fake(timeout: float) -> dict[str, object]:
+            calls["n"] += 1
+            return {"ok": False, "reason": "ValueError: bad config"}
+
+        result = _retry_if_cold_timeout(fake, timeout=1, retries=1)
+        self.assertFalse(result["ok"])
+        self.assertEqual(calls["n"], 1)
+
+    def test_completion_check_p5_rejects_wrong_task_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            gate = build_evidence("resource_gate", "increase_by_1", task_key="task-a")
+            gate_path = write_evidence(gate, evidence_dir=Path(td))
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "completion-check",
+                    "--mode",
+                    "formal",
+                    "--policy",
+                    "strict",
+                    "--task-key",
+                    "task-b",
+                    "--require-resource-gate",
+                    "--parent-evidence",
+                    str(gate_path),
+                ]
+            )
+            with mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))), mock.patch(
+                "clauder_workbench.cli.load_inflight", lambda task_key: None
+            ):
+                self.assertEqual(cmd_completion_check(args), 5)
+
+    def test_completion_check_requires_job_complete_when_requested(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["completion-check", "--mode", "formal", "--policy", "strict", "--task-key", "task-a", "--require-job-complete"])
+        with mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))), mock.patch(
+            "clauder_workbench.cli.load_inflight", lambda task_key: None
+        ):
+            self.assertEqual(cmd_completion_check(args), 5)
+
+    def test_completion_check_p6_rejects_small_rdata(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x.RData"
+            p.write_bytes(b"x")
+            parser = build_parser()
+            args = parser.parse_args(["completion-check", "--mode", "formal", "--policy", "strict", "--require-file", f"rdata::{p}"])
+            with mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))), mock.patch(
+                "clauder_workbench.cli.load_inflight", lambda task_key: None
+            ):
+                self.assertEqual(cmd_completion_check(args), 5)
+
+    def test_completion_check_passes_with_complete_job_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            parent = build_evidence("async_guard", "PASS", task_key="task-a", extra={"archived_path": "archive.json"})
+            parent_path = write_evidence(parent, evidence_dir=Path(td))
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "completion-check",
+                    "--mode",
+                    "formal",
+                    "--policy",
+                    "strict",
+                    "--task-key",
+                    "task-a",
+                    "--require-job-complete",
+                    "--parent-evidence",
+                    str(parent_path),
+                ]
+            )
+            with mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))), mock.patch(
+                "clauder_workbench.cli.load_inflight", lambda task_key: None
+            ):
+                self.assertEqual(cmd_completion_check(args), 0)
 
 
 if __name__ == "__main__":

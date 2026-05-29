@@ -9,7 +9,8 @@ Use `execute_r_async` for long-running model fitting, bootstrap, simulation, lar
 - Treat `running` as normal.
 - Do not resubmit the same code unless there is a real error or intentional change.
 - Add `clauder_progress(stage, message)` at meaningful milestones.
-- Before submitting formal long work, record an `async-guard submit` evidence entry with `--io-mode`.
+- Before submitting formal long work, run `async-guard pre-submit` with the task key and `--io-mode`.
+- Immediately after the approved agent transport returns a real job id, run `async-guard register-job --job-id <real_job_id>`.
 - For large RData/model jobs, use `--io-mode durable_files`; do not marshal large model objects through async `outputs`.
 
 Example R code inside an async job:

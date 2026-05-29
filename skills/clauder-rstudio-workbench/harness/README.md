@@ -22,7 +22,7 @@ clauder-workbench doctor
 - `transport-classify`: native MCP / MCP stdio / HTTP / Rscript boundary.
 - `preflight`: records three-layer preflight evidence.
 - `connect`: records connection route classification.
-- `async-guard`: submit/list/complete/cancel guard with in-flight registry.
+- `async-guard`: pre-submit/register-job/list/complete/cancel guard with in-flight registry.
 - `resource-gate`: advise/enforce dynamic concurrency.
 - `completion-check`: validates artifacts, evidence, and policy rules.
 
@@ -43,6 +43,17 @@ probes where possible. Agent-supplied flags are diagnostic hints only unless
 `resource-gate enforce` permits increasing concurrency only when memory is below
 85%, disk I/O is not blocked, Rterm/RStudio/MCP are responsive, and durable
 output is still advancing.
+
+## Async Guard Hook
+
+```powershell
+.\run.ps1 async-guard pre-submit --task-key <task> --io-mode durable_files
+# Submit the actual job through the approved agent transport.
+.\run.ps1 async-guard register-job --task-key <task> --job-id <real_job_id>
+```
+
+`submit --via-mcp-stdio --code-file <R>` is available only for diagnostic MCP
+stdio workflows. It must not be labeled as native wrapper execution.
 
 ## Completion Contract Examples
 

@@ -31,6 +31,16 @@ The harness writes JSON evidence under `<USER_HOME>\.clauder_workbench\evidence`
 
 Formal completion must pass `completion-check`. Completion evidence can be supplied through `--contract task.yaml` or CLI flags such as `--require-file`, `--require-transport-class`, `--require-preflight`, `--state-file`, and `--require-resource-gate`.
 
+For async long jobs, use the two-step hook:
+
+```powershell
+.\harness\run.ps1 async-guard pre-submit --task-key <task> --io-mode durable_files
+# agent performs the real execute_r_async call through its approved transport
+.\harness\run.ps1 async-guard register-job --task-key <task> --job-id <real_job_id>
+```
+
+`async-guard submit --via-mcp-stdio --code-file <R>` is diagnostic MCP stdio mode only. Do not report it as native `mcp__r_studio__` wrapper execution.
+
 ### Transport Evidence Boundary
 
 - Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
@@ -74,4 +84,4 @@ Formal completion must pass `completion-check`. Completion evidence can be suppl
 
 ## Compatible Release
 
-This skill release `v0.2.0` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.2.1` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.

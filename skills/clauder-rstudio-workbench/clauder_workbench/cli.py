@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ from .config import (
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, write_evidence
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
-from .mcp_client import EXPECTED_R_STUDIO_TOOLS, list_tools
+from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke
 from .resource import decide_resource_gate
 from .transport import (
     classify_transport,
@@ -157,20 +158,28 @@ def cmd_tool_surface(args: argparse.Namespace) -> int:
 def cmd_preflight(args: argparse.Namespace) -> int:
     parents = args.parent_evidence or []
     transport_class = args.transport_class
+    preflight_result: dict[str, Any] | None = None
     if not transport_class:
-        transport_class, _ = classify_transport(
-            native_ok=args.native_ok,
-            mcp_stdio_ok=args.mcp_stdio_ok,
-            native_required=args.native_required,
-            allow_agent_hints=args.allow_agent_hints,
-            probe_stdio=args.probe_mcp_stdio,
-            probe_http=args.probe_http,
-            probe_rscript=args.probe_rscript,
-            timeout=args.timeout,
-        )
-    reasons = ["preflight evidence recorded"]
+        if args.probe_mcp_stdio:
+            preflight_result = preflight_smoke(session_name=args.session_name, timeout=args.timeout, async_poll_attempts=args.async_poll_attempts)
+            transport_class = "MCP_STDIO_OK" if preflight_result.get("ok") else "BLOCKED"
+        else:
+            transport_class, _ = classify_transport(
+                native_ok=args.native_ok,
+                mcp_stdio_ok=args.mcp_stdio_ok,
+                native_required=args.native_required,
+                allow_agent_hints=args.allow_agent_hints,
+                probe_stdio=False,
+                probe_http=args.probe_http,
+                probe_rscript=args.probe_rscript,
+                timeout=args.timeout,
+            )
+    reasons = ["preflight evidence recorded"] if preflight_result is None else [preflight_result.get("reason") or "MCP stdio preflight completed"]
     exit_code = PASS
     decision = "PASS"
+    if preflight_result is not None and not preflight_result.get("ok"):
+        decision = "BLOCK"
+        exit_code = TRANSPORT_UNSTABLE
     if args.native_required and transport_class != "NATIVE_MCP_OK":
         decision = "BLOCK"
         exit_code = TRANSPORT_UNSTABLE
@@ -188,6 +197,7 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         extra={
             "expected_layers": ["list_sessions/connect_session", "execute_r smoke", "execute_r_async/get_async_result smoke"],
             "native_required": args.native_required,
+            "preflight_result": preflight_result,
             "note": "Native wrapper calls occur in the active agent tool layer; this harness independently probes MCP stdio/HTTP/Rscript unless native evidence is supplied.",
         },
     )
@@ -265,9 +275,55 @@ def cmd_async_guard(args: argparse.Namespace) -> int:
         )
         return emit(doc)
 
+    if args.action == "register-job":
+        existing = load_inflight(task_key)
+        policy_violations: list[str] = []
+        reasons: list[str] = []
+        if not existing:
+            policy_violations.append("REGISTER-JOB-WITHOUT-PRESUBMIT")
+            reasons.append(f"no pre-submit record found for task_key={task_key}")
+        if not args.job_id:
+            policy_violations.append("REGISTER-JOB-MISSING-JOB-ID")
+            reasons.append("register-job requires --job-id from the actual execute_r_async response")
+        if policy_violations:
+            doc = build_evidence(
+                "async_guard",
+                "BLOCK",
+                reasons=reasons,
+                task_key=task_key,
+                job_id=args.job_id,
+                policy_violations=policy_violations,
+                exit_code=BLOCK,
+                extra={"existing": existing},
+            )
+            return emit(doc)
+        existing = existing or {}
+        existing.update(
+            {
+                "job_id": args.job_id,
+                "status": "inflight",
+                "registered_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "registration_transport": args.transport_scope,
+            }
+        )
+        write_inflight(task_key, existing)
+        doc = build_evidence(
+            "async_guard",
+            "PASS",
+            reasons=["registered real async job_id for pre-submitted task"],
+            task_key=task_key,
+            session_name=args.session_name,
+            job_id=args.job_id,
+            io_mode=existing.get("io_mode"),
+            exit_code=PASS,
+            extra={"inflight": existing},
+        )
+        return emit(doc)
+
     existing = load_inflight(task_key)
     policy_violations: list[str] = []
     reasons: list[str] = []
+    job_id = args.job_id
     if args.io_mode == "durable_files" and args.outputs and not args.allow_large_outputs:
         policy_violations.append("P2 BIG-MODEL-LARGE-OUTPUTS")
         reasons.append("durable_files mode cannot marshal outputs unless --allow-large-outputs is explicit")
@@ -284,19 +340,45 @@ def cmd_async_guard(args: argparse.Namespace) -> int:
     else:
         exit_code = PASS
         decision = "PASS"
-        reasons.append("async submit is allowed by guard")
-        write_inflight(
-            task_key,
-            {
-                "task_key": task_key,
-                "job_id": args.job_id,
-                "status": "inflight",
-                "io_mode": args.io_mode,
-                "outputs": args.outputs or [],
-                "session_name": args.session_name,
-                "transport_scope": args.transport_scope,
-            },
-        )
+        action_label = "pre-submit" if args.action in {"pre-submit", "submit"} else args.action
+        reasons.append(f"async {action_label} is allowed by guard")
+        status = "pre_submitted"
+        job_id = args.job_id
+        via_mcp_stdio_result = None
+        if args.via_mcp_stdio:
+            if not args.code_file:
+                policy_violations.append("MCP-STDIO-SUBMIT-MISSING-CODE-FILE")
+                reasons.append("--via-mcp-stdio requires --code-file")
+                exit_code = BLOCK
+                decision = "BLOCK"
+            else:
+                code = Path(args.code_file).read_text(encoding="utf-8-sig")
+                via_mcp_stdio_result = call_tool("execute_r_async", {"code": code, "outputs": args.outputs or []}, timeout=args.timeout, retries=1)
+                job_id = extract_job_id(via_mcp_stdio_result.get("text", ""))
+                if not via_mcp_stdio_result.get("ok") or not job_id:
+                    policy_violations.append("MCP-STDIO-SUBMIT-FAILED")
+                    reasons.append("diagnostic MCP stdio execute_r_async failed or returned no job_id")
+                    exit_code = BLOCK
+                    decision = "BLOCK"
+                else:
+                    status = "inflight"
+                    reasons.append("diagnostic MCP stdio execute_r_async submitted a job")
+        if decision == "PASS":
+            write_inflight(
+                task_key,
+                {
+                    "task_key": task_key,
+                    "job_id": job_id,
+                    "status": status,
+                    "io_mode": args.io_mode,
+                    "outputs": args.outputs or [],
+                    "session_name": args.session_name,
+                    "transport_scope": args.transport_scope,
+                    "pre_submitted_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "via_mcp_stdio": args.via_mcp_stdio,
+                    "via_mcp_stdio_result": via_mcp_stdio_result,
+                },
+            )
 
     doc = build_evidence(
         "async_guard",
@@ -304,11 +386,11 @@ def cmd_async_guard(args: argparse.Namespace) -> int:
         reasons=reasons,
         task_key=task_key,
         session_name=args.session_name,
-        job_id=args.job_id,
+        job_id=job_id,
         io_mode=args.io_mode,
         policy_violations=policy_violations,
         exit_code=exit_code,
-        extra={"outputs": args.outputs or [], "force_new_job": args.force_new_job},
+        extra={"outputs": args.outputs or [], "force_new_job": args.force_new_job, "via_mcp_stdio": args.via_mcp_stdio},
     )
     return emit(doc)
 
@@ -394,6 +476,74 @@ def _load_contract(path: str | None) -> dict[str, Any]:
     return data
 
 
+def _parse_utc(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _fresh_enough(doc: dict[str, Any], max_age_min: float | None) -> bool:
+    if max_age_min is None:
+        return True
+    ts = _parse_utc(str(doc.get("timestamp_utc") or ""))
+    if ts is None:
+        return False
+    age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
+    return age_min <= max_age_min
+
+
+def _matching_task(doc: dict[str, Any], task_key: str | None) -> bool:
+    if not task_key:
+        return True
+    return doc.get("task_key") == task_key
+
+
+def _resource_gate_ok(parent_docs: list[dict[str, Any]], task_key: str | None, max_age_min: float | None) -> bool:
+    return any(
+        doc.get("harness_name") == "resource_gate"
+        and doc.get("decision") == "increase_by_1"
+        and _matching_task(doc, task_key)
+        and _fresh_enough(doc, max_age_min)
+        for doc in parent_docs
+    )
+
+
+def _job_complete_ok(parent_docs: list[dict[str, Any]], task_key: str | None) -> bool:
+    return any(
+        doc.get("harness_name") == "async_guard"
+        and _matching_task(doc, task_key)
+        and doc.get("decision") == "PASS"
+        and (
+            "archived_path" in (doc.get("extra") or {})
+            or any("archived in-flight record" in str(reason) for reason in doc.get("reasons", []))
+        )
+        for doc in parent_docs
+    )
+
+
+def _p6_durable_violations(requirements: list[dict[str, Any]], artifact_checks: list[dict[str, Any]]) -> list[str]:
+    violations: list[str] = []
+    for req, check in zip(requirements, artifact_checks):
+        path = Path(req["path"])
+        kind = str(req.get("kind") or "file").lower()
+        options = req.get("options", {})
+        reason = str(check.get("reason") or "")
+        if any(marker in reason for marker in ["outside required output_root", "stale:", "missing:"]):
+            violations.append(reason)
+            continue
+        if not path.exists():
+            continue
+        if kind not in {"validation", "manifest", "csv_rows", "gt_errors_empty", "empty_ok"}:
+            min_bytes = int(options.get("min_bytes", 1024))
+            size = path.stat().st_size
+            if size < min_bytes:
+                violations.append(f"{path} is below durable size threshold: {size} < {min_bytes} bytes")
+    return violations
+
+
 def cmd_completion_check(args: argparse.Namespace) -> int:
     contract = _load_contract(args.contract)
     contract_require_files = contract.get("require_file") or contract.get("require_files") or []
@@ -434,17 +584,28 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
         except Exception as exc:
             policy_violations.append("P3 RDATA-INCOMPLETE-READ")
             reasons.append(f"state file could not be read: {exc}")
+    require_job_complete = args.require_job_complete or bool(contract.get("require_job_complete"))
+    if require_job_complete and not _job_complete_ok(parent_docs, args.task_key):
+        policy_violations.append("P3 RDATA-INCOMPLETE-READ")
+        reasons.append("required async job completion evidence is missing")
     if args.task_key and load_inflight(args.task_key):
         policy_violations.append("P4 RESUBMIT-AFTER-TRANSIENT")
         reasons.append("task still has an active in-flight record")
     require_resource_gate = args.require_resource_gate or bool(contract.get("require_resource_gate"))
     if require_resource_gate:
-        gate_ok = any(doc.get("harness_name") == "resource_gate" and doc.get("decision") == "increase_by_1" for doc in parent_docs)
+        max_age_min = args.resource_gate_max_age_min
+        if contract.get("resource_gate_max_age_min") is not None:
+            max_age_min = float(contract["resource_gate_max_age_min"])
+        gate_ok = _resource_gate_ok(parent_docs, args.task_key, max_age_min)
         if not gate_ok:
             policy_violations.append("P5 CONCURRENCY-WITHOUT-GATE")
-            reasons.append("resource_gate increase_by_1 evidence is missing")
-    if requirements and not artifacts["ok"]:
+            reasons.append("fresh matching resource_gate increase_by_1 evidence is missing")
+    p6_violations = _p6_durable_violations(requirements, artifacts["checks"])
+    if p6_violations:
         policy_violations.append("P6 COMPLETION-WITHOUT-DURABLE")
+        reasons.extend(p6_violations)
+    elif requirements and not artifacts["ok"]:
+        policy_violations.append("ARTIFACT-CONTRACT-FAILED")
 
     policy = args.policy
     if policy == "auto":
@@ -521,6 +682,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--probe-http", action=argparse.BooleanOptionalAction, default=False)
     p.add_argument("--probe-rscript", action=argparse.BooleanOptionalAction, default=False)
     p.add_argument("--timeout", type=float, default=20.0)
+    p.add_argument("--async-poll-attempts", type=int, default=2)
     p.add_argument("--transport-class")
     p.add_argument("--pid")
     p.add_argument("--parent-evidence", nargs="*", default=[])
@@ -540,13 +702,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-attempts", type=int, default=20)
 
     p = sub.add_parser("async-guard")
-    p.add_argument("action", choices=["submit", "list", "complete", "cancel"])
+    p.add_argument("action", choices=["pre-submit", "register-job", "submit", "list", "complete", "cancel"])
     add_common_task_args(p)
     p.add_argument("--job-id")
     p.add_argument("--io-mode", choices=["marshal_small", "durable_files", "hybrid"], default="durable_files")
     p.add_argument("--outputs", nargs="*", default=[])
     p.add_argument("--allow-large-outputs", action="store_true")
     p.add_argument("--force-new-job", action="store_true")
+    p.add_argument("--via-mcp-stdio", action="store_true")
+    p.add_argument("--code-file")
+    p.add_argument("--timeout", type=float, default=30.0)
     p.add_argument("--reason")
 
     p = sub.add_parser("resource-gate")
@@ -575,6 +740,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--outputs", nargs="*", default=[])
     p.add_argument("--state-file")
     p.add_argument("--require-resource-gate", action="store_true")
+    p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
+    p.add_argument("--require-job-complete", action="store_true")
 
     return parser
 
