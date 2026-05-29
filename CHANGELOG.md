@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.4 - 2026-05-29
+
+- **HOTFIX (P0)**: Fix `install.ps1 -ConfigureCodex` corrupting `~/.codex/config.toml` on Windows installs that contain Chinese paths (e.g. `[projects.'C:\Users\...\开题报告']`). PowerShell 5.1 `Set-Content -Encoding UTF8` adds a BOM and `Get-Content -Raw` reads with ANSI/CP936, causing the Chinese path bytes to be misdecoded and the trailing `'` to be lost. Codex then fails to start with `unclosed table, expected ]`.
+- Introduce UTF-8 helpers `Read-Utf8File`, `Write-Utf8NoBom`, `Test-TomlParseable`, and `Restore-FromLatestBackup` in `install.ps1`. All `.codex/config.toml`, `INSTALL_INFO.json`, and `.copilot/mcp-config.json` writes now go through the no-BOM writer.
+- Add post-write TOML parse self-check in `Write-CodexConfig`. On parse failure, automatically restore from the most recent `config.toml.bak_*` and abort with a pointer to guide section 27.11.
+- Add `doctor --check-toml-parse` so colleagues can verify their Codex config independently without rerunning the installer.
+- Add 8 regression tests covering: UTF-8 BOM input, invalid UTF-8 bytes, Chinese paths in `[projects.'...']` entries, unclosed-table corruption, missing config, helper presence, doctor flag wiring, and installer no-BOM contract.
+- Bump evidence schema to `0.2.4`.
+- Document the incident, root cause, manual recovery, and long-term fix in guide section 27.11.
+
 ## v0.2.3 - 2026-05-29
 
 - Add ClaudeR tag-zip fallback in `install.ps1` for proxy/reset environments where GitHub smart HTTP clone fails.

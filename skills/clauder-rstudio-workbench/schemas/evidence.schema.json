@@ -17,7 +17,7 @@
     "exit_code"
   ],
   "properties": {
-    "schema_version": { "const": "0.2.3" },
+    "schema_version": { "const": "0.2.4" },
     "evidence_id": { "type": "string" },
     "parent_evidence_ids": { "type": "array", "items": { "type": "string" } },
     "task_key": { "type": ["string", "null"] },

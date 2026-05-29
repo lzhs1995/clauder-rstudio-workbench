@@ -37,6 +37,73 @@ function Write-Step($Message) {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
+# v0.2.4: UTF-8 编码安全读写助手
+# 解决：PowerShell 5.1 默认 Set-Content -Encoding UTF8 写入带 BOM；
+#       Get-Content -Raw 在 Windows 中文环境用 ANSI/CP936 读取，把 UTF-8 字节误解码。
+function Read-Utf8File($Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return "" }
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -eq 0) { return "" }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $bytes = $bytes[3..($bytes.Length - 1)]
+    }
+    return [System.Text.Encoding]::UTF8.GetString($bytes)
+}
+
+function Write-Utf8NoBom($Path, $Content) {
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $enc)
+}
+
+function Test-TomlParseable($Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    $py = $null
+    try { $py = Find-HarnessPython } catch { return $true }
+    if (-not $py -or -not (Test-Path -LiteralPath $py)) { return $true }
+    $code = @'
+import sys
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        sys.exit(0)
+with open(sys.argv[1], 'rb') as f:
+    data = f.read()
+if data.startswith(b'\xef\xbb\xbf'):
+    data = data[3:]
+try:
+    tomllib.loads(data.decode('utf-8'))
+except Exception as e:
+    sys.stderr.write("TOML parse error: " + str(e) + "\n")
+    sys.exit(2)
+'@
+    # v0.2.4: PS 5.1 把多行 -c 字符串传给 python.exe 时会因换行符截断；改用临时文件
+    $tmp = [System.IO.Path]::GetTempFileName() + ".py"
+    try {
+        [System.IO.File]::WriteAllText($tmp, $code, (New-Object System.Text.UTF8Encoding($false)))
+        & $py $tmp $Path 2>&1 | Out-Host
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
+    }
+}
+
+function Restore-FromLatestBackup($Path) {
+    $dir = Split-Path -Parent $Path
+    $name = Split-Path -Leaf $Path
+    $bakPattern = "$name.bak_*"
+    $bak = Get-ChildItem -LiteralPath $dir -Filter $bakPattern -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($bak) {
+        Copy-Item -LiteralPath $bak.FullName -Destination $Path -Force
+        Write-Warning "Restored $Path from $($bak.Name)"
+        return $bak.FullName
+    }
+    return $null
+}
+
 function Test-Executable($Command) {
     if ($Command -match '[\\/]') {
         return (Test-Path -LiteralPath $Command)
@@ -198,7 +265,7 @@ function Write-InstallInfo($Dest) {
         $pathParts = $userPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     }
     $info = [ordered]@{
-        schema_version = "0.2.3"
+        schema_version = "0.2.4"
         git_commit = (Get-GitValue -Arguments @("rev-parse", "HEAD") -Fallback "unknown")
         git_branch_or_tag = (Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Fallback "unknown")
         workbench_source_type = (Get-WorkbenchSourceType)
@@ -222,7 +289,7 @@ function Write-InstallInfo($Dest) {
     $json = $info | ConvertTo-Json -Depth 5
     Write-Host "Writing install info -> $path"
     if (-not $DryRun) {
-        Set-Content -LiteralPath $path -Value $json -Encoding UTF8
+        Write-Utf8NoBom $path $json
     }
 }
 
@@ -568,7 +635,8 @@ NO_PROXY = "127.0.0.1,localhost"
     Write-Host $block
     if ($DryRun) { return }
 
-    $content = if (Test-Path $config) { Get-Content -LiteralPath $config -Raw } else { "" }
+    # v0.2.4: 用 UTF-8 安全读写，避免 PS 5.1 默认 ANSI/CP936 读取 + BOM 写入污染中文路径
+    $content = Read-Utf8File $config
     $content = Remove-TomlSections $content @("mcp_servers.r-studio", "mcp_servers.r-studio.env")
     $content = $content.TrimEnd()
     if ($content) {
@@ -576,7 +644,18 @@ NO_PROXY = "127.0.0.1,localhost"
     } else {
         $content = $block + "`r`n"
     }
-    Set-Content -LiteralPath $config -Value $content -Encoding UTF8
+    Write-Utf8NoBom $config $content
+
+    # v0.2.4: 写后 TOML 解析自检；fail 自动回滚备份
+    if (-not (Test-TomlParseable $config)) {
+        $restored = Restore-FromLatestBackup $config
+        if ($restored) {
+            throw "Codex config.toml write produced invalid TOML; restored from backup '$restored'. See guide 27.11 for root cause and manual recovery."
+        } else {
+            throw "Codex config.toml write produced invalid TOML and no backup found. Manual recovery required; see guide 27.11."
+        }
+    }
+    Write-Host "Codex config.toml parse OK"
 }
 
 function Remove-TomlSections($Content, [string[]]$SectionNames) {
@@ -648,7 +727,7 @@ function Write-CopilotConfig {
         New-Item -ItemType Directory -Force $dir | Out-Null
     }
     if (-not (Test-Path $config) -and -not $DryRun) {
-        Set-Content -LiteralPath $config -Value "{}" -Encoding UTF8
+        Write-Utf8NoBom $config "{}"
     }
     Backup-File $config
 
@@ -671,7 +750,7 @@ function Write-CopilotConfig {
     $json = $obj | ConvertTo-Json -Depth 10
     Write-Host $json
     if (-not $DryRun) {
-        Set-Content -LiteralPath $config -Value $json -Encoding UTF8
+        Write-Utf8NoBom $config $json
     }
 }
 
