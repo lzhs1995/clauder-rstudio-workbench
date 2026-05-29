@@ -27,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.2.4 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.0 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -57,10 +57,10 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.2.4.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.2.4"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.0.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.0"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.2.4/clauder-rstudio-workbench-v0.2.4.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.0/clauder-rstudio-workbench-v0.3.0.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -203,7 +203,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.2.4
+git checkout v0.3.0
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

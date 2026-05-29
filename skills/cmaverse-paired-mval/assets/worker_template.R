@@ -70,15 +70,20 @@ write_state("init", "running", nboot = NBOOT, groups = paste(GROUPS, collapse = 
 #
 # The paired estimator MUST record, per group, a hash of the bootstrap indices
 # used for M=0 and for M=1, so pairing can be PROVEN (not assumed):
-#   boot_hash[[group]][["0"]]  and  boot_hash[[group]][["1"]]
-# These must be equal. Initialize the store the gate relies on:
+#   boot_hash[[group]][["0"]]  and  boot_hash[[group]][["1"]]   (must be equal)
+# It MUST also assemble the scientific deliverable: the controlled direct effect
+# delta (CDE at M=1 minus CDE at M=0) with full inference, per group:
+#   delta_cde[[group]] <- list(pe=, se=, ci_low=, ci_high=, pval=,
+#                              scale="difference"|"ratio", contrast="m1_minus_m0")
 boot_hash <- list()
+delta_cde <- list()
 #
 # >>> BEGIN model region: paste the original M=0 block for this mediator <<<
 #     - run cmest(..., mval = list(0), inference = "bootstrap", nboot = NBOOT)
 #       once per group under a fixed SEED;
 #     - the wrapper captures the paired M=1 result on the SAME indices;
 #     - record boot_hash[[g]][["0"]] / [["1"]] (e.g. digest of the index matrix);
+#     - compute delta_cde[[g]] from the paired per-replicate CDEs;
 #     - build `nested` as a named list over GROUPS, each with [["0"]] and [["1"]].
 # >>> END model region <<<
 
@@ -91,9 +96,14 @@ is_full_cmest <- function(x) inherits(x, "cmest")
 paired_ok <- function(g) {
   h <- boot_hash[[g]]
   is.list(h) && !is.null(h[["0"]]) && !is.null(h[["1"]]) &&
-    identical(h[["0"]], h[["1"]])
+    nzchar(as.character(h[["0"]])) && identical(h[["0"]], h[["1"]])
+}
+dcde_field <- function(g, f) {
+  d <- delta_cde[[g]]
+  if (is.list(d) && !is.null(d[[f]])) d[[f]] else NA
 }
 validation <- do.call(rbind, lapply(GROUPS, function(g) {
+  d <- delta_cde[[g]]
   data.frame(
     mediator = MEDIATOR, group = g,
     m0_is_full_cmest = is_full_cmest(nested[[g]][["0"]]),
@@ -107,10 +117,41 @@ validation <- do.call(rbind, lapply(GROUPS, function(g) {
     m0_boot_hash = if (!is.null(boot_hash[[g]][["0"]])) boot_hash[[g]][["0"]] else "",
     m1_boot_hash = if (!is.null(boot_hash[[g]][["1"]])) boot_hash[[g]][["1"]] else "",
     paired_same_bootstrap = paired_ok(g),
+    has_delta_cde = is.list(d) && length(d) > 0,
+    delta_cde_pe = dcde_field(g, "pe"),
+    delta_cde_se = dcde_field(g, "se"),
+    delta_cde_ci_low = dcde_field(g, "ci_low"),
+    delta_cde_ci_high = dcde_field(g, "ci_high"),
+    delta_cde_pval = dcde_field(g, "pval"),
+    delta_cde_scale = as.character(dcde_field(g, "scale")),
+    delta_cde_contrast = as.character(dcde_field(g, "contrast")),
     stringsAsFactors = FALSE
   )
 }))
 utils::write.csv(validation, VALIDATION_PATH, row.names = FALSE, fileEncoding = "UTF-8")
+
+# --- hard gate: stop on any scientific invariant failure (H4) ---------------
+# A "files complete but scientifically invalid" result must NOT be saved as
+# complete. If any group fails full-cmest / ref-mval 0-1 / bootstrap pairing /
+# delta_cde, write a failed state and stop BEFORE saveRDS/manifest/complete.
+invariant_fail <- character(0)
+for (g in GROUPS) {
+  r <- validation[validation$group == g, ]
+  if (!isTRUE(r$m0_is_full_cmest) || !isTRUE(r$m1_is_full_cmest))
+    invariant_fail <- c(invariant_fail, sprintf("%s: not full cmest", g))
+  if (!identical(r$m0_ref_mval, "0") || !identical(r$m1_ref_mval, "1"))
+    invariant_fail <- c(invariant_fail, sprintf("%s: ref mval not 0/1", g))
+  if (!isTRUE(r$paired_same_bootstrap))
+    invariant_fail <- c(invariant_fail, sprintf("%s: bootstrap not paired", g))
+  if (!isTRUE(r$has_delta_cde) || is.na(r$delta_cde_pe) || is.na(r$delta_cde_se) ||
+      is.na(r$delta_cde_pval))
+    invariant_fail <- c(invariant_fail, sprintf("%s: delta_cde missing/incomplete", g))
+}
+if (length(invariant_fail) > 0) {
+  write_state("validate", "failed", failures = paste(invariant_fail, collapse = "; "))
+  stop(sprintf("Scientific validation failed; not saving complete result:\n%s",
+               paste(invariant_fail, collapse = "\n")))
+}
 
 # --- save full nested object ------------------------------------------------
 write_state("save", "running")

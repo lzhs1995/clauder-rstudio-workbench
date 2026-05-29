@@ -67,6 +67,19 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
    clauder-workbench fanout-run --contract task.yaml --max-parallel 7 --first-artifact-timeout-min 15
    ```
 
+   > `fanout-run` submits and polls the workers itself **through the Python MCP
+   > stdio client** (its evidence is stamped `MCP_STDIO_OK`). It does **not** drive
+   > the agent's native `mcp__r_studio__` wrapper. If a task must be proven over the
+   > agent's native MCP transport, use the **native path** instead of `fanout-run`:
+   > `fanout-plan` (emit per-worker submit codes) → submit each via the native
+   > wrapper → `async-guard register-job` (record each real `job_id`) → `fanout-poll`
+   > → `merge-gate`. `fanout-run --transport native-wrapper` deliberately BLOCKs and
+   > points here, so it can never silently masquerade as a native submission.
+   >
+   > `--max-parallel` is a **fixed, manually chosen** ceiling for this run. The
+   > harness does not auto-scale concurrency up or down mid-run; pick it from a
+   > resource probe (step 5) and re-run with a different value if needed.
+
 4. **Validate** every mediator x group result before claiming success:
 
    ```powershell

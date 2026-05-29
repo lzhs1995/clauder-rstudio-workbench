@@ -18,6 +18,7 @@
   ],
   "properties": {
     "schema_version": { "const": "0.2.4" },
+    "producer_version": { "type": "string" },
     "evidence_id": { "type": "string" },
     "parent_evidence_ids": { "type": "array", "items": { "type": "string" } },
     "task_key": { "type": ["string", "null"] },

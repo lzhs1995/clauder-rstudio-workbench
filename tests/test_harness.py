@@ -188,7 +188,10 @@ class HarnessUnitTests(unittest.TestCase):
         doc = build_evidence("x", "PASS", task_key="abc", parent_evidence_ids=["p1"])
         self.assertIn("evidence_id", doc)
         self.assertEqual(doc["parent_evidence_ids"], ["p1"])
+        # evidence *format* version stays 0.2.4; package/release version is tracked
+        # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
+        self.assertEqual(doc["producer_version"], "0.3.0")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -376,12 +379,16 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("WorkbenchBinDir", text)
         self.assertIn("clauder-workbench.cmd", text)
 
-    def test_readme_quickstart_uses_v022_and_wrapper(self) -> None:
+    def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.2.4", text)
-        self.assertIn("releases/download/v0.2.4/clauder-rstudio-workbench-v0.2.4.zip", text)
+        self.assertIn("--branch v0.3.0", text)
+        self.assertIn("releases/download/v0.3.0/clauder-rstudio-workbench-v0.3.0.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
+        # The install/clone/zip/upgrade commands must not point at the old tag.
+        self.assertNotIn("--branch v0.2.4", text)
+        self.assertNotIn("git checkout v0.2.4", text)
+        self.assertNotIn("releases/download/v0.2.4/", text)
 
     def test_installer_exposes_zip_fallback_options(self) -> None:
         text = Path("install.ps1").read_text(encoding="utf-8")

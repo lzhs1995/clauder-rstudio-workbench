@@ -251,6 +251,48 @@ class FanoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _minimal_yaml(bad)
 
+    def test_fanout_run_blocks_native_wrapper_transport(self) -> None:
+        # fanout-run only submits via mcp-stdio; asking it to act as a native
+        # wrapper must BLOCK and point to the native fanout-plan path.
+        import io
+        from contextlib import redirect_stdout
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            contract = _write_contract(root)
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = cli.main(["fanout-run", "--contract", str(contract),
+                               "--transport", "native-wrapper"])
+            self.assertEqual(rc, cli.BLOCK)
+            doc = json.loads(buf.getvalue())
+            self.assertEqual(doc["decision"], "BLOCK")
+            self.assertEqual(doc["transport_class"], "BLOCKED")
+            self.assertTrue(any("native-wrapper" in r or "fanout-plan" in r
+                                for r in doc["reasons"]))
+
+
+class FanoutSchemaPackagingTests(unittest.TestCase):
+    REPO = Path(__file__).resolve().parents[1]
+    SHARED = REPO / "shared" / "schemas" / "fanout-contract.schema.json"
+    SHIPPED = (REPO / "skills" / "clauder-rstudio-workbench" / "schemas"
+               / "fanout-contract.schema.json")
+
+    def test_schema_ships_with_skill(self) -> None:
+        self.assertTrue(self.SHIPPED.exists(),
+                        "fanout-contract.schema.json must ship inside the skill so "
+                        "installed runtimes have it (installer only copies skills/).")
+
+    def test_shipped_schema_matches_shared_source(self) -> None:
+        # guard against drift between the shared source and the shipped copy
+        self.assertEqual(
+            self.SHIPPED.read_text(encoding="utf-8"),
+            self.SHARED.read_text(encoding="utf-8"),
+        )
+        # both must be valid JSON
+        json.loads(self.SHIPPED.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

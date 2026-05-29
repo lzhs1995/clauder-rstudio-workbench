@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from .config import EVIDENCE_DIR, default_agent, ensure_state_dirs, normalize_path
+from . import __version__ as PRODUCER_VERSION
 
 
+# Evidence *file format* version. Bump only when the evidence schema changes,
+# independently of the package/release version (PRODUCER_VERSION).
 SCHEMA_VERSION = "0.2.4"
 
 
@@ -55,6 +58,7 @@ def build_evidence(
 ) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
+        "producer_version": PRODUCER_VERSION,
         "evidence_id": str(uuid.uuid4()),
         "parent_evidence_ids": parent_evidence_ids or [],
         "task_key": task_key,

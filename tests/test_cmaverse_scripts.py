@@ -75,14 +75,30 @@ class MakeWorkerContractTests(unittest.TestCase):
 
 
 class CmaverseValidateTests(unittest.TestCase):
+    # full row tail: paired-bootstrap proof + delta_cde deliverable.
+    DELTA = "0.05,0.01,0.03,0.07,0.001,difference,m1_minus_m0"  # pe,se,ci_low,ci_high,pval,scale,contrast
     HEADER = ("mediator,group,m0_is_full_cmest,m1_is_full_cmest,"
               "m0_effect_n,m1_effect_n,m0_data_ncol,m1_data_ncol,"
               "m0_ref_mval,m1_ref_mval,m0_boot_hash,m1_boot_hash,"
-              "paired_same_bootstrap")
-    # legacy CSV without the pairing-proof columns
+              "paired_same_bootstrap,has_delta_cde,"
+              "delta_cde_pe,delta_cde_se,delta_cde_ci_low,delta_cde_ci_high,"
+              "delta_cde_pval,delta_cde_scale,delta_cde_contrast")
+    # paired-proof present but no delta_cde columns (exercises the delta gate)
+    NO_DELTA_HEADER = ("mediator,group,m0_is_full_cmest,m1_is_full_cmest,"
+                       "m0_effect_n,m1_effect_n,m0_data_ncol,m1_data_ncol,"
+                       "m0_ref_mval,m1_ref_mval,m0_boot_hash,m1_boot_hash,"
+                       "paired_same_bootstrap")
+    # legacy CSV without the pairing-proof or delta columns
     LEGACY_HEADER = ("mediator,group,m0_is_full_cmest,m1_is_full_cmest,"
                      "m0_effect_n,m1_effect_n,m0_data_ncol,m1_data_ncol,"
                      "m0_ref_mval,m1_ref_mval")
+
+    def _row(self, m, group, *, ncol="159,159", mval="0,1",
+             hashes="h1,h1", paired="TRUE", delta=None):
+        """Build a full validation row (with paired + delta tail)."""
+        delta = self.DELTA if delta is None else delta
+        return (f"{m},{group},TRUE,TRUE,17,17,{ncol},{mval},"
+                f"{hashes},{paired},TRUE,{delta}")
 
     def _write(self, root, mediator, rows, header=None):
         d = Path(root) / mediator
@@ -102,8 +118,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    self._row(m, "sy_female", hashes="h1,h1"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
                 ])
             r = self._run(tmp)
             self.assertEqual(r["decision"], "PASS")
@@ -114,12 +130,12 @@ class CmaverseValidateTests(unittest.TestCase):
     def test_fail_on_ncol(self):
         with tempfile.TemporaryDirectory() as tmp:
             self._write(tmp, "msat_c12_2", [
-                "msat_c12_2,sy_female,TRUE,TRUE,17,17,158,159,0,1,h1,h1,TRUE",
-                "msat_c12_2,sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                self._row("msat_c12_2", "sy_female", ncol="158,159"),
+                self._row("msat_c12_2", "sy_male", hashes="h2,h2"),
             ])
             self._write(tmp, "msat_c12_3", [
-                "msat_c12_3,sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                "msat_c12_3,sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                self._row("msat_c12_3", "sy_female"),
+                self._row("msat_c12_3", "sy_male", hashes="h2,h2"),
             ])
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -129,8 +145,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,0,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    self._row(m, "sy_female", mval="0,0"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
                 ])
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -140,8 +156,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,,1,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    self._row(m, "sy_female", mval=",1"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
                 ])
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -151,12 +167,12 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             # msat_c12_3's file contains rows tagged with the wrong mediator
             self._write(tmp, "msat_c12_2", [
-                "msat_c12_2,sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                "msat_c12_2,sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                self._row("msat_c12_2", "sy_female"),
+                self._row("msat_c12_2", "sy_male", hashes="h2,h2"),
             ])
             self._write(tmp, "msat_c12_3", [
-                "msat_c12_2,sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                "msat_c12_2,sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                self._row("msat_c12_2", "sy_female"),
+                self._row("msat_c12_2", "sy_male", hashes="h2,h2"),
             ])
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -166,8 +182,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
+                    self._row(m, "sy_female"),
+                    self._row(m, "sy_female"),
                 ])  # sy_female twice, sy_male absent
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -177,13 +193,38 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,hX,FALSE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    self._row(m, "sy_female", hashes="h1,hX", paired="FALSE"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
                 ])
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
             self.assertTrue(any("paired_same_bootstrap is not TRUE" in f
                                 for f in r["failures"]))
+
+    def test_fail_on_unequal_boot_hash(self):
+        # hashes differ but the worker still self-reported paired=TRUE: the gate
+        # must decide on the hashes, not the boolean.
+        with tempfile.TemporaryDirectory() as tmp:
+            for m in ("msat_c12_2", "msat_c12_3"):
+                self._write(tmp, m, [
+                    self._row(m, "sy_female", hashes="h1,hX", paired="TRUE"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
+                ])
+            r = self._run(tmp)
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
+            self.assertTrue(any("m0_boot_hash != m1_boot_hash" in f
+                                for f in r["failures"]))
+
+    def test_fail_on_empty_boot_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for m in ("msat_c12_2", "msat_c12_3"):
+                self._write(tmp, m, [
+                    self._row(m, "sy_female", hashes=",h1"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
+                ])
+            r = self._run(tmp)
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
+            self.assertTrue(any("empty boot hash" in f for f in r["failures"]))
 
     def test_fail_on_missing_pairing_column(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -204,15 +245,50 @@ class CmaverseValidateTests(unittest.TestCase):
                     f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1",
                     f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1",
                 ], header=self.LEGACY_HEADER)
-            r = self._run(tmp, **{"no-pairing-check": True})
+            # legacy CSVs lack both the pairing proof and the delta columns
+            r = self._run(tmp, **{"no-pairing-check": True, "no-delta-cde-check": True})
+            self.assertEqual(r["decision"], "PASS")
+            self.assertTrue(r["weak_validation"])
+
+    def test_fail_on_missing_delta_cde(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for m in ("msat_c12_2", "msat_c12_3"):
+                self._write(tmp, m, [
+                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
+                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                ], header=self.NO_DELTA_HEADER)
+            r = self._run(tmp)
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
+            self.assertTrue(any("missing has_delta_cde" in f for f in r["failures"]))
+
+    def test_fail_on_nonnumeric_delta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for m in ("msat_c12_2", "msat_c12_3"):
+                self._write(tmp, m, [
+                    self._row(m, "sy_female",
+                              delta="NA,0.01,0.03,0.07,0.001,difference,m1_minus_m0"),
+                    self._row(m, "sy_male", hashes="h2,h2"),
+                ])
+            r = self._run(tmp)
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
+            self.assertTrue(any("delta_cde_pe not numeric" in f for f in r["failures"]))
+
+    def test_no_delta_cde_check_weak(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for m in ("msat_c12_2", "msat_c12_3"):
+                self._write(tmp, m, [
+                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
+                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                ], header=self.NO_DELTA_HEADER)
+            r = self._run(tmp, **{"no-delta-cde-check": True})
             self.assertEqual(r["decision"], "PASS")
             self.assertTrue(r["weak_validation"])
 
     def test_missing_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             self._write(tmp, "msat_c12_2", [
-                "msat_c12_2,sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                "msat_c12_2,sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                self._row("msat_c12_2", "sy_female"),
+                self._row("msat_c12_2", "sy_male", hashes="h2,h2"),
             ])
             r = self._run(tmp)  # msat_c12_3 missing
             self.assertEqual(r["exit_code"], cma_validate.EXIT_MISSING)
@@ -222,7 +298,7 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
+                    self._row(m, "sy_female"),
                 ])  # sy_male row absent
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -232,8 +308,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,99,99,1,1,0,1,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,99,99,1,1,0,1,h2,h2,TRUE",
+                    self._row(m, "sy_female", ncol="1,1"),
+                    self._row(m, "sy_male", ncol="1,1", hashes="h2,h2"),
                 ])
             r = self._run(tmp, **{"no-count-check": True})
             self.assertEqual(r["decision"], "PASS")

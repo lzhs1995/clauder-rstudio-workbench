@@ -21,16 +21,27 @@ The worker also **records these into `validation_<mediator>.csv`**, and
 - `m0_effect_n`, `m1_effect_n` == 17;
 - `m0_data_ncol`, `m1_data_ncol` == 159;
 - `m0_ref_mval` == 0, `m1_ref_mval` == 1;
-- `paired_same_bootstrap` == TRUE — the core invariant: M=0 and M=1 used the
-  **same** bootstrap indices (proven by equal `m0_boot_hash`/`m1_boot_hash`),
-  not two independent resamples.
+- **boot-hash equality** — the core invariant: `m0_boot_hash` and `m1_boot_hash`
+  must both be present, non-empty, and **equal** for every row. This proves M=0
+  and M=1 used the **same** bootstrap indices rather than two independent
+  resamples. The self-reported `paired_same_bootstrap` boolean is treated only as
+  an auxiliary signal; the gate decides on the hashes themselves, so a worker
+  cannot pass by asserting `paired_same_bootstrap=TRUE` without matching hashes.
+- **delta_cde deliverable** — the skill's whole point is the paired controlled
+  direct effect *difference*. Every row must carry `has_delta_cde` (TRUE) and a
+  full inference set: `delta_cde_pe`, `delta_cde_se`, `delta_cde_ci_low`,
+  `delta_cde_ci_high`, `delta_cde_pval` (all numeric) plus non-empty
+  `delta_cde_scale` / `delta_cde_contrast`. Missing or non-numeric delta inference
+  fails the gate. `--no-delta-cde-check` relaxes this but marks the run
+  `weak_validation` (not for formal success claims).
 
 The 17-effect and 159-column figures are case-study specific (new4.7 data). When
 porting to another dataset/version, recompute the expected effect count and
 column count from one known-good native `cmest` object and pass them via
 `--expected-effects` / `--expected-ncol`. Prefer that over `--no-count-check`,
 which relaxes the gate and marks the result `weak_validation` (not for formal
-success claims).
+success claims). `--no-pairing-check` and `--no-delta-cde-check` likewise
+downgrade the run to `weak_validation`.
 
 ## Row-count expectations
 
