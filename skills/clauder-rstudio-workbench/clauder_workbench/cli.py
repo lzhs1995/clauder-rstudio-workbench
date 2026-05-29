@@ -26,8 +26,16 @@ from .config import (
     python_command,
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, write_evidence
+from .fanout import (
+    build_submit_code,
+    load_fanout_contract,
+    merge_gate,
+    plan_fanout,
+    poll_once,
+    run_fanout,
+)
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
-from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke
+from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
 from .resource import decide_resource_gate
 from .transport import (
     classify_transport,
@@ -724,6 +732,170 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     return emit(doc)
 
 
+def cmd_fanout_plan(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    plan = plan_fanout(contract, advise_parallel=not args.no_advise)
+    submit_codes = {}
+    for worker in contract.get("workers") or []:
+        if isinstance(worker, dict) and worker.get("id"):
+            try:
+                submit_codes[worker["id"]] = build_submit_code(worker)
+            except Exception as exc:
+                submit_codes[worker["id"]] = f"<error: {exc}>"
+    exit_code = PASS if plan["ok"] else CONTRACT_FAILED
+    decision = "PASS" if plan["ok"] else "CONTRACT_FAILED"
+    reasons = plan["problems"] or [
+        f"{plan['worker_count']} workers planned; recommended start parallel={plan['recommended_max_parallel']} ({plan['advice_reason']})"
+    ]
+    doc = build_evidence(
+        "fanout_plan",
+        decision,
+        reasons=reasons,
+        task_key=plan["task_key"],
+        exit_code=exit_code,
+        extra=plan | {"submit_codes": submit_codes, "contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_fanout_run(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    transport = (args.transport or contract.get("transport") or "mcp-stdio").lower()
+    if transport != "mcp-stdio":
+        doc = build_evidence(
+            "fanout_run",
+            "BLOCK",
+            reasons=[
+                f"fanout-run only submits via mcp-stdio (got transport={transport}). "
+                "For native-wrapper, use fanout-plan to emit submit codes, submit them via the native "
+                "mcp__r_studio__ wrapper, record job_ids with async-guard register-job, then use fanout-poll/merge-gate."
+            ],
+            task_key=contract.get("task_key"),
+            transport_class="BLOCKED",
+            exit_code=BLOCK,
+            extra={"transport": transport, "contract": str(args.contract)},
+        )
+        return emit(doc)
+
+    session_name = args.session_name or contract.get("session_name") or ""
+    poll_interval = float(args.poll_interval_sec or contract.get("poll_interval_sec") or 30.0)
+    job_timeout = float(args.job_timeout_min or contract.get("job_timeout_min") or 180.0)
+    task_key = contract.get("task_key") or "fanout"
+
+    if args.dry_run:
+        plan = plan_fanout(contract, advise_parallel=True)
+        doc = build_evidence(
+            "fanout_run",
+            "PASS" if plan["ok"] else "CONTRACT_FAILED",
+            reasons=["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
+            task_key=task_key,
+            transport_class="N/A",
+            exit_code=PASS if plan["ok"] else CONTRACT_FAILED,
+            extra=plan | {"dry_run": True, "contract": str(args.contract)},
+        )
+        return emit(doc)
+
+    def submit_fn(code: str) -> dict[str, Any]:
+        return submit_async(session_name, code, timeout=args.submit_timeout)
+
+    def register_fn(worker_id: str, job_id: str) -> None:
+        write_inflight(
+            f"{task_key}:{worker_id}",
+            {
+                "task_key": f"{task_key}:{worker_id}",
+                "fanout_task_key": task_key,
+                "worker_id": worker_id,
+                "job_id": job_id,
+                "session_name": session_name,
+                "transport_class": "MCP_STDIO_OK",
+                "registered_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            },
+        )
+
+    result = run_fanout(
+        contract,
+        submit_fn=submit_fn,
+        max_parallel=args.max_parallel,
+        poll_interval_sec=poll_interval,
+        job_timeout_min=job_timeout,
+        first_artifact_timeout_min=args.first_artifact_timeout_min,
+        reuse_existing=args.reuse_existing,
+        register_fn=register_fn,
+        max_iterations=args.max_iterations,
+    )
+    for wid in result.get("done", []):
+        archive_inflight(f"{task_key}:{wid}", "worker complete")
+    exit_code = PASS if result["ok"] else BLOCK
+    decision = "PASS" if result["ok"] else "BLOCK"
+    worker_total = len([w for w in (contract.get("workers") or []) if isinstance(w, dict)])
+    reasons = [
+        f"done={len(result.get('done', []))}/{worker_total} workers; "
+        f"failed={result.get('failed')}; pending={result.get('pending')}; "
+        f"still_running={result.get('still_running')}; max_parallel={result.get('max_parallel')}"
+    ]
+    doc = build_evidence(
+        "fanout_run",
+        decision,
+        reasons=reasons,
+        task_key=task_key,
+        transport_class=result.get("transport_class", "MCP_STDIO_OK"),
+        session_name=session_name,
+        exit_code=exit_code,
+        extra=result | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_fanout_poll(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    poll = poll_once(contract)
+    exit_code = PASS if poll["all_complete"] else WARN
+    decision = "PASS" if poll["all_complete"] else "WARN"
+    reasons = [
+        f"done={len(poll['done'])}/{poll['worker_count']}; pending={poll['pending']}"
+    ]
+    doc = build_evidence(
+        "fanout_poll",
+        decision,
+        reasons=reasons,
+        task_key=contract.get("task_key"),
+        exit_code=exit_code,
+        extra=poll | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_merge_gate(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    gate = merge_gate(contract)
+    artifact_paths: list[str] = []
+    for s in gate["statuses"]:
+        for key in ("expected_manifest", "expected_validation"):
+            p = s["files"].get(key, {}).get("path")
+            if p:
+                artifact_paths.append(p)
+    if gate["ok"]:
+        exit_code, decision = PASS, "PASS"
+    elif gate["all_complete"]:
+        exit_code, decision = BLOCK, "BLOCK"
+    else:
+        exit_code, decision = CONTRACT_FAILED, "CONTRACT_FAILED"
+    reasons = gate["violations"] or [
+        f"all {gate['worker_count']} workers complete with manifest+validation present"
+    ]
+    doc = build_evidence(
+        "merge_gate",
+        decision,
+        reasons=reasons,
+        task_key=contract.get("task_key"),
+        artifact_paths=artifact_paths,
+        policy_violations=gate["violations"],
+        exit_code=exit_code,
+        extra=gate | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
 def add_common_task_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--task-key")
     parser.add_argument("--project-root", default="")
@@ -831,6 +1003,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
     p.add_argument("--require-job-complete", action="store_true")
 
+    p = sub.add_parser("fanout-plan")
+    p.add_argument("--contract", required=True)
+    p.add_argument("--no-advise", action="store_true",
+                   help="Skip memory-based parallelism advice; only validate the contract.")
+
+    p = sub.add_parser("fanout-run")
+    p.add_argument("--contract", required=True)
+    p.add_argument("--transport", choices=["mcp-stdio", "native-wrapper"], default=None)
+    p.add_argument("--session-name", default="")
+    p.add_argument("--max-parallel", type=int)
+    p.add_argument("--poll-interval-sec", type=float)
+    p.add_argument("--job-timeout-min", type=float)
+    p.add_argument("--first-artifact-timeout-min", type=float,
+                   help="Fail a worker that produces no output file within this many minutes (detects silent R death).")
+    p.add_argument("--reuse-existing", action="store_true",
+                   help="Resume: treat already-complete worker outputs as done and skip resubmission. "
+                        "Default off (always resubmits this run and only counts fresh outputs).")
+    p.add_argument("--submit-timeout", type=float, default=60.0)
+    p.add_argument("--max-iterations", type=int)
+    p.add_argument("--dry-run", action="store_true",
+                   help="Validate contract and report plan without submitting any jobs.")
+
+    p = sub.add_parser("fanout-poll")
+    p.add_argument("--contract", required=True)
+
+    p = sub.add_parser("merge-gate")
+    p.add_argument("--contract", required=True)
+
     return parser
 
 
@@ -854,6 +1054,14 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_resource_gate(args)
         if args.cmd == "completion-check":
             return cmd_completion_check(args)
+        if args.cmd == "fanout-plan":
+            return cmd_fanout_plan(args)
+        if args.cmd == "fanout-run":
+            return cmd_fanout_run(args)
+        if args.cmd == "fanout-poll":
+            return cmd_fanout_poll(args)
+        if args.cmd == "merge-gate":
+            return cmd_merge_gate(args)
     except KeyboardInterrupt:
         raise
     except Exception as exc:

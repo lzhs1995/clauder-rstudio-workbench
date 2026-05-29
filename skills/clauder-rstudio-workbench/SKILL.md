@@ -7,11 +7,14 @@ description: Use when an agent needs to connect to a live RStudio session throug
 
 This skill is the operating protocol for using ClaudeR as a live RStudio workbench from Codex, Claude Code, GitHub Copilot CLI, or another MCP-capable agent. It is not a statistics reference; combine it with an R analysis skill for modeling decisions.
 
+> **Headline capability:** async polling lets one RStudio session drive N child R worker processes at once and merge the results autonomously. See [parallel-async-fanout.md](references/parallel-async-fanout.md) and the Parallel Async Fan-out section below.
+
 ## First Reads
 
 - Before formal long-running RStudio work, run the executable harness layer below. Markdown is advisory; harness evidence is the completion gate.
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
+- For running many parallel R workers from one session, read [parallel-async-fanout.md](references/parallel-async-fanout.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
 
@@ -41,6 +44,19 @@ For async long jobs, use the two-step hook:
 ```
 
 `async-guard submit --via-mcp-stdio --code-file <R>` is diagnostic MCP stdio mode only. Do not report it as native `mcp__r_studio__` wrapper execution.
+
+### Parallel Async Fan-out
+
+Run many independent R workers from one RStudio session and gate the autonomous merge. Each worker writes `state_<id>.json`, `manifest_<id>.csv`, and `validation_<id>.csv` into `output_root`; the harness polls those durable files. Full contract schema and rules are in [parallel-async-fanout.md](references/parallel-async-fanout.md).
+
+```powershell
+.\harness\run.ps1 fanout-plan --contract task.yaml                          # validate + parallelism advice
+.\harness\run.ps1 fanout-run  --contract task.yaml --max-parallel 3 --first-artifact-timeout-min 10
+.\harness\run.ps1 fanout-poll --contract task.yaml                          # for native-wrapper submissions
+.\harness\run.ps1 merge-gate  --contract task.yaml                          # final all-workers-complete gate
+```
+
+`fanout-run` submits via an independent Python MCP stdio client and labels evidence `MCP_STDIO_OK`; it BLOCKs `--transport native-wrapper`. For native-wrapper fan-out, use `fanout-plan` to emit each worker's submit code, submit it via your own wrapper, record real job ids with `async-guard register-job`, then poll with `fanout-poll`/`merge-gate`. Stale prior-run outputs do not count unless you pass `--reuse-existing` (resume) or the worker output is within `artifacts.max_age_h`.
 
 ### Transport Evidence Boundary
 
@@ -85,4 +101,9 @@ For async long jobs, use the two-step hook:
 
 ## Compatible Release
 
-This skill release `v0.2.3` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.2.4` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+
+Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
+`<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
+non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
+without BOM and validates TOML after writing.

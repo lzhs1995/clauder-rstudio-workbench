@@ -9,6 +9,10 @@ description = "Executable harnesses for ClaudeR RStudio workbench discipline"
 requires-python = ">=3.10"
 dependencies = ["mcp>=1.0"]
 
+[project.optional-dependencies]
+fanout = ["pyyaml>=6", "psutil>=5.9"]
+dev = ["pyyaml>=6", "psutil>=5.9"]
+
 [project.scripts]
 clauder-workbench = "clauder_workbench.cli:main"
 

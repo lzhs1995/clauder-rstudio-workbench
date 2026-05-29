@@ -222,3 +222,37 @@ def probe_mcp_stdio(timeout: float = 20.0) -> dict[str, Any]:
     result = list_tools(timeout=timeout)
     result["transport_class"] = "MCP_STDIO_OK" if result.get("ok") else "BLOCKED"
     return result
+
+
+async def _submit_async_async(*, session_name: str, code: str, timeout: float) -> dict[str, Any]:
+    async def runner(session: Any, command: str, args: list[str]) -> dict[str, Any]:
+        steps: list[dict[str, Any]] = []
+        if session_name:
+            connect = _tool_result(
+                await session.call_tool("connect_session", {"session_name": session_name}),
+                tool_name="connect_session",
+            )
+            steps.append({"step": "connect_session", **connect})
+            if not connect["ok"]:
+                return {"ok": False, "reason": "connect_session failed", "steps": steps}
+        submit = _tool_result(await session.call_tool("execute_r_async", {"code": code}), tool_name="execute_r_async")
+        job_id = extract_job_id(submit["text"])
+        steps.append({"step": "execute_r_async", **submit, "job_id": job_id})
+        return {
+            "ok": bool(submit["ok"] and job_id),
+            "job_id": job_id,
+            "text": submit["text"],
+            "transport_class": "MCP_STDIO_OK",
+            "steps": steps,
+        }
+
+    return await _session_run(timeout, runner)
+
+
+def submit_async(session_name: str, code: str, timeout: float = 60.0, retries: int = 1) -> dict[str, Any]:
+    """在单个 MCP stdio 会话内 connect_session（可选）+ execute_r_async 提交，返回 job_id。"""
+
+    async def run(timeout: float) -> dict[str, Any]:
+        return await _submit_async_async(session_name=session_name, code=code, timeout=timeout)
+
+    return _retry_if_cold_timeout(run, timeout=timeout, retries=retries)
