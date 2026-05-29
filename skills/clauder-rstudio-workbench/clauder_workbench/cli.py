@@ -79,6 +79,47 @@ def _expected_clients(args: argparse.Namespace, install_info: dict[str, Any]) ->
     return valid or ["codex"]
 
 
+def _check_codex_toml_parseable() -> dict[str, Any]:
+    """v0.2.4: 验证 Codex config.toml 是否能成功 parse。
+    
+    防御 install.ps1 写 toml 时 BOM/编码/换行问题导致 codex 启动失败的回归。
+    返回 {"ok": bool, "path": str, "error": str (only on failure), "skipped": str (only when skipped)}
+    """
+    result: dict[str, Any] = {"path": str(CODEX_CONFIG)}
+    if not CODEX_CONFIG.exists():
+        result["ok"] = False
+        result["error"] = "config.toml does not exist"
+        return result
+    try:
+        try:
+            import tomllib  # py3.11+
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+    except ImportError:
+        result["ok"] = True
+        result["skipped"] = "no tomllib/tomli available; cannot verify"
+        return result
+    try:
+        raw = CODEX_CONFIG.read_bytes()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            result["bom_detected"] = True
+            raw = raw[3:]
+        else:
+            result["bom_detected"] = False
+        text = raw.decode("utf-8")
+        tomllib.loads(text)
+        result["ok"] = True
+        return result
+    except UnicodeDecodeError as exc:
+        result["ok"] = False
+        result["error"] = f"utf-8 decode failed: {exc}"
+        return result
+    except Exception as exc:
+        result["ok"] = False
+        result["error"] = f"toml parse failed: {exc}"
+        return result
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     reasons: list[str] = []
     warnings: list[str] = []
@@ -103,6 +144,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     if "copilot" in expected_clients and not COPILOT_CONFIG.exists():
         warnings.append(f"Copilot MCP config missing: {COPILOT_CONFIG}")
 
+    # v0.2.4: 可选 TOML parse 自检，防止 install.ps1 写坏 .codex/config.toml 后无人发现
+    toml_parse_info: dict[str, Any] = {}
+    if getattr(args, "check_toml_parse", False) and "codex" in expected_clients:
+        toml_parse_info = _check_codex_toml_parseable()
+        if not toml_parse_info.get("ok", True):
+            reasons.append(
+                f"Codex config.toml parse failed: {toml_parse_info.get('error', 'unknown')}; "
+                f"see guide section 27.11 for recovery."
+            )
+
     exit_code = BLOCK if reasons else WARN if warnings else PASS
     decision = "BLOCK" if reasons else "WARN" if warnings else "PASS"
     doc = build_evidence(
@@ -125,6 +176,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "expect_client": args.expect_client,
             "expected_clients": expected_clients,
             "discovery_sessions": discovery_sessions(),
+            "toml_parse_check": toml_parse_info,
         },
     )
     return emit(doc)
@@ -686,6 +738,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("doctor")
     p.add_argument("--expect-client", choices=["auto", "codex", "claude", "copilot", "all"], default="auto")
+    p.add_argument("--check-toml-parse", action="store_true",
+                   help="Validate that Codex config.toml parses cleanly; BLOCK if it does not.")
 
     p = sub.add_parser("transport-classify")
     p.add_argument("--native-ok", action="store_true")

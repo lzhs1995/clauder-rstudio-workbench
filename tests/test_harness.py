@@ -188,12 +188,12 @@ class HarnessUnitTests(unittest.TestCase):
         doc = build_evidence("x", "PASS", task_key="abc", parent_evidence_ids=["p1"])
         self.assertIn("evidence_id", doc)
         self.assertEqual(doc["parent_evidence_ids"], ["p1"])
-        self.assertEqual(doc["schema_version"], "0.2.3")
+        self.assertEqual(doc["schema_version"], "0.2.4")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
         self.assertTrue(schema.exists())
-        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.3")
+        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.4")
 
     def test_write_evidence_atomic_creates_json(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -378,8 +378,8 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_v022_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.2.3", text)
-        self.assertIn("releases/download/v0.2.3/clauder-rstudio-workbench-v0.2.3.zip", text)
+        self.assertIn("--branch v0.2.4", text)
+        self.assertIn("releases/download/v0.2.4/clauder-rstudio-workbench-v0.2.4.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
 
@@ -410,6 +410,88 @@ class HarnessUnitTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["doctor"])
         self.assertEqual(_expected_clients(args, {}), ["codex"])
+
+    # v0.2.4: install.ps1 UTF-8 + TOML 自检测试
+    def test_installer_has_utf8_no_bom_helpers(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("Read-Utf8File", text)
+        self.assertIn("Write-Utf8NoBom", text)
+        self.assertIn("Test-TomlParseable", text)
+        self.assertIn("Restore-FromLatestBackup", text)
+        # 显式 UTF8Encoding(false) 构造 — 关键防 BOM 标志
+        self.assertIn("UTF8Encoding($false)", text)
+
+    def test_installer_codex_write_uses_no_bom_and_self_check(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertNotIn("Set-Content -LiteralPath $config -Value $content -Encoding UTF8", text)
+        self.assertIn("Write-Utf8NoBom $config $content", text)
+        self.assertIn("Test-TomlParseable $config", text)
+        self.assertIn("Restore-FromLatestBackup $config", text)
+
+    def test_doctor_check_toml_parse_flag_registered(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["doctor", "--check-toml-parse"])
+        self.assertTrue(getattr(args, "check_toml_parse", False))
+
+    def test_check_codex_toml_parseable_detects_bom(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        sample_bytes = b"\xef\xbb\xbf[mcp_servers.r-studio]\ncommand = \"uvx\"\n"
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_bytes(sample_bytes)
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_toml_parseable()
+        # BOM 应被检测并剥离后 parse 成功
+        self.assertTrue(result["bom_detected"])
+        self.assertTrue(result["ok"])
+
+    def test_check_codex_toml_parseable_handles_invalid_utf8(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        # 真实事故的根因之一：install.ps1 将 UTF-8 字节按 GBK 误读后再写回 UTF-8。
+        # 这里直接构造非法 UTF-8 序列，验证 _check_codex_toml_parseable 不崩溃并标记 ok=False。
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.toml"
+            # 0x80-0xFF 单独出现是非法 UTF-8 起始字节
+            cfg.write_bytes(b"key = \"value\"\n[bad\x80table]\nx = 1\n")
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_toml_parseable()
+        self.assertFalse(result["ok"], result)
+        self.assertIn("error", result)
+
+    def test_check_codex_toml_parseable_accepts_chinese_paths(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        good = (
+            "[mcp_servers.r-studio]\n"
+            "command = \"uvx\"\n\n"
+            "[projects.'C:\\Users\\LZHS\\Desktop\\开题报告']\n"
+            "trust_level = \"trusted\"\n"
+        ).encode("utf-8")
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_bytes(good)
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_toml_parseable()
+        self.assertTrue(result["ok"], result)
+
+    def test_check_codex_toml_parseable_missing_file(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "nonexistent.toml"
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_toml_parseable()
+        self.assertFalse(result["ok"])
+        self.assertIn("does not exist", result["error"])
+
+    def test_check_codex_toml_parseable_rejects_unclosed_table(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        # 模拟同事 1 真实事故：路径结尾的 ' 丢失 → unclosed table
+        broken = b"[projects.'C:\\Users\\LZHS\\Desktop\\bad_path]\ntrust_level = \"trusted\"\n"
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_bytes(broken)
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_toml_parseable()
+        self.assertFalse(result["ok"])
 
 
 if __name__ == "__main__":
