@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clauder-rstudio-workbench-harness"
+version = "0.2.1"
+description = "Executable harnesses for ClaudeR RStudio workbench discipline"
+requires-python = ">=3.10"
+dependencies = ["mcp>=1.0"]
+
+[project.scripts]
+clauder-workbench = "clauder_workbench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["skills/clauder-rstudio-workbench"]
+include = ["clauder_workbench*"]

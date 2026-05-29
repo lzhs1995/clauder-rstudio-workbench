@@ -1,15 +1,16 @@
 # clauder-rstudio-workbench
 
-Portable Codex skill and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
+Portable Codex skill, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
 This repository pairs with the ClaudeR fork release `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
 
-**Platform status:** v0.1.x is Windows-first. macOS/Linux installation scripts are not included yet.
+**Platform status:** v0.2.x is Windows-first. macOS/Linux installation scripts are not included yet.
 
 ## What This Installs
 
 - The patched ClaudeR R package from `https://github.com/lzhs1995/ClaudeR`.
 - The `clauder-rstudio-workbench` Codex skill under `<CODEX_HOME>/skills`.
+- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, resource gate, and completion gate checks.
 - Optional MCP configuration for Codex, Claude Code, or GitHub Copilot CLI.
 
 The installer is Windows-first. It does not modify MCP client configuration unless you pass an explicit `-Configure...` switch.
@@ -19,7 +20,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell:
 
 ```powershell
-git clone --branch v0.1.2 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.2.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
@@ -45,6 +46,8 @@ Preview changes without writing files or installing packages:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DryRun -ConfigureCodex
 ```
 
+Use `-SkipHarness` only when you want to install the Markdown skill without the executable Python gate.
+
 ## Install Choices
 
 Use one MCP configuration path at a time:
@@ -65,6 +68,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.2.1` | `v0.2.0-lzhs.1` | Adds executable harnesses, real MCP stdio preflight, async two-step hook, resource gate, completion gate, DevSync, and runtime install metadata. |
 | `v0.1.2` | `v0.2.0-lzhs.1` | Adds safer skill replacement, Claude Code MCP verification, release dates, feature request template, and real smoke transcript. |
 | `v0.1.1` | `v0.2.0-lzhs.1` | Adds installer preflight, troubleshooting, issue templates, and idempotent Codex config rewrite. |
 | `v0.1.0` | `v0.2.0-lzhs.1` | Async progress, async metadata, Copilot CLI setup, Windows multi-session safety. |
@@ -101,6 +105,13 @@ After installation:
 3. Ask Codex to connect with `$clauder 连接Rstudio`.
 4. Verify `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test.
 5. For long tasks, require visible `Latest progress:` or final progress before claiming MCP async readiness.
+6. For formal completion, run the harness gate, for example:
+
+```powershell
+.\skills\clauder-rstudio-workbench\harness\run.ps1 completion-check --mode formal --require-file "validation::C:\out\validation.csv,min_rows=1,max_age_h=24"
+```
+
+Harness evidence is written to `<USER_HOME>\.clauder_workbench\evidence`.
 
 For the installer smoke transcript format, see `tests/install_smoke.md`.
 
@@ -155,11 +166,33 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.1.2
+git checkout v0.2.1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
 If you configured Claude Code or Copilot CLI, pass the corresponding `-Configure...` switch again.
+
+## Working on This Skill
+
+Use the repository under `<USER_HOME>\projects\clauder-rstudio-workbench` as the only development source. Runtime skill directories are installer outputs and may be overwritten.
+
+| Location | Role | Commit? | Writer/reader |
+|---|---|---:|---|
+| `<USER_HOME>\projects\clauder-rstudio-workbench` | Development source of truth | Yes | Edit, test, commit, push |
+| `<USER_HOME>\.codex\skills\clauder-rstudio-workbench` | Codex runtime copy | No | Written by `install.ps1` |
+| `<USER_HOME>\.agents\skills\clauder-rstudio-workbench` | Shared agents runtime copy, when `-SyncAgentsSkill` is used | No | Written by `install.ps1` |
+| `<USER_HOME>\.clauder_workbench` | evidence / inflight state | No | Written by harness |
+| GitHub `lzhs1995/clauder-rstudio-workbench` | Published source | Yes | Colleagues clone tags/releases |
+| editable Python install | `python -m clauder_workbench` across directories | n/a | Points to the development source |
+
+Development sync:
+
+```powershell
+cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DevSync
+```
+
+Use `-SyncAgentsSkill` when the shared `.agents` runtime copy also needs updating.
 
 ## What Is Not Included
 

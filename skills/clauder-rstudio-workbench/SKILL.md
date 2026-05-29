@@ -9,10 +9,46 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 
 ## First Reads
 
+- Before formal long-running RStudio work, run the executable harness layer below. Markdown is advisory; harness evidence is the completion gate.
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
+
+## Executable Harness Layer
+
+Use these commands from this skill directory or after `install.ps1` installs the editable Python package:
+
+```powershell
+.\harness\run.ps1 doctor
+.\harness\run.ps1 transport-classify
+.\harness\run.ps1 tool-surface
+.\harness\run.ps1 resource-gate advise --current-parallel 1 --memory-threshold 85
+.\harness\run.ps1 completion-check --mode formal --require-file validation::C:\path\validation.csv,min_rows=1,max_age_h=24
+```
+
+The harness writes JSON evidence under `<USER_HOME>\.clauder_workbench\evidence`, following [evidence.schema.json](schemas/evidence.schema.json), and returns stable exit codes: `0 PASS`, `2 WARN`, `3 BLOCK`, `4 TRANSPORT_UNSTABLE`, `5 CONTRACT_FAILED`.
+
+Formal completion must pass `completion-check`. Completion evidence can be supplied through `--contract task.yaml` or CLI flags such as `--require-file`, `--require-transport-class`, `--require-preflight`, `--state-file`, and `--require-resource-gate`.
+
+For async long jobs, use the two-step hook:
+
+```powershell
+.\harness\run.ps1 async-guard pre-submit --task-key <task> --io-mode durable_files
+# agent performs the real execute_r_async call through its approved transport
+.\harness\run.ps1 async-guard register-job --task-key <task> --job-id <real_job_id>
+```
+
+`async-guard submit --via-mcp-stdio --code-file <R>` is diagnostic MCP stdio mode only. Do not report it as native `mcp__r_studio__` wrapper execution.
+
+### Transport Evidence Boundary
+
+- Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
+- Python MCP stdio: independent MCP probe against the configured `clauder-mcp` server. Valid MCP evidence, but label it `MCP_STDIO_OK`, not native wrapper success.
+- HTTP fallback: diagnostic only for MCP-only tasks. It can prove the Addin HTTP server is alive, not that MCP/native wrapper is healthy.
+- `Rscript.exe`: offline R process only. It never proves RStudio/ClaudeR/MCP readiness.
+
+`transport-classify` ignores agent-supplied `--native-ok`, `--mcp-stdio-ok`, `--http-ok`, and `--rscript-ok` hints unless `--allow-agent-hints` is explicitly passed for diagnostic/test use.
 
 ## Core Workflow
 
@@ -48,4 +84,4 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 
 ## Compatible Release
 
-This skill release `v0.1.2` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.2.1` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.

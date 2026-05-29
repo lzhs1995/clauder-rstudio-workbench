@@ -8,6 +8,12 @@ param(
     [switch]$ConfigureCodex,
     [switch]$ConfigureClaudeCode,
     [switch]$ConfigureCopilot,
+    [switch]$SkipHarness,
+    [switch]$SkipClaudeR,
+    [switch]$DevSync,
+    [switch]$SyncAgentsSkill,
+    [string]$AgentsHome = "$env:USERPROFILE\.agents",
+    [string]$HarnessPython = "",
     [switch]$DryRun
 )
 
@@ -79,13 +85,64 @@ function Test-Prerequisites {
     if ($ConfigureClaudeCode) {
         Require-Command "claude" "Install Claude Code first, then re-run this installer."
     }
+    if (-not $SkipHarness) {
+        $resolvedPython = Find-HarnessPython
+        Write-Host "Harness Python: $resolvedPython"
+    }
 
-    $resolvedR = Find-RExe
-    Write-Host "R.exe: $resolvedR"
+    if (-not ($DevSync -or $SkipClaudeR)) {
+        $resolvedR = Find-RExe
+        Write-Host "R.exe: $resolvedR"
+    } else {
+        Write-Host "R.exe: skipped by -DevSync/-SkipClaudeR"
+    }
     Write-Host "git: $((Get-Command git).Source)"
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
         Write-Host "uvx: $((Get-Command uvx).Source)"
     }
+}
+
+function Get-GitValue($Arguments, $Fallback) {
+    try {
+        $value = & git -C $PSScriptRoot @Arguments 2>$null
+        if ($LASTEXITCODE -eq 0 -and $value) { return (($value | Out-String).Trim()) }
+    } catch {
+        return $Fallback
+    }
+    return $Fallback
+}
+
+function Write-InstallInfo($Dest) {
+    $python = if ($SkipHarness) { "" } else { Find-HarnessPython }
+    $info = [ordered]@{
+        schema_version = "0.2.1"
+        git_commit = (Get-GitValue -Arguments @("rev-parse", "HEAD") -Fallback "unknown")
+        git_branch_or_tag = (Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Fallback "unknown")
+        installed_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+        installed_from = $PSScriptRoot
+        install_destination = $Dest
+        harness_python = $python
+        claudeR_ref = $ClaudeRRef
+        dev_sync = [bool]$DevSync
+    }
+    $path = Join-Path $Dest "INSTALL_INFO.json"
+    $json = $info | ConvertTo-Json -Depth 5
+    Write-Host "Writing install info -> $path"
+    if (-not $DryRun) {
+        Set-Content -LiteralPath $path -Value $json -Encoding UTF8
+    }
+}
+
+function Find-HarnessPython {
+    if ($HarnessPython -and (Test-Path -LiteralPath $HarnessPython)) { return $HarnessPython }
+    if ($env:CLAUDER_WORKBENCH_PYTHON -and (Test-Path -LiteralPath $env:CLAUDER_WORKBENCH_PYTHON)) {
+        return $env:CLAUDER_WORKBENCH_PYTHON
+    }
+    $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    throw "Could not find Python for harness. Re-run with -HarnessPython <path> or set CLAUDER_WORKBENCH_PYTHON."
 }
 
 function Install-ClaudeR {
@@ -149,6 +206,7 @@ function Install-Skill {
         if (Test-Path $old) {
             Remove-Item -LiteralPath $old -Recurse -Force
         }
+        Write-InstallInfo $dest
         Write-Host "Installed skill to $dest"
     }
     catch {
@@ -166,6 +224,60 @@ function Install-Skill {
         if (Test-Path $staging) {
             Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+}
+
+function Install-AgentsSkill {
+    if (-not $SyncAgentsSkill) { return }
+    Write-Step "Installing shared agents skill"
+    $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
+    $destRoot = Join-Path $AgentsHome "skills"
+    $dest = Join-Path $destRoot "clauder-rstudio-workbench"
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $backup = "${dest}_bak_$stamp"
+    $staging = "${dest}_staging_$stamp"
+    $old = "${dest}_old_$stamp"
+
+    if ($DryRun) {
+        Write-Host "Would stage and install $source -> $dest"
+        return
+    }
+    if (-not (Test-Path $destRoot)) {
+        New-Item -ItemType Directory -Force $destRoot | Out-Null
+    }
+    try {
+        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+        if (Test-Path $dest) {
+            Copy-Item -LiteralPath $dest -Destination $backup -Recurse -Force
+            Rename-Item -LiteralPath $dest -NewName (Split-Path -Leaf $old)
+        }
+        Move-Item -LiteralPath $staging -Destination $dest
+        if (Test-Path $old) {
+            Remove-Item -LiteralPath $old -Recurse -Force
+        }
+        Write-InstallInfo $dest
+        Write-Host "Installed shared agents skill to $dest"
+    }
+    finally {
+        if (Test-Path $staging) {
+            Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Install-Harness {
+    if ($SkipHarness) {
+        Write-Step "Skipping harness editable install"
+        return
+    }
+    Write-Step "Installing harness package"
+    $python = Find-HarnessPython
+    $args = @("-m", "pip", "install", "--user", "-e", $PSScriptRoot)
+    Write-Host "+ $python $($args -join ' ')" -ForegroundColor DarkGray
+    if ($DryRun) { return }
+    & $python @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Harness editable install failed with exit code ${LASTEXITCODE}."
     }
 }
 
@@ -307,8 +419,10 @@ function Write-CopilotConfig {
 
 try {
     Test-Prerequisites
-    Install-ClaudeR
+    if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Write-Step "Skipping ClaudeR install" }
     Install-Skill
+    Install-AgentsSkill
+    Install-Harness
 
     if ($ConfigureCodex) { Write-CodexConfig }
     if ($ConfigureClaudeCode) { Configure-ClaudeCode }

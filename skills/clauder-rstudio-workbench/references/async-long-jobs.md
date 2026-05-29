@@ -9,6 +9,9 @@ Use `execute_r_async` for long-running model fitting, bootstrap, simulation, lar
 - Treat `running` as normal.
 - Do not resubmit the same code unless there is a real error or intentional change.
 - Add `clauder_progress(stage, message)` at meaningful milestones.
+- Before submitting formal long work, run `async-guard pre-submit` with the task key and `--io-mode`.
+- Immediately after the approved agent transport returns a real job id, run `async-guard register-job --job-id <real_job_id>`.
+- For large RData/model jobs, use `--io-mode durable_files`; do not marshal large model objects through async `outputs`.
 
 Example R code inside an async job:
 
@@ -34,6 +37,17 @@ The main RStudio session can respond while the async job runs, but shared resour
 - Safe by default: `ls()`, `Sys.time()`, `str()`, `head()`, `file.exists()`.
 - Unsafe by default: writing the same output files, mutating async `outputs`, or starting another long synchronous task in the same session.
 - Best multi-agent mode: one agent monitors the async job while another agent uses a different RStudio session for substantial work.
+
+## Dynamic Concurrency Gate
+
+Use `resource-gate advise` for manual guidance and `resource-gate enforce` for automated pipelines. Increase `max_parallel` by exactly 1 only when all are true:
+
+- memory has stayed below the threshold, normally 85%;
+- disk I/O is not visibly blocked;
+- Rterm/RStudio and MCP polling remain responsive;
+- durable output state or file mtimes are still advancing.
+
+If any condition fails, hold the current parallelism. If memory is extreme or MCP becomes unstable, reduce or stop instead of adding work.
 
 ## Cancellation
 

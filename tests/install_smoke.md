@@ -2,6 +2,39 @@
 
 This file records sanitized smoke evidence for the public sharing package. Private user paths are replaced with `<USER_HOME>`, `<TEMP>`, or `<REPO>`.
 
+## v0.2.1 Harness Smoke
+
+Observed: 2026-05-29 Asia/Shanghai
+
+Commands:
+
+```powershell
+$env:PYTHONPATH = "<REPO>\skills\clauder-rstudio-workbench"
+python -m unittest discover -s <REPO>\tests -v
+python -m clauder_workbench doctor
+python -m clauder_workbench transport-classify --no-probe-mcp-stdio --probe-rscript
+python -m clauder_workbench resource-gate advise --current-parallel 1 --memory-threshold 85
+python -m clauder_workbench async-guard pre-submit --task-key smoke
+python -m clauder_workbench async-guard register-job --task-key smoke --job-id <JOB_ID>
+```
+
+Expected:
+
+- unit tests pass;
+- `doctor` returns `PASS` or `WARN` with distributable `<USER_HOME>`/environment-driven paths, not hard-coded private paths;
+- `transport-classify` labels Rscript-only evidence as `RSCRIPT_ONLY` and does not treat it as MCP/native success;
+- `resource-gate` only recommends `increase_by_1` when memory/I/O/responsiveness/durable-output checks all pass.
+
+Local result:
+
+- unit tests: `Ran 48 tests ... OK`;
+- `doctor`: `PASS`, discovery found session `<SESSION>` on port `<PORT>`;
+- first cold `transport-classify --probe-mcp-stdio` may time out while `uvx` installs dependencies; immediate warm retry returned `MCP_STDIO_OK`;
+- `tool-surface`: `PASS`, expected `list_sessions`, `connect_session`, `execute_r`, `execute_r_async`, and `get_async_result` were present;
+- `completion-check`: `PASS` for a fresh validation CSV with `min_rows`, `max_age_h`, and `output_root` constraints;
+- `install.ps1 -DryRun` prints harness editable install unless `-SkipHarness` is passed.
+- `install.ps1 -DevSync -DryRun` skips ClaudeR reinstall and prints runtime skill/harness sync steps.
+
 ## v0.1.2 Local Rehearsal
 
 Observed: 2026-05-29 Asia/Shanghai
