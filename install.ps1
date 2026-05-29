@@ -434,37 +434,43 @@ function Install-ClaudeR {
     Invoke-Checked $resolvedR @("CMD", "INSTALL", $ClaudeRDir)
 }
 
-function Install-Skill {
-    Write-Step "Installing Codex skill"
-    $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
-    $destRoot = Join-Path $CodexHome "skills"
-    $dest = Join-Path $destRoot "clauder-rstudio-workbench"
+function Get-CollectionSkills {
+    # A skill is any immediate subdirectory of skills\ that contains a SKILL.md.
+    $skillsRoot = Join-Path $PSScriptRoot "skills"
+    if (-not (Test-Path $skillsRoot)) { return @() }
+    return @(Get-ChildItem -LiteralPath $skillsRoot -Directory |
+        Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") })
+}
+
+function Install-OneSkill($Source, $DestRoot, [switch]$WriteInfo) {
+    $name = Split-Path -Leaf $Source
+    $dest = Join-Path $DestRoot $name
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backup = "${dest}_bak_$stamp"
     $staging = "${dest}_staging_$stamp"
     $old = "${dest}_old_$stamp"
 
-    if (-not (Test-Path $source)) {
-        throw "Skill source not found: $source"
+    if (-not (Test-Path $Source)) {
+        throw "Skill source not found: $Source"
     }
-    if (-not (Test-Path $destRoot) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force $destRoot | Out-Null
+    if (-not (Test-Path $DestRoot) -and -not $DryRun) {
+        New-Item -ItemType Directory -Force $DestRoot | Out-Null
     }
 
     if ($DryRun) {
         if (Test-Path $dest) {
             Write-Host "Would copy backup $dest -> $backup"
-            Write-Host "Would stage new skill $source -> $staging"
+            Write-Host "Would stage new skill $Source -> $staging"
             Write-Host "Would replace $dest with staged skill and keep backup"
         } else {
-            Write-Host "Would stage and install $source -> $dest"
+            Write-Host "Would stage and install $Source -> $dest"
         }
         return
     }
 
     try {
-        Write-Host "Staging new skill $source -> $staging"
-        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+        Write-Host "Staging new skill $Source -> $staging"
+        Copy-Item -LiteralPath $Source -Destination $staging -Recurse -Force
 
         if (Test-Path $dest) {
             Write-Host "Copying backup $dest -> $backup"
@@ -477,7 +483,7 @@ function Install-Skill {
         if (Test-Path $old) {
             Remove-Item -LiteralPath $old -Recurse -Force
         }
-        Write-InstallInfo $dest
+        if ($WriteInfo) { Write-InstallInfo $dest }
         Write-Host "Installed skill to $dest"
     }
     catch {
@@ -498,41 +504,27 @@ function Install-Skill {
     }
 }
 
+function Install-Skill {
+    Write-Step "Installing Codex skills"
+    $destRoot = Join-Path $CodexHome "skills"
+    $skills = Get-CollectionSkills
+    if (-not $skills) { throw "No skills found under $(Join-Path $PSScriptRoot 'skills')" }
+    foreach ($s in $skills) {
+        # Write INSTALL_INFO.json only into the primary workbench skill.
+        $writeInfo = ($s.Name -eq "clauder-rstudio-workbench")
+        Install-OneSkill -Source $s.FullName -DestRoot $destRoot -WriteInfo:$writeInfo
+    }
+}
+
 function Install-AgentsSkill {
     if (-not $SyncAgentsSkill) { return }
-    Write-Step "Installing shared agents skill"
-    $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
+    Write-Step "Installing shared agents skills"
     $destRoot = Join-Path $AgentsHome "skills"
-    $dest = Join-Path $destRoot "clauder-rstudio-workbench"
-    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backup = "${dest}_bak_$stamp"
-    $staging = "${dest}_staging_$stamp"
-    $old = "${dest}_old_$stamp"
-
-    if ($DryRun) {
-        Write-Host "Would stage and install $source -> $dest"
-        return
-    }
-    if (-not (Test-Path $destRoot)) {
-        New-Item -ItemType Directory -Force $destRoot | Out-Null
-    }
-    try {
-        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
-        if (Test-Path $dest) {
-            Copy-Item -LiteralPath $dest -Destination $backup -Recurse -Force
-            Rename-Item -LiteralPath $dest -NewName (Split-Path -Leaf $old)
-        }
-        Move-Item -LiteralPath $staging -Destination $dest
-        if (Test-Path $old) {
-            Remove-Item -LiteralPath $old -Recurse -Force
-        }
-        Write-InstallInfo $dest
-        Write-Host "Installed shared agents skill to $dest"
-    }
-    finally {
-        if (Test-Path $staging) {
-            Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
-        }
+    $skills = Get-CollectionSkills
+    if (-not $skills) { throw "No skills found under $(Join-Path $PSScriptRoot 'skills')" }
+    foreach ($s in $skills) {
+        $writeInfo = ($s.Name -eq "clauder-rstudio-workbench")
+        Install-OneSkill -Source $s.FullName -DestRoot $destRoot -WriteInfo:$writeInfo
     }
 }
 

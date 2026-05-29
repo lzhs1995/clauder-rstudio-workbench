@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.0 - 2026-05-29
+
+- **Collection**: this repo is now a skill *collection*. `install.ps1` discovers and installs every `skills/<name>/` directory that contains a `SKILL.md`, not just the primary skill. `INSTALL_INFO.json` is still written into `clauder-rstudio-workbench`.
+- Add **fan-out harness** to `clauder-rstudio-workbench` (`clauder_workbench/fanout.py` + CLI): generate, submit, and merge-gate N parallel async R worker jobs driven from one RStudio session, with autonomous result merge. Adds `submit_async` and a minimal-YAML contract loader.
+- Add new domain skill **`cmaverse-paired-mval`**: a worked, executable example of the async fan-out workflow (one RStudio driving 7 R workers for paired M=0/M=1 CMAverse bootstrap).
+  - `scripts/make_worker_contract.py` generates a fan-out `task.yaml` (one worker per mediator, env `NEW47_*`, absolute forward-slash paths).
+  - `scripts/cmaverse_validate.py` is a Python gate over `validation_<mediator>.csv` enforcing full `cmest`, effect/column counts, `ref` mval 0/1, no duplicate/wrong-mediator rows, and the core `paired_same_bootstrap` invariant. `--no-count-check` / `--no-pairing-check` flag the run as `weak_validation`.
+  - `assets/worker_template.R` is a credential-free worker skeleton emitting state/manifest/validation plus a bootstrap-pairing proof.
+  - `shared/schemas/fanout-contract.schema.json` + `assets/task.yaml.example`.
+- Add 21 unit tests (fan-out contract round-trip + CMAverse generator/validator pass/fail/missing/weak paths).
+
 ## v0.2.4 - 2026-05-29
 
 - **HOTFIX (P0)**: Fix `install.ps1 -ConfigureCodex` corrupting `~/.codex/config.toml` on Windows installs that contain Chinese paths (e.g. `[projects.'C:\Users\...\开题报告']`). PowerShell 5.1 `Set-Content -Encoding UTF8` adds a BOM and `Get-Content -Raw` reads with ANSI/CP936, causing the Chinese path bytes to be misdecoded and the trailing `'` to be lost. Codex then fails to start with `unclosed table, expected ]`.

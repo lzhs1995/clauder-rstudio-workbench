@@ -1,16 +1,23 @@
 # clauder-rstudio-workbench
 
-Portable Codex skill, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
+Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
 This repository pairs with the ClaudeR fork release `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
 
-**Platform status:** v0.2.x is Windows-first. macOS/Linux installation scripts are not included yet.
+**Platform status:** v0.2.x/v0.3.x is Windows-first. macOS/Linux installation scripts are not included yet.
+
+## Skills in This Collection
+
+`install.ps1` installs every `skills/<name>/` directory that contains a `SKILL.md`:
+
+- **`clauder-rstudio-workbench`** — core skill: connect/preflight/async-guard/resource-gate/completion gates plus the parallel **fan-out** harness (one RStudio driving N async R workers with autonomous merge).
+- **`cmaverse-paired-mval`** — domain skill: a worked, executable example of the fan-out workflow for paired M=0/M=1 CMAverse bootstrap (7 mediators in parallel), with a generator and a validation gate.
 
 ## What This Installs
 
 - The patched ClaudeR R package from `https://github.com/lzhs1995/ClaudeR`.
-- The `clauder-rstudio-workbench` Codex skill under `<CODEX_HOME>/skills`.
-- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, resource gate, and completion gate checks.
+- Every skill in this collection under `<CODEX_HOME>/skills` (and `<AGENTS_HOME>/skills` with `-SyncAgentsSkill`).
+- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, fan-out, resource gate, and completion gate checks.
 - Optional MCP configuration for Codex, Claude Code, or GitHub Copilot CLI.
 
 The installer is Windows-first. It does not modify MCP client configuration unless you pass an explicit `-Configure...` switch.
@@ -94,6 +101,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness and the `cmaverse-paired-mval` domain skill. |
 | `v0.2.4` | `v0.2.0-lzhs.1` | UTF-8 no-BOM writer for Codex/Copilot configs, fixes Chinese-path corruption in `[projects.''...'']` entries, adds `doctor --check-toml-parse` self-check with auto-rollback after `install.ps1 -ConfigureCodex`. |
 | `v0.2.3` | `v0.2.0-lzhs.1` | Adds ClaudeR zip fallback, source metadata in `INSTALL_INFO.json`, client-scoped `doctor`, Python 3.14 opt-in install, and workbench zip bootstrap docs. |
 | `v0.2.2` | `v0.2.0-lzhs.1` | Adds a user-level `clauder-workbench.cmd` wrapper, optional PATH update, clearer colleague Quick Start, and updated smoke transcript. |
