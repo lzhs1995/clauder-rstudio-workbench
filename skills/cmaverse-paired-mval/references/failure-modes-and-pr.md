@@ -1,0 +1,74 @@
+# Failure modes, prohibitions, and the native-PR direction
+
+## Common failure modes
+
+### Tiny RData saved
+A few-MB RData usually means a compact result was saved instead of the full
+`cmest` object. With `sy_female,sy_male`, `nboot=10`, a correct nested file can
+reach several GB. Check size before trusting it.
+
+### Async objects not in the foreground .GlobalEnv
+An async Rterm worker does not auto-return objects to the RStudio foreground
+`.GlobalEnv`. Treat the local RData + manifest + validation CSV as the only
+completion evidence. To inspect in the foreground, read the RData back
+explicitly.
+
+### MCP poll interruption != Rterm failure
+A dropped MCP poll does not mean the model failed. Before reacting, check
+`state_*.json`, `manifest_*.csv`, `validation_*.csv`, the Rterm process, and
+whether the output RData is still growing or already complete. **Do not resubmit
+the same mediator because of one poll interruption.**
+
+### Optional upload: file not visible
+If an upload target is not visible in a web/client view, trust the API
+verification (returned `fs_id` + matching size) over the unrefreshed web view.
+Account identifiers are **never** stored in this skill — they come from the
+environment or an untracked config only.
+
+## Prohibitions
+
+- Do not edit the original R script and overwrite it.
+- Do not run the original M=0 and M=1 regions as two independent bootstraps and
+  then claim "same bootstrap".
+- Do not save a table or compact list in place of the full `cmest`.
+- Do not delete a local RData before validation passes.
+- Do not delete a local RData before an upload is verified (when upload is on).
+- Do not write any authorization credential into markdown, assets, schemas, or
+  contracts.
+- Do not resubmit a long job because of a transient MCP poll failure.
+- Do not extrapolate the `nboot=10` concurrency optimum to `nboot=1000`.
+
+## Delete-local-RData conditions
+
+Delete a local RData only when **all** hold: the RData wrote completely;
+validation passed; (if uploading) the upload API returned success, the remote
+`fs_id` is readable, and remote size == local size; the manifest records
+`upload_status=success` and `size_match=TRUE`. Otherwise keep the file, mark the
+failure reason in the manifest, keep the upload log, and stop silent cleanup.
+When not uploading, you may delete by a disk policy, but only after validation
+and after saving a deletion manifest.
+
+## Verifying the paired contrast against native CMAverse
+
+To prove the wrapper did not distort results, re-run the same specification with
+a native multi-`mval` path and compare effect tables within tolerance. This is
+the regression that justifies the wrapper approach.
+
+## Toward a native CMAverse PR
+
+The wrapper around `cmest()`/`boot()` is a user-side workaround. The cleaner
+design is native multi-`mval` support:
+
+```r
+cmest(..., mval_grid = list(list(0), list(1)))
+# or
+cmest(..., mval = list(list(0), list(1)), paired_mval = TRUE)
+```
+
+A PR's core is not concurrency scheduling but:
+
+1. supporting multiple `mval` in one `boot()` call;
+2. every replicate sharing the same bootstrap indices;
+3. each `mval` returning a complete `cmest` structure;
+4. keeping the single-`mval` legacy interface compatible;
+5. a sensible `summary()` for multi-mval results.

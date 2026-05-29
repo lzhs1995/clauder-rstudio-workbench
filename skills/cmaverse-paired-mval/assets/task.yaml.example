@@ -1,0 +1,46 @@
+# CMAverse paired-mval fan-out contract (example).
+#
+# Generate this with scripts/make_worker_contract.py rather than hand-editing.
+# Consumed by: clauder-workbench fanout-plan|fanout-run|merge-gate
+#
+# output_root is the "level dir"; each worker's expected_* paths are resolved
+# relative to it. Use forward slashes (valid in R on Windows, no escaping).
+
+task_key: cmaverse_paired_mval_RUN1
+max_parallel: 7
+artifacts:
+  output_root: "<OUTPUT_ROOT>/RUN1/max_parallel_7"
+  max_age_h: 24
+meta:
+  nboot: 10
+  groups: sy_female,sy_male
+  expected_validation_rows: 4
+workers:
+  - id: msat_c12_2
+    code_file: "<SKILL_DIR>/assets/worker_template.R"
+    env:
+      NEW47_MEDIATOR: msat_c12_2
+      NEW47_NBOOT: 10
+      NEW47_SEED: 12345
+      NEW47_GROUPS: sy_female,sy_male
+      NEW47_RUN_ID: RUN1
+      NEW47_MAX_PARALLEL: 7
+      NEW47_OUTPUT_ROOT: "<OUTPUT_ROOT>"
+      NEW47_UPLOAD_ENABLED: false
+    expected_state: msat_c12_2/state_msat_c12_2.json
+    expected_manifest: msat_c12_2/manifest_msat_c12_2.csv
+    expected_validation: msat_c12_2/validation_msat_c12_2.csv
+  - id: msat_c12_3
+    code_file: "<SKILL_DIR>/assets/worker_template.R"
+    env:
+      NEW47_MEDIATOR: msat_c12_3
+      NEW47_NBOOT: 10
+      NEW47_SEED: 12345
+      NEW47_GROUPS: sy_female,sy_male
+      NEW47_RUN_ID: RUN1
+      NEW47_MAX_PARALLEL: 7
+      NEW47_OUTPUT_ROOT: "<OUTPUT_ROOT>"
+      NEW47_UPLOAD_ENABLED: false
+    expected_state: msat_c12_3/state_msat_c12_3.json
+    expected_manifest: msat_c12_3/manifest_msat_c12_3.csv
+    expected_validation: msat_c12_3/validation_msat_c12_3.csv

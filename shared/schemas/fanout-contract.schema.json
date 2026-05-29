@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/lzhs1995/clauder-rstudio-workbench/shared/schemas/fanout-contract.schema.json",
+  "title": "clauder-workbench fan-out contract",
+  "description": "Contract consumed by clauder-workbench fanout-plan / fanout-run / merge-gate. One worker per child R process; each emits a state/manifest/validation triple under artifacts.output_root.",
+  "type": "object",
+  "required": ["workers"],
+  "properties": {
+    "task_key": {
+      "type": "string",
+      "description": "Stable task identity used for inflight registration and evidence linkage."
+    },
+    "max_parallel": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Default concurrency level if not overridden on the CLI."
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "output_root": {
+          "type": "string",
+          "description": "Base dir for worker outputs. Relative worker paths resolve against this (relative output_root resolves against the contract file's directory). Use forward slashes."
+        },
+        "max_age_h": {
+          "type": "number",
+          "description": "merge-gate rejects worker outputs older than this many hours (freshness guard)."
+        }
+      }
+    },
+    "resource_gate": {
+      "type": "object",
+      "properties": {
+        "memory_threshold": {
+          "type": "number",
+          "description": "Memory percent ceiling for the advise/enforce concurrency decision."
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Free-form, non-enforced metadata (nboot, groups, expected_validation_rows, ...)."
+    },
+    "workers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "expected_state", "expected_manifest", "expected_validation"],
+        "properties": {
+          "id": {"type": "string", "description": "Unique worker id."},
+          "code_file": {"type": "string", "description": "Path to the R worker file. Either code_file or code is required."},
+          "code": {"type": "string", "description": "Inline R code. Either code_file or code is required."},
+          "session": {"type": "string", "description": "Optional RStudio session name to bind the worker to."},
+          "env": {
+            "type": "object",
+            "description": "Environment variables passed to the worker. NEVER place credentials here; use the environment at run time.",
+            "additionalProperties": {"type": ["string", "number", "boolean"]}
+          },
+          "expected_state": {"type": "string", "description": "state_<id>.json path (relative to output_root). status=='complete' is the done signal."},
+          "expected_manifest": {"type": "string", "description": "manifest_<id>.csv path (relative to output_root)."},
+          "expected_validation": {"type": "string", "description": "validation_<id>.csv path (relative to output_root)."}
+        }
+      }
+    }
+  }
+}
