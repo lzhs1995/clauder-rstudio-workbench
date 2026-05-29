@@ -390,6 +390,13 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertNotIn("git checkout v0.2.4", text)
         self.assertNotIn("releases/download/v0.2.4/", text)
 
+    def test_workbench_skill_documents_collection_release(self) -> None:
+        text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("skill collection release `v0.3.0`", text)
+        self.assertIn("cmaverse-paired-mval", text)
+        self.assertIn("`v0.2.4` is the minimum safe release", text)
+        self.assertNotIn("This skill release `v0.2.4`", text)
+
     def test_installer_exposes_zip_fallback_options(self) -> None:
         text = Path("install.ps1").read_text(encoding="utf-8")
         self.assertIn("NoZipFallback", text)

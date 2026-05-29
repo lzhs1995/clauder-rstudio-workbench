@@ -14,6 +14,7 @@ marks the run ``weak_validation`` and disqualifies it from a formal success clai
 
 Exit codes (aligned with the clauder-rstudio-workbench harness):
     0  PASS           - every expected row present and passing
+    2  WEAK_PASS      - relaxed gate passed; not valid for formal success claims
     3  USAGE/MISSING  - a validation CSV is missing or unreadable
     5  CONTRACT_FAILED- rows present but one or more checks failed
 """
@@ -26,6 +27,7 @@ import sys
 from pathlib import Path
 
 EXIT_PASS = 0
+EXIT_WEAK = 2
 EXIT_MISSING = 3
 EXIT_FAILED = 5
 
@@ -205,6 +207,9 @@ def validate(args):
                 f"row count {total_rows} != expected {report['expected_rows']}")
         report["decision"] = "CONTRACT_FAILED"
         report["exit_code"] = EXIT_FAILED
+    elif report["weak_validation"]:
+        report["decision"] = "WEAK_PASS"
+        report["exit_code"] = EXIT_WEAK
     else:
         report["decision"] = "PASS"
         report["exit_code"] = EXIT_PASS

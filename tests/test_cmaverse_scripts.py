@@ -247,7 +247,8 @@ class CmaverseValidateTests(unittest.TestCase):
                 ], header=self.LEGACY_HEADER)
             # legacy CSVs lack both the pairing proof and the delta columns
             r = self._run(tmp, **{"no-pairing-check": True, "no-delta-cde-check": True})
-            self.assertEqual(r["decision"], "PASS")
+            self.assertEqual(r["decision"], "WEAK_PASS")
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_WEAK)
             self.assertTrue(r["weak_validation"])
 
     def test_fail_on_missing_delta_cde(self):
@@ -281,7 +282,8 @@ class CmaverseValidateTests(unittest.TestCase):
                     f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
                 ], header=self.NO_DELTA_HEADER)
             r = self._run(tmp, **{"no-delta-cde-check": True})
-            self.assertEqual(r["decision"], "PASS")
+            self.assertEqual(r["decision"], "WEAK_PASS")
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_WEAK)
             self.assertTrue(r["weak_validation"])
 
     def test_missing_csv(self):
@@ -312,7 +314,8 @@ class CmaverseValidateTests(unittest.TestCase):
                     self._row(m, "sy_male", ncol="1,1", hashes="h2,h2"),
                 ])
             r = self._run(tmp, **{"no-count-check": True})
-            self.assertEqual(r["decision"], "PASS")
+            self.assertEqual(r["decision"], "WEAK_PASS")
+            self.assertEqual(r["exit_code"], cma_validate.EXIT_WEAK)
             self.assertTrue(r["weak_validation"])
 
 
