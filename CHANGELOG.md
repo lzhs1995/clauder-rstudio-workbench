@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.3 - 2026-05-29
+
+- Add ClaudeR tag-zip fallback in `install.ps1` for proxy/reset environments where GitHub smart HTTP clone fails.
+- Add `-NoZipFallback` and explicit `-InstallPython314` installer switches.
+- Extend `INSTALL_INFO.json` with workbench source metadata, ClaudeR source metadata, and configured client metadata.
+- Add `doctor --expect-client codex|claude|copilot|all`, with `auto` defaulting from `INSTALL_INFO.json`, so Codex-only installs do not warn about missing Copilot config.
+- Add README release-asset zip bootstrap commands for obtaining `clauder-rstudio-workbench` itself when `git clone` is blocked.
+- Add clearer winget hints for Git, uv, Python 3.14, R, and RStudio prerequisites.
+
 ## v0.2.2 - 2026-05-29
 
 - Add a user-level `clauder-workbench.cmd` wrapper under `<USER_HOME>\bin` so colleagues can run short harness commands without remembering the full Python module path.

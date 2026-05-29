@@ -6,6 +6,7 @@ This harness layer turns the skill's Markdown rules into executable checks.
 
 ```powershell
 <SKILL_ROOT>\harness\run.ps1 doctor
+<SKILL_ROOT>\harness\run.ps1 doctor --expect-client codex
 ```
 
 or, after editable install:
@@ -29,6 +30,10 @@ clauder-workbench doctor
 By default, `transport-classify` and `tool-surface` use independent MCP stdio
 probes where possible. Agent-supplied flags are diagnostic hints only unless
 `--allow-agent-hints` is explicit.
+
+`doctor --expect-client auto` reads runtime `INSTALL_INFO.json` when available.
+For a Codex-only install, use `--expect-client codex` to avoid warnings about
+unconfigured Claude Code or Copilot clients.
 
 ## Exit Codes
 

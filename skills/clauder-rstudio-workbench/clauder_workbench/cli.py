@@ -9,10 +9,12 @@ from typing import Any
 
 from .artifacts import check_artifacts, parse_requirement
 from .config import (
+    AGENTS_INSTALL_INFO,
     BLOCK,
     CLAUDE_JSON,
     COPILOT_CONFIG,
     CODEX_CONFIG,
+    CODEX_INSTALL_INFO,
     CONTRACT_FAILED,
     DISCOVERY_DIR,
     LOCAL_CLAUDER_BRIDGE,
@@ -53,9 +55,35 @@ def parse_bool_flag(value: str | None) -> bool:
     return value.lower() in {"1", "true", "yes", "y", "ok", "pass"}
 
 
+def _load_install_info() -> tuple[dict[str, Any], Path | None]:
+    for path in (CODEX_INSTALL_INFO, AGENTS_INSTALL_INFO):
+        if path and path.exists():
+            try:
+                return load_json(path), path
+            except Exception:
+                return {}, path
+    return {}, None
+
+
+def _expected_clients(args: argparse.Namespace, install_info: dict[str, Any]) -> list[str]:
+    requested = getattr(args, "expect_client", "auto") or "auto"
+    if requested == "all":
+        return ["codex", "claude", "copilot"]
+    if requested != "auto":
+        return [requested]
+    configured = install_info.get("configured_clients") or []
+    if isinstance(configured, str):
+        configured = [configured]
+    configured = [str(item).strip().lower() for item in configured if str(item).strip()]
+    valid = [item for item in configured if item in {"codex", "claude", "copilot"}]
+    return valid or ["codex"]
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     reasons: list[str] = []
     warnings: list[str] = []
+    install_info, install_info_path = _load_install_info()
+    expected_clients = _expected_clients(args, install_info)
     py_smoke = run_python_smoke()
     if not PYTHON314.exists():
         warnings.append(f"default Python314 missing: {PYTHON314}; using {python_command()}")
@@ -65,13 +93,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         warnings.append(f"local patched ClaudeR bridge missing: {LOCAL_CLAUDER_BRIDGE}")
     if not DISCOVERY_DIR.exists():
         warnings.append(f"discovery directory missing: {DISCOVERY_DIR}")
-    if not CODEX_CONFIG.exists():
-        warnings.append(f"Codex config missing: {CODEX_CONFIG}")
-    elif not codex_config_mentions_local_bridge():
-        warnings.append("Codex config does not mention local patched ClaudeR bridge")
-    if not CLAUDE_JSON.exists():
+    if "codex" in expected_clients:
+        if not CODEX_CONFIG.exists():
+            warnings.append(f"Codex config missing: {CODEX_CONFIG}")
+        elif not codex_config_mentions_local_bridge():
+            warnings.append("Codex config does not mention local patched ClaudeR bridge")
+    if "claude" in expected_clients and not CLAUDE_JSON.exists():
         warnings.append(f"Claude Code user config missing: {CLAUDE_JSON}")
-    if not COPILOT_CONFIG.exists():
+    if "copilot" in expected_clients and not COPILOT_CONFIG.exists():
         warnings.append(f"Copilot MCP config missing: {COPILOT_CONFIG}")
 
     exit_code = BLOCK if reasons else WARN if warnings else PASS
@@ -91,6 +120,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "codex_config": str(CODEX_CONFIG),
             "claude_json": str(CLAUDE_JSON),
             "copilot_config": str(COPILOT_CONFIG),
+            "install_info_path": str(install_info_path) if install_info_path else "",
+            "install_info": install_info,
+            "expect_client": args.expect_client,
+            "expected_clients": expected_clients,
             "discovery_sessions": discovery_sessions(),
         },
     )
@@ -651,7 +684,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clauder_workbench")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("doctor")
+    p = sub.add_parser("doctor")
+    p.add_argument("--expect-client", choices=["auto", "codex", "claude", "copilot", "all"], default="auto")
 
     p = sub.add_parser("transport-classify")
     p.add_argument("--native-ok", action="store_true")

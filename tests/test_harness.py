@@ -10,6 +10,7 @@ from unittest import mock
 
 from clauder_workbench.artifacts import artifact_ok, check_artifacts, parse_requirement
 from clauder_workbench.cli import (
+    _expected_clients,
     _job_complete_ok,
     _p6_durable_violations,
     _resource_gate_ok,
@@ -187,12 +188,12 @@ class HarnessUnitTests(unittest.TestCase):
         doc = build_evidence("x", "PASS", task_key="abc", parent_evidence_ids=["p1"])
         self.assertIn("evidence_id", doc)
         self.assertEqual(doc["parent_evidence_ids"], ["p1"])
-        self.assertEqual(doc["schema_version"], "0.2.2")
+        self.assertEqual(doc["schema_version"], "0.2.3")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
         self.assertTrue(schema.exists())
-        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.2")
+        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.3")
 
     def test_write_evidence_atomic_creates_json(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -377,9 +378,38 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_v022_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.2.2", text)
+        self.assertIn("--branch v0.2.3", text)
+        self.assertIn("releases/download/v0.2.3/clauder-rstudio-workbench-v0.2.3.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
+
+    def test_installer_exposes_zip_fallback_options(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("NoZipFallback", text)
+        self.assertIn("Install-ClaudeRZipFallback", text)
+        self.assertIn("InstallPython314", text)
+
+    def test_installer_records_source_metadata(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("workbench_source_type", text)
+        self.assertIn("workbench_ref", text)
+        self.assertIn("claudeR_source_type", text)
+        self.assertIn("configured_clients", text)
+
+    def test_expected_clients_defaults_to_install_info(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["doctor"])
+        self.assertEqual(_expected_clients(args, {"configured_clients": ["codex"]}), ["codex"])
+
+    def test_expected_clients_all_expands_every_client(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["doctor", "--expect-client", "all"])
+        self.assertEqual(_expected_clients(args, {"configured_clients": ["codex"]}), ["codex", "claude", "copilot"])
+
+    def test_expected_clients_auto_falls_back_to_codex(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["doctor"])
+        self.assertEqual(_expected_clients(args, {}), ["codex"])
 
 
 if __name__ == "__main__":
