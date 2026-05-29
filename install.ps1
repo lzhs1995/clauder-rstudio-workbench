@@ -14,6 +14,8 @@ param(
     [switch]$SyncAgentsSkill,
     [string]$AgentsHome = "$env:USERPROFILE\.agents",
     [string]$HarnessPython = "",
+    [string]$WorkbenchBinDir = "$env:USERPROFILE\bin",
+    [switch]$AddHarnessToPath,
     [switch]$DryRun
 )
 
@@ -114,14 +116,24 @@ function Get-GitValue($Arguments, $Fallback) {
 
 function Write-InstallInfo($Dest) {
     $python = if ($SkipHarness) { "" } else { Find-HarnessPython }
+    $wrapper = Join-Path $WorkbenchBinDir "clauder-workbench.cmd"
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $pathParts = @()
+    if ($userPath) {
+        $pathParts = $userPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
     $info = [ordered]@{
-        schema_version = "0.2.1"
+        schema_version = "0.2.2"
         git_commit = (Get-GitValue -Arguments @("rev-parse", "HEAD") -Fallback "unknown")
         git_branch_or_tag = (Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Fallback "unknown")
         installed_at_utc = (Get-Date).ToUniversalTime().ToString("o")
         installed_from = $PSScriptRoot
         install_destination = $Dest
         harness_python = $python
+        harness_wrapper = $wrapper
+        add_harness_to_path = [bool]$AddHarnessToPath
+        user_path_contains_wrapper_dir = [bool](($pathParts -contains $WorkbenchBinDir) -or $AddHarnessToPath)
+        user_path_contains_wrapper_dir_before_install = [bool]($pathParts -contains $WorkbenchBinDir)
         claudeR_ref = $ClaudeRRef
         dev_sync = [bool]$DevSync
     }
@@ -281,6 +293,60 @@ function Install-Harness {
     }
 }
 
+function Install-HarnessWrapper {
+    if ($SkipHarness) {
+        Write-Step "Skipping harness command wrapper"
+        return
+    }
+    Write-Step "Installing harness command wrapper"
+    $python = Find-HarnessPython
+    $wrapper = Join-Path $WorkbenchBinDir "clauder-workbench.cmd"
+    $content = @"
+@echo off
+"$python" -m clauder_workbench %*
+"@
+    Write-Host "Wrapper: $wrapper"
+    if ($DryRun) {
+        Write-Host "Would write clauder-workbench.cmd wrapper to $WorkbenchBinDir"
+    } else {
+        if (-not (Test-Path -LiteralPath $WorkbenchBinDir)) {
+            New-Item -ItemType Directory -Force -Path $WorkbenchBinDir | Out-Null
+        }
+        Set-Content -LiteralPath $wrapper -Value $content -Encoding ASCII
+    }
+
+    if ($AddHarnessToPath) {
+        Add-WorkbenchBinToUserPath $WorkbenchBinDir
+    } else {
+        Write-Host "PATH unchanged. Run with -AddHarnessToPath to add $WorkbenchBinDir to the user PATH."
+        Write-Host "Portable fallback: $python -m clauder_workbench doctor"
+    }
+}
+
+function Add-WorkbenchBinToUserPath($Dir) {
+    Write-Step "Checking user PATH for harness wrapper"
+    $current = [Environment]::GetEnvironmentVariable("Path", "User")
+    $parts = @()
+    if ($current) {
+        $parts = $current -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
+    if ($parts -contains $Dir) {
+        Write-Host "User PATH already contains $Dir"
+        return
+    }
+    $newPath = if ($current) { "$current;$Dir" } else { $Dir }
+    Write-Host "Adding $Dir to user PATH"
+    if ($DryRun) {
+        Write-Host "Would set user PATH to: $newPath"
+        return
+    }
+    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+    if (-not (($env:Path -split ';') -contains $Dir)) {
+        $env:Path = "$env:Path;$Dir"
+    }
+    Write-Host "User PATH updated. Restart terminals/agents for inherited PATH to refresh."
+}
+
 function Write-CodexConfig {
     Write-Step "Configuring Codex MCP"
     $configDir = Join-Path $CodexHome ""
@@ -423,6 +489,7 @@ try {
     Install-Skill
     Install-AgentsSkill
     Install-Harness
+    Install-HarnessWrapper
 
     if ($ConfigureCodex) { Write-CodexConfig }
     if ($ConfigureClaudeCode) { Configure-ClaudeCode }

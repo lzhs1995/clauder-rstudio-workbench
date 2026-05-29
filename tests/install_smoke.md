@@ -2,6 +2,34 @@
 
 This file records sanitized smoke evidence for the public sharing package. Private user paths are replaced with `<USER_HOME>`, `<TEMP>`, or `<REPO>`.
 
+## v0.2.2 Wrapper and PATH Smoke
+
+Observed: 2026-05-29 Asia/Shanghai
+
+Commands:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO>\install.ps1 -DevSync -SyncAgentsSkill -DryRun
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO>\install.ps1 -DevSync -SyncAgentsSkill
+& "<USER_HOME>\bin\clauder-workbench.cmd" doctor
+python -m clauder_workbench doctor
+```
+
+Expected:
+
+- installer writes `<USER_HOME>\bin\clauder-workbench.cmd`;
+- `INSTALL_INFO.json` records `schema_version = 0.2.2`, the current git commit, `harness_wrapper`, `add_harness_to_path`, and `user_path_contains_wrapper_dir`;
+- wrapper invocation and `python -m clauder_workbench doctor` both reach the same harness package;
+- the installer does not modify the user PATH unless `-AddHarnessToPath` is explicitly passed.
+
+Local result:
+
+- unit tests: `Ran 50 tests ... OK`;
+- `install.ps1 -DevSync -SyncAgentsSkill -DryRun`: completed without writes and printed wrapper/PATH actions;
+- `install.ps1 -DevSync -SyncAgentsSkill`: synchronized both runtime skill copies and wrote wrapper metadata;
+- `<USER_HOME>\bin\clauder-workbench.cmd doctor`: `PASS`;
+- `python -m clauder_workbench doctor`: `PASS`.
+
 ## v0.2.1 Harness Smoke
 
 Observed: 2026-05-29 Asia/Shanghai

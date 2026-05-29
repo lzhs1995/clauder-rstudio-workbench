@@ -17,12 +17,13 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 
 ## Quick Start
 
-Open PowerShell:
+Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.2.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.2.2 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
+& "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
 ```
 
 Then restart Codex and start ClaudeR inside RStudio:
@@ -37,6 +38,14 @@ In Codex:
 ```text
 $clauder 连接Rstudio
 ```
+
+If the wrapper path is not available, use the portable fallback:
+
+```powershell
+python -m clauder_workbench doctor
+```
+
+To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 ## Dry Run
 
@@ -68,6 +77,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.2.2` | `v0.2.0-lzhs.1` | Adds a user-level `clauder-workbench.cmd` wrapper, optional PATH update, clearer colleague Quick Start, and updated smoke transcript. |
 | `v0.2.1` | `v0.2.0-lzhs.1` | Adds executable harnesses, real MCP stdio preflight, async two-step hook, resource gate, completion gate, DevSync, and runtime install metadata. |
 | `v0.1.2` | `v0.2.0-lzhs.1` | Adds safer skill replacement, Claude Code MCP verification, release dates, feature request template, and real smoke transcript. |
 | `v0.1.1` | `v0.2.0-lzhs.1` | Adds installer preflight, troubleshooting, issue templates, and idempotent Codex config rewrite. |
@@ -166,7 +176,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.2.1
+git checkout v0.2.2
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
@@ -193,6 +203,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DevSync
 ```
 
 Use `-SyncAgentsSkill` when the shared `.agents` runtime copy also needs updating.
+Use `-AddHarnessToPath` only when you want the installer to add `<USER_HOME>\bin` to the user PATH. Without that switch, the installer still writes `<USER_HOME>\bin\clauder-workbench.cmd`, and `python -m clauder_workbench ...` remains the portable fallback.
 
 ## What Is Not Included
 

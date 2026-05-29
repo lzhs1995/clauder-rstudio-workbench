@@ -12,7 +12,7 @@ from typing import Any
 from .config import EVIDENCE_DIR, default_agent, ensure_state_dirs, normalize_path
 
 
-SCHEMA_VERSION = "0.2.1"
+SCHEMA_VERSION = "0.2.2"
 
 
 def utc_now() -> str:

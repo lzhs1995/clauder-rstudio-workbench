@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.2 - 2026-05-29
+
+- Add a user-level `clauder-workbench.cmd` wrapper under `<USER_HOME>\bin` so colleagues can run short harness commands without remembering the full Python module path.
+- Add installer switches `-WorkbenchBinDir` and `-AddHarnessToPath`; the installer writes the wrapper by default but only updates the user PATH when explicitly requested.
+- Extend runtime `INSTALL_INFO.json` with wrapper path and PATH-update metadata for easier support.
+- Tighten README Quick Start around the v0.2.2 clone/install/smoke path for colleague onboarding.
+- Expand the sanitized install smoke transcript with the v0.2.1 harness chain and v0.2.2 wrapper/PATH validation notes.
+
 ## v0.2.1 - 2026-05-29
 
 - Add the `clauder_workbench` executable harness package under the skill, with `doctor`, `transport-classify`, `tool-surface`, `preflight`, `connect`, `async-guard`, `resource-gate`, and `completion-check`.

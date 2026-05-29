@@ -84,4 +84,4 @@ For async long jobs, use the two-step hook:
 
 ## Compatible Release
 
-This skill release `v0.2.1` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.2.2` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.

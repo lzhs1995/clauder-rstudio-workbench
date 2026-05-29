@@ -187,12 +187,12 @@ class HarnessUnitTests(unittest.TestCase):
         doc = build_evidence("x", "PASS", task_key="abc", parent_evidence_ids=["p1"])
         self.assertIn("evidence_id", doc)
         self.assertEqual(doc["parent_evidence_ids"], ["p1"])
-        self.assertEqual(doc["schema_version"], "0.2.1")
+        self.assertEqual(doc["schema_version"], "0.2.2")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
         self.assertTrue(schema.exists())
-        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.1")
+        self.assertEqual(json.loads(schema.read_text(encoding="utf-8"))["properties"]["schema_version"]["const"], "0.2.2")
 
     def test_write_evidence_atomic_creates_json(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -368,6 +368,18 @@ class HarnessUnitTests(unittest.TestCase):
                 "clauder_workbench.cli.load_inflight", lambda task_key: None
             ):
                 self.assertEqual(cmd_completion_check(args), 0)
+
+    def test_installer_exposes_wrapper_options(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("AddHarnessToPath", text)
+        self.assertIn("WorkbenchBinDir", text)
+        self.assertIn("clauder-workbench.cmd", text)
+
+    def test_readme_quickstart_uses_v022_and_wrapper(self) -> None:
+        text = Path("README.md").read_text(encoding="utf-8")
+        self.assertIn("--branch v0.2.2", text)
+        self.assertIn("clauder-workbench.cmd", text)
+        self.assertIn("-AddHarnessToPath", text)
 
 
 if __name__ == "__main__":
