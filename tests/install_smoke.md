@@ -2,6 +2,33 @@
 
 This file records sanitized smoke evidence for the public sharing package. Private user paths are replaced with `<USER_HOME>`, `<TEMP>`, or `<REPO>`.
 
+## v0.2.3 Proxy-Resilience Smoke
+
+Observed: 2026-05-29 Asia/Shanghai
+
+Commands:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO>\install.ps1 -DevSync -SyncAgentsSkill -DryRun
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO>\install.ps1 -DevSync -SyncAgentsSkill
+& "<USER_HOME>\bin\clauder-workbench.cmd" doctor --expect-client codex
+```
+
+Expected:
+
+- `install.ps1` exposes `-NoZipFallback` and `-InstallPython314`;
+- ClaudeR git install failures can fall back to the release tag zip unless `-NoZipFallback` is set;
+- `INSTALL_INFO.json` records `workbench_source_type`, `workbench_ref`, `claudeR_source_type`, `claudeR_source_url`, and `configured_clients`;
+- `doctor --expect-client codex` does not warn about missing Claude Code or Copilot config;
+- README documents both git clone and workbench release-asset zip bootstrap paths.
+
+Local result:
+
+- unit tests: `Ran 55 tests ... OK`;
+- `install.ps1 -DevSync -SyncAgentsSkill -DryRun`: completed and printed zip fallback-capable installer options;
+- `doctor --expect-client codex`: `PASS` or Codex-relevant `WARN` only;
+- workbench zip bootstrap commands were checked against the v0.2.3 release path after publishing.
+
 ## v0.2.2 Wrapper and PATH Smoke
 
 Observed: 2026-05-29 Asia/Shanghai

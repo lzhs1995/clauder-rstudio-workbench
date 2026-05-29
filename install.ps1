@@ -16,10 +16,14 @@ param(
     [string]$HarnessPython = "",
     [string]$WorkbenchBinDir = "$env:USERPROFILE\bin",
     [switch]$AddHarnessToPath,
+    [switch]$NoZipFallback,
+    [switch]$InstallPython314,
     [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
+$script:ClaudeRSourceType = "unknown"
+$script:ClaudeRSourceUrl = $ClaudeRRepo
 
 if ($LogFile) {
     $logDir = Split-Path -Parent $LogFile
@@ -74,12 +78,29 @@ function Find-RExe {
     $candidates = Get-ChildItem "C:\Program Files\R" -Filter R.exe -Recurse -ErrorAction SilentlyContinue |
         Sort-Object FullName -Descending
     if ($candidates) { return $candidates[0].FullName }
-    throw "Could not find R.exe. Re-run with -RExe <path-to-R.exe>."
+    throw "Could not find R.exe. Re-run with -RExe <path-to-R.exe>. Install hint: winget install --id RProject.R -e"
+}
+
+function Test-RStudioInstalled {
+    if (Get-Command rstudio.exe -ErrorAction SilentlyContinue) { return $true }
+    $candidates = @(
+        "C:\Program Files\RStudio\rstudio.exe",
+        "C:\Program Files\Posit\RStudio\rstudio.exe"
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { return $true }
+    }
+    return $false
 }
 
 function Test-Prerequisites {
     Write-Step "Checking prerequisites"
-    Require-Command "git" "Install Git for Windows: winget install --id Git.Git -e"
+    if (-not (Test-Executable "git")) {
+        if ($NoZipFallback) {
+            throw "Required command not found: git. Install Git for Windows: winget install --id Git.Git -e"
+        }
+        Write-Warning "git not found. ClaudeR install will rely on zip fallback. Install Git for Windows: winget install --id Git.Git -e"
+    }
 
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
         Require-Command "uvx" "Install uv: winget install --id astral-sh.uv -e"
@@ -98,7 +119,15 @@ function Test-Prerequisites {
     } else {
         Write-Host "R.exe: skipped by -DevSync/-SkipClaudeR"
     }
-    Write-Host "git: $((Get-Command git).Source)"
+    if (-not (Test-RStudioInstalled)) {
+        Write-Warning "RStudio was not found in common locations. Install hint: winget install --id Posit.RStudio -e"
+    }
+    $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+    if ($gitCmd) {
+        Write-Host "git: $($gitCmd.Source)"
+    } else {
+        Write-Host "git: not found; zip fallback is enabled"
+    }
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
         Write-Host "uvx: $((Get-Command uvx).Source)"
     }
@@ -114,6 +143,52 @@ function Get-GitValue($Arguments, $Fallback) {
     return $Fallback
 }
 
+function Get-PackageVersion {
+    $pyproject = Join-Path $PSScriptRoot "pyproject.toml"
+    if (Test-Path -LiteralPath $pyproject) {
+        $line = Select-String -LiteralPath $pyproject -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+        if ($line -and $line.Matches.Count -gt 0) {
+            return $line.Matches[0].Groups[1].Value
+        }
+    }
+    return "unknown"
+}
+
+function Get-WorkbenchSourceType {
+    if (Test-Path -LiteralPath (Join-Path $PSScriptRoot ".git")) { return "git" }
+    return "zip"
+}
+
+function Get-WorkbenchRef {
+    if ((Get-WorkbenchSourceType) -eq "git") {
+        $tag = Get-GitValue -Arguments @("describe", "--tags", "--exact-match") -Fallback ""
+        if ($tag) { return $tag }
+        return (Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Fallback "unknown")
+    }
+    $version = Get-PackageVersion
+    if ($version -ne "unknown") { return "v$version" }
+    return "unknown"
+}
+
+function Get-WorkbenchSourceUrl {
+    if ((Get-WorkbenchSourceType) -eq "git") {
+        return (Get-GitValue -Arguments @("config", "--get", "remote.origin.url") -Fallback "")
+    }
+    $ref = Get-WorkbenchRef
+    if ($ref -ne "unknown") {
+        return "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/$ref/clauder-rstudio-workbench-$ref.zip"
+    }
+    return ""
+}
+
+function Get-ConfiguredClients {
+    $clients = @()
+    if ($ConfigureCodex) { $clients += "codex" }
+    if ($ConfigureClaudeCode) { $clients += "claude" }
+    if ($ConfigureCopilot) { $clients += "copilot" }
+    return @($clients)
+}
+
 function Write-InstallInfo($Dest) {
     $python = if ($SkipHarness) { "" } else { Find-HarnessPython }
     $wrapper = Join-Path $WorkbenchBinDir "clauder-workbench.cmd"
@@ -123,9 +198,12 @@ function Write-InstallInfo($Dest) {
         $pathParts = $userPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     }
     $info = [ordered]@{
-        schema_version = "0.2.2"
+        schema_version = "0.2.3"
         git_commit = (Get-GitValue -Arguments @("rev-parse", "HEAD") -Fallback "unknown")
         git_branch_or_tag = (Get-GitValue -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Fallback "unknown")
+        workbench_source_type = (Get-WorkbenchSourceType)
+        workbench_ref = (Get-WorkbenchRef)
+        workbench_source_url = (Get-WorkbenchSourceUrl)
         installed_at_utc = (Get-Date).ToUniversalTime().ToString("o")
         installed_from = $PSScriptRoot
         install_destination = $Dest
@@ -134,6 +212,9 @@ function Write-InstallInfo($Dest) {
         add_harness_to_path = [bool]$AddHarnessToPath
         user_path_contains_wrapper_dir = [bool](($pathParts -contains $WorkbenchBinDir) -or $AddHarnessToPath)
         user_path_contains_wrapper_dir_before_install = [bool]($pathParts -contains $WorkbenchBinDir)
+        configured_clients = @(Get-ConfiguredClients)
+        claudeR_source_type = $script:ClaudeRSourceType
+        claudeR_source_url = $script:ClaudeRSourceUrl
         claudeR_ref = $ClaudeRRef
         dev_sync = [bool]$DevSync
     }
@@ -152,9 +233,111 @@ function Find-HarnessPython {
     }
     $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
     if (Test-Path -LiteralPath $candidate) { return $candidate }
+    if ($InstallPython314) {
+        Install-Python314
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
     $cmd = Get-Command python -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
-    throw "Could not find Python for harness. Re-run with -HarnessPython <path> or set CLAUDER_WORKBENCH_PYTHON."
+    throw "Could not find Python for harness. Re-run with -HarnessPython <path>, set CLAUDER_WORKBENCH_PYTHON, or install Python 3.14 with: winget install --id Python.Python.3.14 --source winget -e"
+}
+
+function Install-Python314 {
+    Write-Step "Installing Python 3.14"
+    Require-Command "winget" "Install App Installer / winget first, or install Python 3.14 manually from python.org."
+    $args = @("install", "--id", "Python.Python.3.14", "--source", "winget", "--accept-package-agreements", "--accept-source-agreements", "-e")
+    Write-Host "+ winget $($args -join ' ')" -ForegroundColor DarkGray
+    if ($DryRun) { return }
+    & winget @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python 3.14 winget install failed with exit code ${LASTEXITCODE}."
+    }
+}
+
+function Get-GitHubZipUrls($Repo, $Ref) {
+    if ($Repo -match '^https://github\.com/([^/]+)/([^/.]+)(\.git)?/?$') {
+        $owner = $Matches[1]
+        $name = $Matches[2]
+        return @(
+            "https://github.com/$owner/$name/releases/download/$Ref/$name-$Ref.zip",
+            "https://github.com/$owner/$name/archive/refs/tags/$Ref.zip"
+        )
+    }
+    return @()
+}
+
+function Test-ClaudeRSource($Path) {
+    return (Test-Path -LiteralPath (Join-Path $Path "DESCRIPTION")) -and (Test-Path -LiteralPath (Join-Path $Path "clauder-mcp"))
+}
+
+function Install-ClaudeRZipFallback($Reason) {
+    if ($NoZipFallback) {
+        throw "ClaudeR git install failed and -NoZipFallback is set. Original error: $Reason"
+    }
+    $zipUrls = @(Get-GitHubZipUrls $ClaudeRRepo $ClaudeRRef)
+    if (-not $zipUrls) {
+        throw "ClaudeR git install failed and zip fallback is unavailable for repo '$ClaudeRRepo'. Original error: $Reason"
+    }
+    Write-Warning "ClaudeR git install failed; using zip fallback. Original error: $Reason"
+    $script:ClaudeRSourceType = "zip"
+    $parent = Split-Path -Parent $ClaudeRDir
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $zip = Join-Path $env:TEMP "ClaudeR-$ClaudeRRef.zip"
+    $extractRoot = Join-Path $env:TEMP "ClaudeR-$ClaudeRRef-$stamp"
+    if ($DryRun) {
+        Write-Host "Would try zip fallback URLs:"
+        foreach ($candidateUrl in $zipUrls) { Write-Host "  $candidateUrl" }
+        Write-Host "Would download first reachable URL -> $zip"
+        Write-Host "Would extract zip to $extractRoot and install to $ClaudeRDir"
+        return
+    }
+    if (-not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+    $downloaded = $false
+    $downloadErrors = @()
+    foreach ($candidateUrl in $zipUrls) {
+        Write-Host "Trying zip fallback URL: $candidateUrl"
+        try {
+            Invoke-WebRequest -Uri $candidateUrl -OutFile $zip
+            $script:ClaudeRSourceUrl = $candidateUrl
+            $downloaded = $true
+            break
+        } catch {
+            $downloadErrors += "$candidateUrl -> $($_.Exception.Message)"
+        }
+    }
+    if (-not $downloaded) {
+        throw "All ClaudeR zip fallback URLs failed: $($downloadErrors -join '; ')"
+    }
+    if (Test-Path -LiteralPath $extractRoot) {
+        Remove-Item -LiteralPath $extractRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
+    Expand-Archive -LiteralPath $zip -DestinationPath $extractRoot -Force
+    $source = Get-ChildItem -LiteralPath $extractRoot -Directory | Select-Object -First 1
+    if (-not $source) {
+        throw "ClaudeR zip fallback did not produce a source directory."
+    }
+    if (Test-Path -LiteralPath $ClaudeRDir) {
+        $backup = "${ClaudeRDir}_bak_$stamp"
+        Write-Host "Moving existing ClaudeR directory $ClaudeRDir -> $backup"
+        Move-Item -LiteralPath $ClaudeRDir -Destination $backup -Force
+    }
+    Move-Item -LiteralPath $source.FullName -Destination $ClaudeRDir
+    if (-not (Test-ClaudeRSource $ClaudeRDir)) {
+        throw "ClaudeR zip fallback produced an invalid source directory: $ClaudeRDir"
+    }
+}
+
+function Set-ClaudeRExistingSourceInfo {
+    if (Test-Path -LiteralPath (Join-Path $ClaudeRDir ".git")) {
+        $script:ClaudeRSourceType = "git"
+        $script:ClaudeRSourceUrl = $ClaudeRDir
+    } elseif (Test-Path -LiteralPath $ClaudeRDir) {
+        $script:ClaudeRSourceType = "zip"
+        $script:ClaudeRSourceUrl = $ClaudeRDir
+    }
 }
 
 function Install-ClaudeR {
@@ -164,11 +347,20 @@ function Install-ClaudeR {
         New-Item -ItemType Directory -Force $parent | Out-Null
     }
 
-    if (Test-Path $ClaudeRDir) {
-        Invoke-Checked "git" @("-C", $ClaudeRDir, "fetch", "--tags", "origin")
-        Invoke-Checked "git" @("-C", $ClaudeRDir, "checkout", $ClaudeRRef)
-    } else {
-        Invoke-Checked "git" @("clone", "--branch", $ClaudeRRef, $ClaudeRRepo, $ClaudeRDir)
+    try {
+        if (Test-Path $ClaudeRDir) {
+            Invoke-Checked "git" @("-C", $ClaudeRDir, "fetch", "--tags", "origin")
+            Invoke-Checked "git" @("-C", $ClaudeRDir, "checkout", $ClaudeRRef)
+        } else {
+            Invoke-Checked "git" @("clone", "--branch", $ClaudeRRef, $ClaudeRRepo, $ClaudeRDir)
+        }
+        if (-not (Test-ClaudeRSource $ClaudeRDir)) {
+            throw "git command finished but ClaudeR source directory is invalid: $ClaudeRDir"
+        }
+        $script:ClaudeRSourceType = "git"
+        $script:ClaudeRSourceUrl = $ClaudeRRepo
+    } catch {
+        Install-ClaudeRZipFallback $_.Exception.Message
     }
 
     $resolvedR = Find-RExe
@@ -485,7 +677,7 @@ function Write-CopilotConfig {
 
 try {
     Test-Prerequisites
-    if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Write-Step "Skipping ClaudeR install" }
+    if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Set-ClaudeRExistingSourceInfo; Write-Step "Skipping ClaudeR install" }
     Install-Skill
     Install-AgentsSkill
     Install-Harness

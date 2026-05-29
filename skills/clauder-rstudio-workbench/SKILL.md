@@ -21,6 +21,7 @@ Use these commands from this skill directory or after `install.ps1` installs the
 
 ```powershell
 .\harness\run.ps1 doctor
+.\harness\run.ps1 doctor --expect-client codex
 .\harness\run.ps1 transport-classify
 .\harness\run.ps1 tool-surface
 .\harness\run.ps1 resource-gate advise --current-parallel 1 --memory-threshold 85
@@ -84,4 +85,4 @@ For async long jobs, use the two-step hook:
 
 ## Compatible Release
 
-This skill release `v0.2.2` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill release `v0.2.3` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
