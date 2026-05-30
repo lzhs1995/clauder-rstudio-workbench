@@ -26,8 +26,18 @@ from .config import (
     python_command,
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, write_evidence
+from .fanout import (
+    build_submit_code,
+    lint_contract_workers,
+    load_fanout_contract,
+    merge_gate,
+    plan_fanout,
+    poll_once,
+    run_fanout,
+)
+from .worker_lint import lint_worker_file
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
-from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke
+from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
 from .resource import decide_resource_gate
 from .transport import (
     classify_transport,
@@ -120,6 +130,102 @@ def _check_codex_toml_parseable() -> dict[str, Any]:
         return result
 
 
+
+def _load_codex_toml() -> dict[str, Any]:
+    try:
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+        raw = CODEX_CONFIG.read_bytes()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            raw = raw[3:]
+        return tomllib.loads(raw.decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate that Codex uses the stable lzhs ClaudeR MCP launch path."""
+    install_info = install_info or {}
+    result: dict[str, Any] = {
+        "ok": True,
+        "warnings": [],
+        "reasons": [],
+        "path": str(CODEX_CONFIG),
+    }
+    if not CODEX_CONFIG.exists():
+        result["ok"] = False
+        result["reasons"].append(f"Codex config missing: {CODEX_CONFIG}")
+        return result
+
+    data = _load_codex_toml()
+    server = ((data.get("mcp_servers") or {}).get("r-studio") or {}) if isinstance(data, dict) else {}
+    env = (server.get("env") or {}) if isinstance(server, dict) else {}
+    command = str(server.get("command") or "")
+    args = server.get("args") or []
+    if isinstance(args, str):
+        args = [args]
+    args = [str(a) for a in args]
+    startup_timeout = server.get("startup_timeout_sec")
+    try:
+        startup_timeout_float = float(startup_timeout)
+    except (TypeError, ValueError):
+        startup_timeout_float = None
+
+    local_bridge = str(LOCAL_CLAUDER_BRIDGE)
+    local_bridge_norm = local_bridge.replace("\\", "/").lower()
+    persistent = command.lower().endswith("clauder-mcp.exe")
+    uvx_from_local = (
+        command.lower() == "uvx"
+        and "--from" in args
+        and any(local_bridge_norm == a.replace("\\", "/").lower() for a in args)
+    )
+    bare_mcp = (command.lower() in {"uvx", "uv"} and "clauder-mcp" in args and "--from" not in args)
+
+    result.update({
+        "command": command,
+        "args": args,
+        "startup_timeout_sec": startup_timeout,
+        "env": {k: env.get(k) for k in ("USERPROFILE", "PYTHONIOENCODING", "NO_PROXY", "UV_CACHE_DIR")},
+        "persistent_entry": persistent,
+        "uvx_from_local_bridge": uvx_from_local,
+        "bare_mcp": bare_mcp,
+    })
+
+    if bare_mcp:
+        result["reasons"].append("r-studio MCP uses bare clauder-mcp without --from; this can pull upstream/PyPI and lose lzhs fork features")
+    elif not persistent:
+        if uvx_from_local:
+            result["warnings"].append("r-studio MCP still uses uvx --from local lzhs fork; valid for dev/diagnostic but not stable colleague install")
+        else:
+            result["reasons"].append("r-studio MCP command is neither persistent clauder-mcp.exe nor uvx --from the local lzhs fork")
+
+    if startup_timeout_float is None or startup_timeout_float < 180:
+        result["reasons"].append("r-studio startup_timeout_sec is missing or below 180 seconds")
+    if not env.get("UV_CACHE_DIR"):
+        result["warnings"].append("r-studio MCP env missing UV_CACHE_DIR; cache parity/prewarm is weaker")
+
+    source_url = str(install_info.get("claudeR_source_url") or "")
+    source_path = str(install_info.get("clauder_mcp_source") or "")
+    install_mode = str(install_info.get("clauder_mcp_install_mode") or "")
+    provenance_ok = (
+        "lzhs1995/ClaudeR" in source_url
+        or "projects\\ClaudeR" in source_url
+        or "projects/ClaudeR" in source_url
+        or "projects\\ClaudeR" in source_path
+        or "projects/ClaudeR" in source_path
+    )
+    if persistent and install_info:
+        if install_mode and install_mode != "uv_tool_from_local_lzhs_fork":
+            result["warnings"].append(f"unexpected clauder_mcp_install_mode={install_mode}")
+        if not provenance_ok:
+            result["reasons"].append("INSTALL_INFO does not prove lzhs ClaudeR fork provenance")
+
+    result["ok"] = not result["reasons"]
+    return result
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     reasons: list[str] = []
     warnings: list[str] = []
@@ -134,11 +240,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         warnings.append(f"local patched ClaudeR bridge missing: {LOCAL_CLAUDER_BRIDGE}")
     if not DISCOVERY_DIR.exists():
         warnings.append(f"discovery directory missing: {DISCOVERY_DIR}")
+    codex_rstudio_mcp_info: dict[str, Any] = {}
     if "codex" in expected_clients:
         if not CODEX_CONFIG.exists():
             warnings.append(f"Codex config missing: {CODEX_CONFIG}")
-        elif not codex_config_mentions_local_bridge():
-            warnings.append("Codex config does not mention local patched ClaudeR bridge")
+        else:
+            codex_rstudio_mcp_info = _check_codex_rstudio_mcp_config(install_info)
+            reasons.extend(codex_rstudio_mcp_info.get("reasons", []))
+            warnings.extend(codex_rstudio_mcp_info.get("warnings", []))
+            if not codex_config_mentions_local_bridge() and not codex_rstudio_mcp_info.get("persistent_entry"):
+                warnings.append("Codex config does not mention local patched ClaudeR bridge")
     if "claude" in expected_clients and not CLAUDE_JSON.exists():
         warnings.append(f"Claude Code user config missing: {CLAUDE_JSON}")
     if "copilot" in expected_clients and not COPILOT_CONFIG.exists():
@@ -177,6 +288,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "expected_clients": expected_clients,
             "discovery_sessions": discovery_sessions(),
             "toml_parse_check": toml_parse_info,
+            "codex_rstudio_mcp_check": codex_rstudio_mcp_info,
         },
     )
     return emit(doc)
@@ -724,6 +836,209 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     return emit(doc)
 
 
+def cmd_worker_lint(args: argparse.Namespace) -> int:
+    """Static-safety lint for fan-out worker R scripts (forbids sink(), etc.)."""
+    if args.contract:
+        contract = load_fanout_contract(args.contract)
+        lint = lint_contract_workers(contract)
+        results = lint["results"]
+        issues = lint["issues"]
+        errors = lint["errors"]
+        task_key = contract.get("task_key")
+    else:
+        results = [lint_worker_file(p) for p in (args.code_file or [])]
+        issues = [i for r in results for i in r.get("issues", [])]
+        errors = [f"{r['path']}: {r['error']}" for r in results if r.get("error")]
+        task_key = None
+    # missing/unreadable files are a usage error; real lint findings are a BLOCK
+    if issues:
+        decision, exit_code = "BLOCK", BLOCK
+    elif errors:
+        decision, exit_code = "USAGE", 3
+    else:
+        decision, exit_code = "PASS", PASS
+    reasons = issues or errors or [f"{len(results)} worker file(s) passed worker-lint"]
+    doc = build_evidence(
+        "worker_lint",
+        decision,
+        reasons=reasons,
+        task_key=task_key,
+        exit_code=exit_code,
+        extra={"results": results, "issue_count": len(issues), "error_count": len(errors)},
+    )
+    return emit(doc)
+
+
+def cmd_fanout_plan(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    plan = plan_fanout(contract, advise_parallel=not args.no_advise)
+    submit_codes = {}
+    for worker in contract.get("workers") or []:
+        if isinstance(worker, dict) and worker.get("id"):
+            try:
+                submit_codes[worker["id"]] = build_submit_code(worker)
+            except Exception as exc:
+                submit_codes[worker["id"]] = f"<error: {exc}>"
+    exit_code = PASS if plan["ok"] else CONTRACT_FAILED
+    decision = "PASS" if plan["ok"] else "CONTRACT_FAILED"
+    reasons = plan["problems"] or [
+        f"{plan['worker_count']} workers planned; recommended start parallel={plan['recommended_max_parallel']} ({plan['advice_reason']})"
+    ]
+    doc = build_evidence(
+        "fanout_plan",
+        decision,
+        reasons=reasons,
+        task_key=plan["task_key"],
+        exit_code=exit_code,
+        extra=plan | {"submit_codes": submit_codes, "contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_fanout_run(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    transport = (args.transport or contract.get("transport") or "mcp-stdio").lower()
+    if transport != "mcp-stdio":
+        doc = build_evidence(
+            "fanout_run",
+            "BLOCK",
+            reasons=[
+                f"fanout-run only submits via mcp-stdio (got transport={transport}). "
+                "For native-wrapper, use fanout-plan to emit submit codes, submit them via the native "
+                "mcp__r_studio__ wrapper, record job_ids with async-guard register-job, then use fanout-poll/merge-gate."
+            ],
+            task_key=contract.get("task_key"),
+            transport_class="BLOCKED",
+            exit_code=BLOCK,
+            extra={"transport": transport, "contract": str(args.contract)},
+        )
+        return emit(doc)
+
+    session_name = args.session_name or contract.get("session_name") or ""
+    poll_interval = float(args.poll_interval_sec or contract.get("poll_interval_sec") or 30.0)
+    job_timeout = float(args.job_timeout_min or contract.get("job_timeout_min") or 180.0)
+    task_key = contract.get("task_key") or "fanout"
+
+    if args.dry_run:
+        plan = plan_fanout(contract, advise_parallel=True)
+        doc = build_evidence(
+            "fanout_run",
+            "PASS" if plan["ok"] else "CONTRACT_FAILED",
+            reasons=["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
+            task_key=task_key,
+            transport_class="N/A",
+            exit_code=PASS if plan["ok"] else CONTRACT_FAILED,
+            extra=plan | {"dry_run": True, "contract": str(args.contract)},
+        )
+        return emit(doc)
+
+    def submit_fn(code: str) -> dict[str, Any]:
+        return submit_async(session_name, code, timeout=args.submit_timeout)
+
+    def register_fn(worker_id: str, job_id: str) -> None:
+        write_inflight(
+            f"{task_key}:{worker_id}",
+            {
+                "task_key": f"{task_key}:{worker_id}",
+                "fanout_task_key": task_key,
+                "worker_id": worker_id,
+                "job_id": job_id,
+                "session_name": session_name,
+                "transport_class": "MCP_STDIO_OK",
+                "registered_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            },
+        )
+
+    result = run_fanout(
+        contract,
+        submit_fn=submit_fn,
+        max_parallel=args.max_parallel,
+        poll_interval_sec=poll_interval,
+        job_timeout_min=job_timeout,
+        first_artifact_timeout_min=args.first_artifact_timeout_min,
+        reuse_existing=args.reuse_existing,
+        register_fn=register_fn,
+        max_iterations=args.max_iterations,
+        auto_scale=args.auto_scale,
+        memory_threshold=args.memory_threshold,
+        max_parallel_cap=args.max_parallel_cap,
+    )
+    for wid in result.get("done", []):
+        archive_inflight(f"{task_key}:{wid}", "worker complete")
+    exit_code = PASS if result["ok"] else BLOCK
+    decision = "PASS" if result["ok"] else "BLOCK"
+    worker_total = len([w for w in (contract.get("workers") or []) if isinstance(w, dict)])
+    reasons = [
+        f"done={len(result.get('done', []))}/{worker_total} workers; "
+        f"failed={result.get('failed')}; pending={result.get('pending')}; "
+        f"still_running={result.get('still_running')}; max_parallel={result.get('max_parallel')}"
+        + (f"; auto_scale start={result.get('start_max_parallel')}->{result.get('max_parallel')} "
+           f"cap={result.get('max_parallel_cap')} scale_events={len(result.get('scale_log', []))}"
+           if result.get("auto_scale") else "")
+    ]
+    doc = build_evidence(
+        "fanout_run",
+        decision,
+        reasons=reasons,
+        task_key=task_key,
+        transport_class=result.get("transport_class", "MCP_STDIO_OK"),
+        session_name=session_name,
+        exit_code=exit_code,
+        extra=result | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_fanout_poll(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    poll = poll_once(contract)
+    exit_code = PASS if poll["all_complete"] else WARN
+    decision = "PASS" if poll["all_complete"] else "WARN"
+    reasons = [
+        f"done={len(poll['done'])}/{poll['worker_count']}; pending={poll['pending']}"
+    ]
+    doc = build_evidence(
+        "fanout_poll",
+        decision,
+        reasons=reasons,
+        task_key=contract.get("task_key"),
+        exit_code=exit_code,
+        extra=poll | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
+def cmd_merge_gate(args: argparse.Namespace) -> int:
+    contract = load_fanout_contract(args.contract)
+    gate = merge_gate(contract)
+    artifact_paths: list[str] = []
+    for s in gate["statuses"]:
+        for key in ("expected_manifest", "expected_validation"):
+            p = s["files"].get(key, {}).get("path")
+            if p:
+                artifact_paths.append(p)
+    if gate["ok"]:
+        exit_code, decision = PASS, "PASS"
+    elif gate["all_complete"]:
+        exit_code, decision = BLOCK, "BLOCK"
+    else:
+        exit_code, decision = CONTRACT_FAILED, "CONTRACT_FAILED"
+    reasons = gate["violations"] or [
+        f"all {gate['worker_count']} workers complete with manifest+validation present"
+    ]
+    doc = build_evidence(
+        "merge_gate",
+        decision,
+        reasons=reasons,
+        task_key=contract.get("task_key"),
+        artifact_paths=artifact_paths,
+        policy_violations=gate["violations"],
+        exit_code=exit_code,
+        extra=gate | {"contract": str(args.contract)},
+    )
+    return emit(doc)
+
+
 def add_common_task_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--task-key")
     parser.add_argument("--project-root", default="")
@@ -831,6 +1146,48 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
     p.add_argument("--require-job-complete", action="store_true")
 
+    p = sub.add_parser("worker-lint")
+    p.add_argument("--contract", help="Lint every worker code_file in this fan-out contract.")
+    p.add_argument("--code-file", action="append",
+                   help="Lint a specific worker .R file (repeatable). Alternative to --contract.")
+
+    p = sub.add_parser("fanout-plan")
+    p.add_argument("--contract", required=True)
+    p.add_argument("--no-advise", action="store_true",
+                   help="Skip memory-based parallelism advice; only validate the contract.")
+
+    p = sub.add_parser("fanout-run")
+    p.add_argument("--contract", required=True)
+    p.add_argument("--transport", choices=["mcp-stdio", "native-wrapper"], default=None)
+    p.add_argument("--session-name", default="")
+    p.add_argument("--max-parallel", type=int)
+    p.add_argument("--poll-interval-sec", type=float)
+    p.add_argument("--job-timeout-min", type=float)
+    p.add_argument("--first-artifact-timeout-min", type=float,
+                   help="Fail a worker that produces no output file within this many minutes (detects silent R death).")
+    p.add_argument("--reuse-existing", action="store_true",
+                   help="Resume: treat already-complete worker outputs as done and skip resubmission. "
+                        "Default off (always resubmits this run and only counts fresh outputs).")
+    p.add_argument("--submit-timeout", type=float, default=60.0)
+    p.add_argument("--max-iterations", type=int)
+    p.add_argument("--auto-scale", action="store_true",
+                   help="Dynamic concurrency (best-practice §6): start at --max-parallel and raise "
+                        "concurrency by 1 each poll cycle while system memory stays below "
+                        "--memory-threshold and work remains; throttle (no new submissions) at/above it. "
+                        "Running jobs are never killed.")
+    p.add_argument("--memory-threshold", type=float, default=85.0,
+                   help="Memory %% ceiling for --auto-scale (default 85). At/above it, no new workers are submitted.")
+    p.add_argument("--max-parallel-cap", type=int,
+                   help="Hard upper bound for --auto-scale concurrency (default: worker count).")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Validate contract and report plan without submitting any jobs.")
+
+    p = sub.add_parser("fanout-poll")
+    p.add_argument("--contract", required=True)
+
+    p = sub.add_parser("merge-gate")
+    p.add_argument("--contract", required=True)
+
     return parser
 
 
@@ -854,6 +1211,16 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_resource_gate(args)
         if args.cmd == "completion-check":
             return cmd_completion_check(args)
+        if args.cmd == "worker-lint":
+            return cmd_worker_lint(args)
+        if args.cmd == "fanout-plan":
+            return cmd_fanout_plan(args)
+        if args.cmd == "fanout-run":
+            return cmd_fanout_run(args)
+        if args.cmd == "fanout-poll":
+            return cmd_fanout_poll(args)
+        if args.cmd == "merge-gate":
+            return cmd_merge_gate(args)
     except KeyboardInterrupt:
         raise
     except Exception as exc:

@@ -1,16 +1,23 @@
 # clauder-rstudio-workbench
 
-Portable Codex skill, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
+Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
 This repository pairs with the ClaudeR fork release `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
 
-**Platform status:** v0.2.x is Windows-first. macOS/Linux installation scripts are not included yet.
+**Platform status:** v0.2.x/v0.3.x is Windows-first. macOS/Linux installation scripts are not included yet.
+
+## Skills in This Collection
+
+`install.ps1` installs every `skills/<name>/` directory that contains a `SKILL.md`:
+
+- **`clauder-rstudio-workbench`** — core skill: connect/preflight/async-guard/resource-gate/completion gates plus the parallel **fan-out** harness (one RStudio driving N async R workers with autonomous merge).
+- **`cmaverse-paired-mval`** — domain skill: a worked, executable example of the fan-out workflow for paired M=0/M=1 CMAverse bootstrap (7 mediators in parallel), with a generator and a validation gate.
 
 ## What This Installs
 
 - The patched ClaudeR R package from `https://github.com/lzhs1995/ClaudeR`.
-- The `clauder-rstudio-workbench` Codex skill under `<CODEX_HOME>/skills`.
-- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, resource gate, and completion gate checks.
+- Every skill in this collection under `<CODEX_HOME>/skills` (and `<AGENTS_HOME>/skills` with `-SyncAgentsSkill`).
+- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, fan-out, resource gate, and completion gate checks.
 - Optional MCP configuration for Codex, Claude Code, or GitHub Copilot CLI.
 
 The installer is Windows-first. It does not modify MCP client configuration unless you pass an explicit `-Configure...` switch.
@@ -20,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.2.4 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.0 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -50,16 +57,50 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.2.4.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.2.4"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.0.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.0"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.2.4/clauder-rstudio-workbench-v0.2.4.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.0/clauder-rstudio-workbench-v0.3.0.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
 cd $dest
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
+
+## Running the CMAverse fan-out workflow
+
+Once installed, the `cmaverse-paired-mval` skill auto-loads in any agent that reads
+`skills/<name>/SKILL.md`. To trigger it, ask the agent to run the paired-mval
+CMAverse 4-way decomposition (the SKILL `description` matches on "CMAverse",
+"paired mval", "fan-out", "4-way decomposition"). The agent then drives this command
+chain (one RStudio session, N async R workers, autonomous merge):
+
+```powershell
+# 1. generate + validate a fan-out contract from your paired worker .R
+python skills\cmaverse-paired-mval\scripts\make_worker_contract.py `
+  --worker-file <paired_worker.R> --output-root "<OUTPUT_ROOT>" --run-id <RUN_ID> `
+  --mediators m1,m2,...,m7 --groups sy_female,sy_male --nboot 10 --seed 12345 --out task.yaml
+clauder-workbench fanout-plan  --contract task.yaml
+
+# 2. static-safety lint (BLOCKs any worker containing sink()), then run
+clauder-workbench worker-lint  --contract task.yaml
+clauder-workbench fanout-run   --contract task.yaml --max-parallel 3 --auto-scale --memory-threshold 85
+
+# 3. scientific validation + merge gate before claiming success
+python skills\cmaverse-paired-mval\scripts\cmaverse_validate.py --output-root "<RUN_DIR>" `
+  --mediators m1,m2,...,m7 --groups sy_female,sy_male
+clauder-workbench merge-gate   --contract task.yaml
+```
+
+`--auto-scale` makes the harness sample memory each poll cycle and raise concurrency
+by one (up to the worker count, or `--max-parallel-cap`) while memory stays under the
+threshold, throttling back when it crosses it (never killing a running job). Drop
+`--auto-scale` for a fixed `--max-parallel` ceiling. For the agent's **native** MCP
+transport (instead of `fanout-run`'s Python MCP stdio), use the native path documented
+in the skill: `fanout-plan` → native submit → `async-guard register-job` →
+`fanout-poll` → `merge-gate`. See `skills/cmaverse-paired-mval/SKILL.md` for the full
+workflow and the worker contract.
 
 ## Dry Run
 
@@ -94,6 +135,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness, the `worker-lint` `sink()` BLOCK gate, `fanout-run --auto-scale` dynamic concurrency, and the `cmaverse-paired-mval` domain skill. |
 | `v0.2.4` | `v0.2.0-lzhs.1` | UTF-8 no-BOM writer for Codex/Copilot configs, fixes Chinese-path corruption in `[projects.''...'']` entries, adds `doctor --check-toml-parse` self-check with auto-rollback after `install.ps1 -ConfigureCodex`. |
 | `v0.2.3` | `v0.2.0-lzhs.1` | Adds ClaudeR zip fallback, source metadata in `INSTALL_INFO.json`, client-scoped `doctor`, Python 3.14 opt-in install, and workbench zip bootstrap docs. |
 | `v0.2.2` | `v0.2.0-lzhs.1` | Adds a user-level `clauder-workbench.cmd` wrapper, optional PATH update, clearer colleague Quick Start, and updated smoke transcript. |
@@ -104,26 +146,35 @@ Installer prerequisites:
 
 ## MCP Command
 
-The preferred Codex configuration points to the local cloned ClaudeR source:
+The preferred Codex configuration uses a persistent `clauder-mcp.exe` entry
+installed from the local `lzhs1995/ClaudeR` fork clone. This avoids the repeated
+`uvx --from ...` cold-start path that can exceed a client startup timeout on a
+new machine or after cache eviction.
 
 ```toml
 [mcp_servers.r-studio]
-command = "uvx"
-args = ["--from", "<USER_HOME>\\projects\\ClaudeR\\clauder-mcp", "clauder-mcp"]
+command = "<USER_HOME>\\.local\\bin\\clauder-mcp.exe"
+startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
 USERPROFILE = "<USER_HOME>"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "C:\\tmp\\uv-cache"
 ```
 
-The ClaudeR release also supports Git-subdirectory execution:
+`install.ps1 -ConfigureCodex` creates this entry by running:
 
 ```text
-uvx --from git+https://github.com/lzhs1995/ClaudeR.git@v0.2.0-lzhs.1#subdirectory=clauder-mcp clauder-mcp
+uv tool install --force --from <USER_HOME>\projects\ClaudeR\clauder-mcp clauder-mcp
 ```
 
-Local clone is the default installer path because it is easier to inspect, patch, and debug.
+The source is still the patched fork, not upstream ClaudeR and not PyPI. Never
+use a bare `uvx clauder-mcp` or `uv tool install clauder-mcp`; those can resolve
+to the upstream package and lose the LZHS async progress, multiple-session, and
+Copilot changes. `uvx --from <USER_HOME>\projects\ClaudeR\clauder-mcp
+clauder-mcp` remains valid only as a development diagnostic path, not the
+stable colleague install path.
 
 ## Validation
 
@@ -174,7 +225,20 @@ Restart the client. Codex, Claude Code, and Copilot CLI do not reliably hot-load
 
 ### Codex shows `Transport closed`
 
-Treat this as a transport-layer failure until proven otherwise. Check that RStudio is open, `library(ClaudeR); claudeAddin()` is running, and the discovery session appears. If HTTP/Addin is alive but the Codex native wrapper is stale, restart Codex before rerunning a long job.
+Treat this as a transport-layer failure until proven otherwise. First run:
+
+```powershell
+clauder-workbench doctor --expect-client codex --check-toml-parse
+```
+
+The Codex `r-studio` MCP entry must use the persistent
+`<USER_HOME>\.local\bin\clauder-mcp.exe`, `startup_timeout_sec = 180.0`, and
+`UV_CACHE_DIR = C:\tmp\uv-cache`. If it still uses `uvx --from`, rerun
+`install.ps1 -ConfigureCodex` to install the hot entry from the local LZHS fork.
+Only after the config/provenance check passes should a native wrapper smoke be
+accepted: `list_sessions`, short `execute_r`, then
+`execute_r_async -> get_async_result`. Do not start long fan-out work after a
+single `Transport closed`.
 
 ### Windows opens a second RStudio session and the first one aborts
 
@@ -195,7 +259,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.2.4
+git checkout v0.3.0
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

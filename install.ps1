@@ -170,6 +170,7 @@ function Test-Prerequisites {
     }
 
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Require-Command "uv" "Install uv: winget install --id astral-sh.uv -e"
         Require-Command "uvx" "Install uv: winget install --id astral-sh.uv -e"
     }
     if ($ConfigureClaudeCode) {
@@ -196,6 +197,7 @@ function Test-Prerequisites {
         Write-Host "git: not found; zip fallback is enabled"
     }
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Write-Host "uv: $((Get-Command uv).Source)"
         Write-Host "uvx: $((Get-Command uvx).Source)"
     }
 }
@@ -283,6 +285,12 @@ function Write-InstallInfo($Dest) {
         claudeR_source_type = $script:ClaudeRSourceType
         claudeR_source_url = $script:ClaudeRSourceUrl
         claudeR_ref = $ClaudeRRef
+        claudeR_commit = (Get-ClaudeRCommit)
+        clauder_mcp_source = (Join-Path $ClaudeRDir "clauder-mcp")
+        clauder_mcp_command = (Get-ClaudeRMcpExe)
+        clauder_mcp_install_mode = "uv_tool_from_local_lzhs_fork"
+        r_studio_startup_timeout_sec = 180.0
+        uv_cache_dir = "C:\tmp\uv-cache"
         dev_sync = [bool]$DevSync
     }
     $path = Join-Path $Dest "INSTALL_INFO.json"
@@ -407,6 +415,47 @@ function Set-ClaudeRExistingSourceInfo {
     }
 }
 
+
+function Get-ClaudeRMcpExe {
+    # Stable install path used by `uv tool install`. Prefer it over any PATH entry
+    # so a stray PyPI/upstream `clauder-mcp` cannot shadow the lzhs fork install.
+    $candidate = Join-Path $env:USERPROFILE ".local\bin\clauder-mcp.exe"
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    $cmd = Get-Command "clauder-mcp" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $candidate
+}
+
+function Get-ClaudeRCommit {
+    if (Test-Path -LiteralPath (Join-Path $ClaudeRDir ".git")) {
+        try {
+            $value = & git -C $ClaudeRDir rev-parse HEAD 2>$null
+            if ($LASTEXITCODE -eq 0 -and $value) { return (($value | Out-String).Trim()) }
+        } catch { return "unknown" }
+    }
+    return "unknown"
+}
+
+function Install-ClaudeRMcpTool {
+    Write-Step "Installing persistent ClaudeR MCP entry from lzhs fork"
+    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    if (-not (Test-Path -LiteralPath (Join-Path $bridge "pyproject.toml"))) {
+        throw "ClaudeR MCP bridge source missing or invalid: $bridge"
+    }
+    Require-Command "uv" "Install uv: winget install --id astral-sh.uv -e"
+    $args = @("tool", "install", "--force", "--from", $bridge, "clauder-mcp")
+    Write-Host "+ uv $($args -join ' ')" -ForegroundColor DarkGray
+    if (-not $DryRun) {
+        & uv @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv tool install clauder-mcp failed with exit code ${LASTEXITCODE}."
+        }
+    }
+    $exe = Get-ClaudeRMcpExe
+    Write-Host "clauder-mcp persistent entry: $exe"
+    return $exe
+}
+
 function Install-ClaudeR {
     Write-Step "Installing ClaudeR fork $ClaudeRRef"
     $parent = Split-Path -Parent $ClaudeRDir
@@ -434,37 +483,43 @@ function Install-ClaudeR {
     Invoke-Checked $resolvedR @("CMD", "INSTALL", $ClaudeRDir)
 }
 
-function Install-Skill {
-    Write-Step "Installing Codex skill"
-    $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
-    $destRoot = Join-Path $CodexHome "skills"
-    $dest = Join-Path $destRoot "clauder-rstudio-workbench"
+function Get-CollectionSkills {
+    # A skill is any immediate subdirectory of skills\ that contains a SKILL.md.
+    $skillsRoot = Join-Path $PSScriptRoot "skills"
+    if (-not (Test-Path $skillsRoot)) { return @() }
+    return @(Get-ChildItem -LiteralPath $skillsRoot -Directory |
+        Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") })
+}
+
+function Install-OneSkill($Source, $DestRoot, [switch]$WriteInfo) {
+    $name = Split-Path -Leaf $Source
+    $dest = Join-Path $DestRoot $name
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backup = "${dest}_bak_$stamp"
     $staging = "${dest}_staging_$stamp"
     $old = "${dest}_old_$stamp"
 
-    if (-not (Test-Path $source)) {
-        throw "Skill source not found: $source"
+    if (-not (Test-Path $Source)) {
+        throw "Skill source not found: $Source"
     }
-    if (-not (Test-Path $destRoot) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force $destRoot | Out-Null
+    if (-not (Test-Path $DestRoot) -and -not $DryRun) {
+        New-Item -ItemType Directory -Force $DestRoot | Out-Null
     }
 
     if ($DryRun) {
         if (Test-Path $dest) {
             Write-Host "Would copy backup $dest -> $backup"
-            Write-Host "Would stage new skill $source -> $staging"
+            Write-Host "Would stage new skill $Source -> $staging"
             Write-Host "Would replace $dest with staged skill and keep backup"
         } else {
-            Write-Host "Would stage and install $source -> $dest"
+            Write-Host "Would stage and install $Source -> $dest"
         }
         return
     }
 
     try {
-        Write-Host "Staging new skill $source -> $staging"
-        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+        Write-Host "Staging new skill $Source -> $staging"
+        Copy-Item -LiteralPath $Source -Destination $staging -Recurse -Force
 
         if (Test-Path $dest) {
             Write-Host "Copying backup $dest -> $backup"
@@ -477,7 +532,7 @@ function Install-Skill {
         if (Test-Path $old) {
             Remove-Item -LiteralPath $old -Recurse -Force
         }
-        Write-InstallInfo $dest
+        if ($WriteInfo) { Write-InstallInfo $dest }
         Write-Host "Installed skill to $dest"
     }
     catch {
@@ -498,41 +553,27 @@ function Install-Skill {
     }
 }
 
+function Install-Skill {
+    Write-Step "Installing Codex skills"
+    $destRoot = Join-Path $CodexHome "skills"
+    $skills = Get-CollectionSkills
+    if (-not $skills) { throw "No skills found under $(Join-Path $PSScriptRoot 'skills')" }
+    foreach ($s in $skills) {
+        # Write INSTALL_INFO.json only into the primary workbench skill.
+        $writeInfo = ($s.Name -eq "clauder-rstudio-workbench")
+        Install-OneSkill -Source $s.FullName -DestRoot $destRoot -WriteInfo:$writeInfo
+    }
+}
+
 function Install-AgentsSkill {
     if (-not $SyncAgentsSkill) { return }
-    Write-Step "Installing shared agents skill"
-    $source = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench"
+    Write-Step "Installing shared agents skills"
     $destRoot = Join-Path $AgentsHome "skills"
-    $dest = Join-Path $destRoot "clauder-rstudio-workbench"
-    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backup = "${dest}_bak_$stamp"
-    $staging = "${dest}_staging_$stamp"
-    $old = "${dest}_old_$stamp"
-
-    if ($DryRun) {
-        Write-Host "Would stage and install $source -> $dest"
-        return
-    }
-    if (-not (Test-Path $destRoot)) {
-        New-Item -ItemType Directory -Force $destRoot | Out-Null
-    }
-    try {
-        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
-        if (Test-Path $dest) {
-            Copy-Item -LiteralPath $dest -Destination $backup -Recurse -Force
-            Rename-Item -LiteralPath $dest -NewName (Split-Path -Leaf $old)
-        }
-        Move-Item -LiteralPath $staging -Destination $dest
-        if (Test-Path $old) {
-            Remove-Item -LiteralPath $old -Recurse -Force
-        }
-        Write-InstallInfo $dest
-        Write-Host "Installed shared agents skill to $dest"
-    }
-    finally {
-        if (Test-Path $staging) {
-            Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
-        }
+    $skills = Get-CollectionSkills
+    if (-not $skills) { throw "No skills found under $(Join-Path $PSScriptRoot 'skills')" }
+    foreach ($s in $skills) {
+        $writeInfo = ($s.Name -eq "clauder-rstudio-workbench")
+        Install-OneSkill -Source $s.FullName -DestRoot $destRoot -WriteInfo:$writeInfo
     }
 }
 
@@ -619,16 +660,25 @@ function Write-CodexConfig {
     Backup-File $config
 
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    $mcpExe = Get-ClaudeRMcpExe
+    if (-not (Test-Path -LiteralPath $mcpExe) -and -not $DryRun) {
+        $mcpExe = Install-ClaudeRMcpTool
+    }
     $userProfile = $env:USERPROFILE
+    $uvCacheDir = "C:\tmp\uv-cache"
+    if (-not (Test-Path -LiteralPath $uvCacheDir) -and -not $DryRun) {
+        New-Item -ItemType Directory -Force -Path $uvCacheDir | Out-Null
+    }
     $block = @"
 [mcp_servers.r-studio]
-command = "uvx"
-args = ["--from", "$($bridge.Replace('\', '\\'))", "clauder-mcp"]
+command = "$($mcpExe.Replace('\', '\\'))"
+startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
 USERPROFILE = "$($userProfile.Replace('\', '\\'))"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "$($uvCacheDir.Replace('\', '\\'))"
 "@
 
     Write-Host "Codex MCP block:"
@@ -686,7 +736,7 @@ function Configure-ClaudeCode {
     Write-Step "Configuring Claude Code MCP"
     $claudeJson = Join-Path $env:USERPROFILE ".claude.json"
     Backup-File $claudeJson
-    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    $mcpExe = Get-ClaudeRMcpExe
     $removeArgs = @(
         "mcp", "remove", "r-studio", "-s", "user"
     )
@@ -702,7 +752,8 @@ function Configure-ClaudeCode {
         "-e", "USERPROFILE=$env:USERPROFILE",
         "-e", "PYTHONIOENCODING=utf-8",
         "-e", "NO_PROXY=127.0.0.1,localhost",
-        "r-studio", "--", "uvx", "--from", $bridge, "clauder-mcp"
+        "-e", "UV_CACHE_DIR=C:\tmp\uv-cache",
+        "r-studio", "--", $mcpExe
     )
     Invoke-Checked "claude" $addArgs
     Verify-ClaudeCodeMcp
@@ -736,12 +787,13 @@ function Write-CopilotConfig {
         mcpServers = [ordered]@{
             "r-studio" = [ordered]@{
                 type = "local"
-                command = "uvx"
-                args = @("--from", $bridge, "clauder-mcp")
+                command = (Get-ClaudeRMcpExe)
+                args = @()
                 env = [ordered]@{
                     USERPROFILE = $env:USERPROFILE
                     PYTHONIOENCODING = "utf-8"
                     NO_PROXY = "127.0.0.1,localhost"
+                    UV_CACHE_DIR = "C:\tmp\uv-cache"
                 }
                 tools = @("*")
             }
@@ -757,6 +809,7 @@ function Write-CopilotConfig {
 try {
     Test-Prerequisites
     if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Set-ClaudeRExistingSourceInfo; Write-Step "Skipping ClaudeR install" }
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) { Install-ClaudeRMcpTool | Out-Null }
     Install-Skill
     Install-AgentsSkill
     Install-Harness

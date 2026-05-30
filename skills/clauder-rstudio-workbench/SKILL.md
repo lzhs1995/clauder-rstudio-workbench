@@ -7,11 +7,14 @@ description: Use when an agent needs to connect to a live RStudio session throug
 
 This skill is the operating protocol for using ClaudeR as a live RStudio workbench from Codex, Claude Code, GitHub Copilot CLI, or another MCP-capable agent. It is not a statistics reference; combine it with an R analysis skill for modeling decisions.
 
+> **Headline capability:** async polling lets one RStudio session drive N child R worker processes at once and merge the results autonomously. See [parallel-async-fanout.md](references/parallel-async-fanout.md) and the Parallel Async Fan-out section below.
+
 ## First Reads
 
 - Before formal long-running RStudio work, run the executable harness layer below. Markdown is advisory; harness evidence is the completion gate.
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
+- For running many parallel R workers from one session, read [parallel-async-fanout.md](references/parallel-async-fanout.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
 
@@ -42,6 +45,19 @@ For async long jobs, use the two-step hook:
 
 `async-guard submit --via-mcp-stdio --code-file <R>` is diagnostic MCP stdio mode only. Do not report it as native `mcp__r_studio__` wrapper execution.
 
+### Parallel Async Fan-out
+
+Run many independent R workers from one RStudio session and gate the autonomous merge. Each worker writes `state_<id>.json`, `manifest_<id>.csv`, and `validation_<id>.csv` into `output_root`; the harness polls those durable files. Full contract schema and rules are in [parallel-async-fanout.md](references/parallel-async-fanout.md).
+
+```powershell
+.\harness\run.ps1 fanout-plan --contract task.yaml                          # validate + parallelism advice
+.\harness\run.ps1 fanout-run  --contract task.yaml --max-parallel 3 --first-artifact-timeout-min 10
+.\harness\run.ps1 fanout-poll --contract task.yaml                          # for native-wrapper submissions
+.\harness\run.ps1 merge-gate  --contract task.yaml                          # final all-workers-complete gate
+```
+
+`fanout-run` submits via an independent Python MCP stdio client and labels evidence `MCP_STDIO_OK`; it BLOCKs `--transport native-wrapper`. For native-wrapper fan-out, use `fanout-plan` to emit each worker's submit code, submit it via your own wrapper, record real job ids with `async-guard register-job`, then poll with `fanout-poll`/`merge-gate`. Stale prior-run outputs do not count unless you pass `--reuse-existing` (resume) or the worker output is within `artifacts.max_age_h`.
+
 ### Transport Evidence Boundary
 
 - Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
@@ -50,6 +66,26 @@ For async long jobs, use the two-step hook:
 - `Rscript.exe`: offline R process only. It never proves RStudio/ClaudeR/MCP readiness.
 
 `transport-classify` ignores agent-supplied `--native-ok`, `--mcp-stdio-ok`, `--http-ok`, and `--rscript-ok` hints unless `--allow-agent-hints` is explicitly passed for diagnostic/test use.
+
+### MCP Launch Stability
+
+Stable installs must launch Codex `r-studio` through a persistent executable installed from the local LZHS ClaudeR fork:
+
+```toml
+[mcp_servers.r-studio]
+command = "<USER_HOME>\\.local\\bin\\clauder-mcp.exe"
+startup_timeout_sec = 180.0
+
+[mcp_servers.r-studio.env]
+USERPROFILE = "<USER_HOME>"
+PYTHONIOENCODING = "utf-8"
+NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "C:\\tmp\\uv-cache"
+```
+
+`install.ps1 -ConfigureCodex` must install that executable with `uv tool install --force --from <USER_HOME>\projects\ClaudeR\clauder-mcp clauder-mcp`. This is still the user-maintained `lzhs1995/ClaudeR@v0.2.0-lzhs.1` fork, not upstream ClaudeR. Never use bare `uvx clauder-mcp` or bare `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop async progress, multiple-session, and Copilot support.
+
+Cold start means every MCP launch asks `uvx --from ...` to resolve/build before serving JSON-RPC. Warm start means the uv cache helps but the launch still goes through `uvx`. Hot/persistent start means Codex launches `clauder-mcp.exe` directly. Long async/fan-out tasks require the hot path plus a native smoke in the current tool layer.
 
 ## Core Workflow
 
@@ -78,11 +114,20 @@ For async long jobs, use the two-step hook:
 ## Required Safety Rules
 
 - **Windows multi-session warning**: do not trust a ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)` as a liveness probe. Use a patched build with a read-only PID check.
+- Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is bare `clauder-mcp`, missing `startup_timeout_sec`, missing `UV_CACHE_DIR`, or lacks LZHS fork provenance.
 - A Codex native-wrapper long job is ready only after `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test pass in the current Codex tool layer.
 - HTTP fallback can diagnose whether the Addin HTTP server is alive, but it is not MCP-only success evidence.
-- If a Codex direct wrapper returns `Transport closed`, test the same configured server command through MCP stdio before blaming RStudio.
+- If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
 - After changing ClaudeR source, R package installation, or MCP config, restart the relevant agent/MCP process. Running agents may not hot-load changes.
 
 ## Compatible Release
 
-This skill release `v0.2.3` is paired with `lzhs1995/ClaudeR@v0.2.0-lzhs.1`.
+This skill collection release `v0.3.0` is paired with
+`lzhs1995/ClaudeR@v0.2.0-lzhs.1`. The collection includes this workbench skill
+and the companion `cmaverse-paired-mval` skill.
+
+Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
+`<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
+non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
+without BOM and validates TOML after writing. Releases after `v0.2.4`, including
+`v0.3.0`, inherit that config-writer fix.
