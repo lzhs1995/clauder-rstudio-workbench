@@ -136,6 +136,8 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
   for diagnostic MCP-stdio experiments, not for formal completion claims. Formal
   runs must use `--require-raw-file`; v0.3.3 and later require all four record
   evidence ids to be chained into the final PASS and preserve raw output hashes.
+  v0.3.4 and later also reject any downstream `native_smoke` parent evidence
+  unless those four chained record ids are present and unique.
 - **Never wrap the worker in `sink()`.** A `sink()`-wrapped worker keeps the
   detached Rterm alive after the computation finishes, so the job never exits and
   the fan-out slot is never released — recovery then needs a manual `cancel` after

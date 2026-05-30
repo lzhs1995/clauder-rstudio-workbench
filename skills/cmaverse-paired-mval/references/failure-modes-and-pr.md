@@ -61,6 +61,15 @@ the matching agent name) and pass `--raw-file` for all four record steps.
 v0.3.3 and later require all record evidence ids to be chained into the final
 PASS and preserve raw output hashes/copies; old v0.3.2 native-smoke state files
 without record evidence ids must be rerun.
+v0.3.4 and later also enforce that chain in every downstream fan-out and
+completion gate. A `native_smoke` PASS with missing or duplicate
+`parent_evidence_ids` is treated as absent, even when it says
+`transport_class = NATIVE_MCP_OK`.
+
+This strictness is by design for CMAverse long runs: do not mix agents inside
+one native smoke, do not bypass `--require-raw-file` for formal results, and do
+not delete raw native evidence as part of ordinary installer cleanup. Runtime
+skill backups have retention; scientific/native evidence does not.
 
 ### Transport closed recovery order (do not restart the agent first)
 

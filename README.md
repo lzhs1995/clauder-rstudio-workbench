@@ -27,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.3.3 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.4 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -57,10 +57,10 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.3.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.3"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.4.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.4"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.3/clauder-rstudio-workbench-v0.3.3.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.4/clauder-rstudio-workbench-v0.3.4.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -140,6 +140,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.4` | `v0.2.0-lzhs.1` | Closes the downstream gate: fan-out, merge, and completion checks now reject stale `native-smoke` PASS evidence unless it carries four unique record `parent_evidence_ids`. Adds installer `-BackupRetention 5` and documents strict single-agent/raw-proof behavior as by design. |
 | `v0.3.3` | `v0.2.0-lzhs.1` | Closes the high-assurance `native-smoke` chain: each record evidence id is saved into state and `complete` requires all four parent evidence ids; raw native output files are hashed, size/mtime stamped, and copied into the evidence tree; agent and native tool-layer must match. CMAverse examples now default to `--agent codex --require-raw-file`. |
 | `v0.3.2` | `v0.2.0-lzhs.1` | Hardens the `native-smoke` gate: high-assurance `--require-raw-file` mode (markers must appear in the dumped native tool output) and `--agent` provenance on the evidence. Adds CMAverse fan-out runbooks: native-smoke-before-fan-out gate, `Transport closed` recovery order, and the addin-transient (retry-same-layer) failure mode. |
 | `v0.3.1` | `v0.2.0-lzhs.1` | Hardens native MCP stability gates: adds executable `native-smoke` evidence flow, installer MCP prewarm/provenance fields, workspace MCP config support, and fan-out/cmaverse parent-evidence checks so long jobs cannot start from an unproven native wrapper. |
@@ -244,7 +245,7 @@ The Codex `r-studio` MCP entry must use the persistent
 `UV_CACHE_DIR = C:\tmp\uv-cache`. If it still uses `uvx --from`, rerun
 `install.ps1 -ConfigureCodex` to install the hot entry from the local LZHS fork.
 Only after the config/provenance check passes should a native wrapper smoke be
-accepted. In v0.3.3 and later, record that smoke with the high-assurance executable gate:
+accepted. In v0.3.4 and later, record that smoke with the high-assurance executable gate:
 
 ```powershell
 clauder-workbench native-smoke start --task-key <task> --session-name default --agent codex --require-raw-file
@@ -282,7 +283,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.3.3
+git checkout v0.3.4
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

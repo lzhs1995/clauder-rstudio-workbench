@@ -302,7 +302,13 @@ class FanoutTests(unittest.TestCase):
             text = text.replace("transport: mcp-stdio\n", "transport: mcp-stdio\nrequires_native_smoke: true\n")
             contract = root / "task.yaml"
             contract.write_text(text, encoding="utf-8")
-            ev = build_evidence("native_smoke", "PASS", task_key="t_demo", transport_class="NATIVE_MCP_OK")
+            ev = build_evidence(
+                "native_smoke",
+                "PASS",
+                task_key="t_demo",
+                transport_class="NATIVE_MCP_OK",
+                parent_evidence_ids=["rec-list", "rec-exec", "rec-async", "rec-result"],
+            )
             ev_path = write_evidence(ev, evidence_dir=root)
             buf = io.StringIO()
             with redirect_stdout(buf):
