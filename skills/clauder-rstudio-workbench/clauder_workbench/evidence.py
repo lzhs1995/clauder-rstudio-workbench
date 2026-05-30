@@ -55,6 +55,7 @@ def build_evidence(
     policy_violations: list[str] | None = None,
     exit_code: int = 0,
     extra: dict[str, Any] | None = None,
+    agent: str | None = None,
 ) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -64,7 +65,7 @@ def build_evidence(
         "task_key": task_key,
         "harness_name": harness_name,
         "timestamp_utc": utc_now(),
-        "agent": default_agent(),
+        "agent": agent or default_agent(),
         "transport_class": transport_class,
         "session_name": session_name,
         "pid": pid,

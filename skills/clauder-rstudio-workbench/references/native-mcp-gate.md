@@ -49,6 +49,41 @@ The final evidence must have:
 - a hand-written JSON file
 - native-smoke records missing the real async `job_id`
 
+## Worked example: addin-transient on first async submit
+
+A real native-smoke run produced this sequence: `list_sessions` ok →
+`execute_r` ok (`NATIVE_EXECUTE_OK`) → first `execute_r_async` returned
+`RStudio addin is not running`. That error is a **native layer transient**, not a
+`Transport closed`, and not a reason to restart the agent. The correct handling
+is to **retry `execute_r_async` on the same native layer**; the retry returned a
+real `job_id` and `get_async_result` later carried `NATIVE_ASYNC_RETRY_DONE`.
+Record only the successful retry:
+
+```powershell
+clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <REAL_JOB_ID>
+clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <REAL_JOB_ID> --marker NATIVE_ASYNC_RETRY_DONE
+```
+
+This is exactly the failure the gate is meant to catch before a long fan-out:
+surface the transient on a 2-second async job, not on a multi-GB worker.
+
+For maximum assurance, add `--require-raw-file` to `native-smoke start` and pass
+`--raw-file <dump.txt>` on every `record`; the harness then verifies each marker
+actually appears inside the dumped native tool output, so a step cannot be
+fabricated from a self-reported string alone.
+
+## High-assurance mode (--require-raw-file)
+
+```powershell
+clauder-workbench native-smoke start --task-key <task> --session-name default --agent codex --require-raw-file
+clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID> --raw-file <execute_r_output.txt>
+```
+
+In this mode any `record` without `--raw-file` is BLOCKed, and a `--marker` that
+is absent from the raw file is BLOCKed. Use `--agent codex|claude|copilot` so the
+final `NATIVE_MCP_OK` evidence records which agent produced it (multi-agent
+provenance); if omitted, the agent is inferred from the native tool layer.
+
 ## Transport closed recovery order
 
 Do not ask the user to restart Codex first. Use this order:

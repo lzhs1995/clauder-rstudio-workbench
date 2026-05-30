@@ -142,7 +142,7 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This skill collection release `v0.3.1` is paired with
+This skill collection release `v0.3.2` is paired with
 `lzhs1995/ClaudeR@v0.2.0-lzhs.1`. The collection includes this workbench skill
 and the companion `cmaverse-paired-mval` skill.
 
@@ -150,4 +150,4 @@ Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.1`, inherit that config-writer fix.
+`v0.3.2`, inherit that config-writer fix.
