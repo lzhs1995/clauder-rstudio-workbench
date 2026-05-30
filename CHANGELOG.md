@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.3 - 2026-05-31
+
+- Close the high-assurance `native-smoke` evidence chain. Each successful `record` now writes its `evidence_id` back into the native-smoke state, and `complete` BLOCKs unless all four native steps contribute parent evidence ids.
+- Preserve raw native MCP output proof in `--require-raw-file` mode: every raw file is SHA256 hashed, size/mtime stamped, and copied under the evidence tree so later audits do not depend on mutable working-directory files.
+- Enforce agent/tool-layer consistency. `--agent codex|claude|copilot` derives the matching `<agent>-native` tool layer when omitted, and mismatched or mixed native tool layers BLOCK.
+- Promote the CMAverse paired-mval workflow examples to the high-assurance default (`--agent codex --require-raw-file`) and document that old v0.3.2 native-smoke states must be rerun rather than completed.
+
 ## v0.3.2 - 2026-05-31
 
 - Harden the `native-smoke` gate with a high-assurance `--require-raw-file` mode: every recorded step must supply `--raw-file` (a dump of the real native MCP tool output), and any `--marker` is verified to actually appear inside that file. A `record` without the raw file, or a marker absent from it, is BLOCKed. This raises the anti-fabrication bar beyond agent-self-reported strings.

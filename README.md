@@ -27,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.3.2 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.3 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -57,10 +57,10 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.2.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.2"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.3.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.3"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.2/clauder-rstudio-workbench-v0.3.2.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.3/clauder-rstudio-workbench-v0.3.3.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -81,10 +81,11 @@ chain (one RStudio session, N async R workers, autonomous merge):
 python skills\cmaverse-paired-mval\scripts\make_worker_contract.py `
   --worker-file <paired_worker.R> --output-root "<OUTPUT_ROOT>" --run-id <RUN_ID> `
   --mediators m1,m2,...,m7 --groups sy_female,sy_male --nboot 10 --seed 12345 --out task.yaml
-clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default
+clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default --agent codex --require-raw-file
 # Run the real Codex native MCP tools now:
 #   list_sessions -> execute_r -> execute_r_async -> get_async_result
-# Then record each result with native-smoke record and finish with native-smoke complete.
+# Dump each native tool output to a raw text file and record it with --raw-file.
+# Then finish with native-smoke complete.
 clauder-workbench fanout-plan  --contract task.yaml --parent-evidence <native_smoke_PASS.json>
 
 # 2. static-safety lint (BLOCKs any worker containing sink()), then run
@@ -139,6 +140,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.3` | `v0.2.0-lzhs.1` | Closes the high-assurance `native-smoke` chain: each record evidence id is saved into state and `complete` requires all four parent evidence ids; raw native output files are hashed, size/mtime stamped, and copied into the evidence tree; agent and native tool-layer must match. CMAverse examples now default to `--agent codex --require-raw-file`. |
 | `v0.3.2` | `v0.2.0-lzhs.1` | Hardens the `native-smoke` gate: high-assurance `--require-raw-file` mode (markers must appear in the dumped native tool output) and `--agent` provenance on the evidence. Adds CMAverse fan-out runbooks: native-smoke-before-fan-out gate, `Transport closed` recovery order, and the addin-transient (retry-same-layer) failure mode. |
 | `v0.3.1` | `v0.2.0-lzhs.1` | Hardens native MCP stability gates: adds executable `native-smoke` evidence flow, installer MCP prewarm/provenance fields, workspace MCP config support, and fan-out/cmaverse parent-evidence checks so long jobs cannot start from an unproven native wrapper. |
 | `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness, the `worker-lint` `sink()` BLOCK gate, `fanout-run --auto-scale` dynamic concurrency, and the `cmaverse-paired-mval` domain skill. |
@@ -242,23 +244,22 @@ The Codex `r-studio` MCP entry must use the persistent
 `UV_CACHE_DIR = C:\tmp\uv-cache`. If it still uses `uvx --from`, rerun
 `install.ps1 -ConfigureCodex` to install the hot entry from the local LZHS fork.
 Only after the config/provenance check passes should a native wrapper smoke be
-accepted. In v0.3.1 and later, record that smoke with the executable gate:
+accepted. In v0.3.3 and later, record that smoke with the high-assurance executable gate:
 
 ```powershell
-clauder-workbench native-smoke start --task-key <task> --session-name default
+clauder-workbench native-smoke start --task-key <task> --session-name default --agent codex --require-raw-file
 # Use the real agent-native MCP tools, not Python stdio:
 # list_sessions, execute_r, execute_r_async, get_async_result
-clauder-workbench native-smoke record --task-key <task> --step list_sessions --ok --session-name default
-clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID>
-clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID>
-clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE
+clauder-workbench native-smoke record --task-key <task> --step list_sessions --ok --session-name default --raw-file <list_sessions_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID> --raw-file <execute_r_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID> --raw-file <execute_r_async_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE --raw-file <get_async_result_raw.txt>
 clauder-workbench native-smoke complete --task-key <task>
 ```
 
-For high-assurance mode, add `--agent codex` and `--require-raw-file` to `start`
-and pass `--raw-file <dump.txt>` on every `record`; the gate then verifies each
-marker actually appears in the dumped native tool output and stamps the agent
-identity on the `NATIVE_MCP_OK` evidence.
+The gate verifies each marker appears in the dumped native tool output, stamps
+agent identity on the `NATIVE_MCP_OK` evidence, chains all four record evidence
+ids into the final PASS, and preserves raw output hashes/copies for later audit.
 
 Do not start long fan-out work after a single `Transport closed`.
 
@@ -281,7 +282,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.3.2
+git checkout v0.3.3
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

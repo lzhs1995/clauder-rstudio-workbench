@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +19,7 @@ from .config import (
     CODEX_INSTALL_INFO,
     CONTRACT_FAILED,
     DISCOVERY_DIR,
+    EVIDENCE_DIR,
     LOCAL_CLAUDER_BRIDGE,
     NATIVE_SMOKE_ARCHIVE_DIR,
     NATIVE_SMOKE_DIR,
@@ -571,6 +574,46 @@ def _agent_from_tool_layer(steps: dict[str, Any]) -> str | None:
     return None
 
 
+def _native_tool_layer_for_agent(agent: str | None) -> str | None:
+    if agent in {"codex", "claude", "copilot"}:
+        return f"{agent}-native"
+    return None
+
+
+def _native_smoke_expected_agent(state: dict[str, Any]) -> str | None:
+    return str(state.get("agent") or "") or None
+
+
+def _native_smoke_existing_tool_layer(state: dict[str, Any]) -> str | None:
+    for prior in (state.get("steps") or {}).values():
+        layer = str(prior.get("tool_layer") or "")
+        if layer:
+            return layer
+    return None
+
+
+def _raw_file_proof(raw_file: str | None, evidence_id: str) -> dict[str, Any] | None:
+    if not raw_file:
+        return None
+    source = Path(raw_file).expanduser().resolve()
+    stat = source.stat()
+    digest = hashlib.sha256()
+    with source.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    target_dir = EVIDENCE_DIR / "raw" / evidence_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / source.name
+    shutil.copy2(source, target)
+    return {
+        "source_path": str(source),
+        "sha256": digest.hexdigest(),
+        "size_bytes": stat.st_size,
+        "mtime_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"),
+        "evidence_copy": str(target),
+    }
+
+
 def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, Any]) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if entry.get("transport_class") != "NATIVE_MCP_OK":
@@ -578,6 +621,14 @@ def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, 
     tool_layer = str(entry.get("tool_layer") or "")
     if not tool_layer.endswith("-native"):
         reasons.append(f"{step} must be recorded from an agent native wrapper tool layer")
+    expected_agent = _native_smoke_expected_agent(state)
+    if expected_agent:
+        expected_layer = _native_tool_layer_for_agent(expected_agent)
+        if tool_layer != expected_layer:
+            reasons.append(f"{step} tool_layer must be {expected_layer} for agent={expected_agent}")
+    existing_layer = _native_smoke_existing_tool_layer(state)
+    if existing_layer and tool_layer and tool_layer != existing_layer:
+        reasons.append(f"{step} tool_layer {tool_layer} does not match prior native smoke tool_layer {existing_layer}")
     if not entry.get("ok"):
         reasons.append(f"{step} is not recorded as ok")
     if step == "list_sessions":
@@ -694,11 +745,13 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
         if args.step not in NATIVE_SMOKE_STEPS:
             doc = build_evidence("native_smoke_record", "BLOCK", reasons=[f"unknown step: {args.step}"], task_key=task_key, exit_code=BLOCK)
             return emit(doc)
+        expected_layer = _native_tool_layer_for_agent(args.agent or state.get("agent"))
+        tool_layer = args.tool_layer or expected_layer or "codex-native"
         entry = {
             "step": args.step,
             "ok": bool(args.ok),
             "recorded_at_utc": utc_now(),
-            "tool_layer": args.tool_layer,
+            "tool_layer": tool_layer,
             "transport_class": args.transport_class,
             "session_name": args.session_name or state.get("session_name"),
             "session_count": args.session_count,
@@ -722,10 +775,6 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
                 extra={"entry": entry},
             )
             return emit(doc)
-        state.setdefault("steps", {})[args.step] = entry
-        state["status"] = "recording"
-        state["updated_at_utc"] = utc_now()
-        _write_native_smoke(task_key, state)
         doc = build_evidence(
             "native_smoke_record",
             "PASS",
@@ -739,6 +788,32 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             extra={"entry": entry},
             agent=args.agent or state.get("agent"),
         )
+        entry["evidence_id"] = doc["evidence_id"]
+        try:
+            proof = _raw_file_proof(entry.get("raw_file"), str(doc["evidence_id"]))
+        except Exception as exc:
+            fail_doc = build_evidence(
+                "native_smoke_record",
+                "BLOCK",
+                reasons=[f"could not preserve raw_file proof for {args.step}: {exc}"],
+                task_key=task_key,
+                transport_class="BLOCKED",
+                session_name=entry.get("session_name"),
+                job_id=entry.get("job_id"),
+                policy_violations=["NATIVE-SMOKE-RAW-PROOF-FAILED"],
+                exit_code=BLOCK,
+                extra={"entry": entry},
+                agent=args.agent or state.get("agent"),
+            )
+            return emit(fail_doc)
+        if proof:
+            entry["raw_file_proof"] = proof
+            doc["artifact_paths"] = [proof["evidence_copy"]]
+        doc["extra"]["entry"] = entry
+        state.setdefault("steps", {})[args.step] = entry
+        state["status"] = "recording"
+        state["updated_at_utc"] = utc_now()
+        _write_native_smoke(task_key, state)
         return emit(doc)
 
     if args.action == "complete":
@@ -751,6 +826,8 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
                 continue
             ok, step_reasons = _native_smoke_step_valid(step, entry, state)
             reasons.extend(step_reasons)
+            if not entry.get("evidence_id"):
+                reasons.append(f"native smoke step is missing record evidence_id: {step}")
             if not _timestamp_fresh_enough(str(entry.get("recorded_at_utc") or ""), args.max_age_min):
                 reasons.append(f"native smoke step is stale: {step}")
         if reasons:
@@ -765,10 +842,22 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
                 extra={"state": state},
             )
             return emit(doc)
+        parent_ids = [step.get("evidence_id") for step in steps.values() if step.get("evidence_id")]
+        if len(parent_ids) != len(NATIVE_SMOKE_STEPS):
+            doc = build_evidence(
+                "native_smoke",
+                "BLOCK",
+                reasons=["native smoke complete requires one parent evidence_id for each recorded step"],
+                task_key=task_key,
+                transport_class="BLOCKED",
+                policy_violations=["NATIVE-SMOKE-PARENT-EVIDENCE-MISSING"],
+                exit_code=BLOCK,
+                extra={"state": state},
+            )
+            return emit(doc)
         state["status"] = "complete"
         state["completed_at_utc"] = utc_now()
         _write_native_smoke(task_key, state)
-        parent_ids = [step.get("evidence_id") for step in steps.values() if step.get("evidence_id")]
         smoke_agent = args.agent or state.get("agent") or _agent_from_tool_layer(steps)
         doc = build_evidence(
             "native_smoke",
@@ -1535,7 +1624,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_task_args(p)
     p.add_argument("--step", choices=list(NATIVE_SMOKE_STEPS))
     p.add_argument("--ok", action="store_true")
-    p.add_argument("--tool-layer", choices=["codex-native", "claude-native", "copilot-native"], default="codex-native")
+    p.add_argument("--tool-layer", choices=["codex-native", "claude-native", "copilot-native"],
+                   help="Agent native wrapper layer that produced this step. Defaults to <agent>-native when --agent was set at start, otherwise codex-native.")
     p.add_argument("--transport-class", choices=["NATIVE_MCP_OK", "MCP_STDIO_OK", "HTTP_ONLY_DIAGNOSTIC", "RSCRIPT_ONLY", "BLOCKED"], default="NATIVE_MCP_OK")
     p.add_argument("--session-count", type=int, default=0)
     p.add_argument("--pid")

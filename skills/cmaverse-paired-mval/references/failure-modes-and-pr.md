@@ -56,6 +56,11 @@ the parent task must pass `clauder-workbench native-smoke` so its evidence has
 `completion-check` consume that parent evidence; a fan-out without a passing
 native-smoke is BLOCKed (not WARNed). See
 `clauder-rstudio-workbench/references/native-mcp-gate.md` for the exact sequence.
+For formal runs, start native-smoke with `--agent codex --require-raw-file` (or
+the matching agent name) and pass `--raw-file` for all four record steps.
+v0.3.3 and later require all record evidence ids to be chained into the final
+PASS and preserve raw output hashes/copies; old v0.3.2 native-smoke state files
+without record evidence ids must be rerun.
 
 ### Transport closed recovery order (do not restart the agent first)
 

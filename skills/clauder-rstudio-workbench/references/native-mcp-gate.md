@@ -14,7 +14,7 @@ agent tool layer.
 
 ```powershell
 clauder-workbench doctor --expect-client codex --check-toml-parse
-clauder-workbench native-smoke start --task-key <task> --session-name default
+clauder-workbench native-smoke start --task-key <task> --session-name default --agent codex --require-raw-file
 ```
 
 Then the agent must use the real native MCP tools:
@@ -27,10 +27,10 @@ Then the agent must use the real native MCP tools:
 Record each result:
 
 ```powershell
-clauder-workbench native-smoke record --task-key <task> --step list_sessions --ok --session-name default
-clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID>
-clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID>
-clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE
+clauder-workbench native-smoke record --task-key <task> --step list_sessions --ok --session-name default --raw-file <list_sessions_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID> --raw-file <execute_r_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID> --raw-file <execute_r_async_raw.txt>
+clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE --raw-file <get_async_result_raw.txt>
 clauder-workbench native-smoke complete --task-key <task>
 ```
 
@@ -40,6 +40,8 @@ The final evidence must have:
 - `decision = PASS`
 - `transport_class = NATIVE_MCP_OK`
 - the same `task_key` as the long job contract
+- four non-empty `parent_evidence_ids` from the four record steps
+- raw output hashes and evidence copies for all recorded `--raw-file` values
 
 ## What does not count
 
@@ -67,10 +69,11 @@ clauder-workbench native-smoke record --task-key <task> --step get_async_result 
 This is exactly the failure the gate is meant to catch before a long fan-out:
 surface the transient on a 2-second async job, not on a multi-GB worker.
 
-For maximum assurance, add `--require-raw-file` to `native-smoke start` and pass
-`--raw-file <dump.txt>` on every `record`; the harness then verifies each marker
-actually appears inside the dumped native tool output, so a step cannot be
-fabricated from a self-reported string alone.
+For maximum assurance, and for formal CMAverse fan-out work, use
+`--require-raw-file` on `native-smoke start` and pass `--raw-file <dump.txt>` on
+every `record`; the harness then verifies each marker actually appears inside
+the dumped native tool output, so a step cannot be fabricated from a
+self-reported string alone.
 
 ## High-assurance mode (--require-raw-file)
 
@@ -83,6 +86,10 @@ In this mode any `record` without `--raw-file` is BLOCKed, and a `--marker` that
 is absent from the raw file is BLOCKed. Use `--agent codex|claude|copilot` so the
 final `NATIVE_MCP_OK` evidence records which agent produced it (multi-agent
 provenance); if omitted, the agent is inferred from the native tool layer.
+v0.3.3 and later also copy each raw file into the evidence tree and store
+`sha256`, `size_bytes`, and `mtime_utc`. A final `complete` without one parent
+record evidence id per native step is BLOCKed; rerun old v0.3.2 smoke states
+rather than trying to complete them after upgrading.
 
 ## Transport closed recovery order
 

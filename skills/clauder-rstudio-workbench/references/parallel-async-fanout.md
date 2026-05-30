@@ -110,9 +110,9 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 
 # 2b. native-wrapper mode: first prove the current agent-native tool layer,
 #     then submit each worker via mcp__r_studio__, record the real job_id, and poll/gate:
-.\harness\run.ps1 native-smoke start --task-key cmaverse_msat_decomp --session-name default
+.\harness\run.ps1 native-smoke start --task-key cmaverse_msat_decomp --session-name default --agent codex --require-raw-file
 # agent runs real native list_sessions / execute_r / execute_r_async / get_async_result
-# and records each with native-smoke record
+# and records each with native-smoke record plus --raw-file
 .\harness\run.ps1 native-smoke complete --task-key cmaverse_msat_decomp
 .\harness\run.ps1 async-guard register-job --task-key cmaverse_msat_decomp:msat_c12_2 --job-id <real_job_id>
 .\harness\run.ps1 fanout-poll --contract task.yaml --parent-evidence <native_smoke_PASS.json>
