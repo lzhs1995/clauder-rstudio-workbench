@@ -192,7 +192,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.3.1")
+        self.assertEqual(doc["producer_version"], "0.3.2")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -534,18 +534,20 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.3.1", text)
-        self.assertIn("releases/download/v0.3.1/clauder-rstudio-workbench-v0.3.1.zip", text)
+        self.assertIn("--branch v0.3.2", text)
+        self.assertIn("releases/download/v0.3.2/clauder-rstudio-workbench-v0.3.2.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
         # The install/clone/zip/upgrade commands must not point at the old tag.
         self.assertNotIn("--branch v0.2.4", text)
         self.assertNotIn("git checkout v0.2.4", text)
         self.assertNotIn("releases/download/v0.2.4/", text)
+        self.assertNotIn("--branch v0.3.1", text)
+        self.assertNotIn("releases/download/v0.3.1/", text)
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.3.1`", text)
+        self.assertIn("skill collection release `v0.3.2`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)

@@ -27,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.3.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.2 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -57,10 +57,10 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.1.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.1"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.2.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.2"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.1/clauder-rstudio-workbench-v0.3.1.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.2/clauder-rstudio-workbench-v0.3.2.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -139,6 +139,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.2` | `v0.2.0-lzhs.1` | Hardens the `native-smoke` gate: high-assurance `--require-raw-file` mode (markers must appear in the dumped native tool output) and `--agent` provenance on the evidence. Adds CMAverse fan-out runbooks: native-smoke-before-fan-out gate, `Transport closed` recovery order, and the addin-transient (retry-same-layer) failure mode. |
 | `v0.3.1` | `v0.2.0-lzhs.1` | Hardens native MCP stability gates: adds executable `native-smoke` evidence flow, installer MCP prewarm/provenance fields, workspace MCP config support, and fan-out/cmaverse parent-evidence checks so long jobs cannot start from an unproven native wrapper. |
 | `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness, the `worker-lint` `sink()` BLOCK gate, `fanout-run --auto-scale` dynamic concurrency, and the `cmaverse-paired-mval` domain skill. |
 | `v0.2.4` | `v0.2.0-lzhs.1` | UTF-8 no-BOM writer for Codex/Copilot configs, fixes Chinese-path corruption in `[projects.''...'']` entries, adds `doctor --check-toml-parse` self-check with auto-rollback after `install.ps1 -ConfigureCodex`. |
@@ -254,6 +255,11 @@ clauder-workbench native-smoke record --task-key <task> --step get_async_result 
 clauder-workbench native-smoke complete --task-key <task>
 ```
 
+For high-assurance mode, add `--agent codex` and `--require-raw-file` to `start`
+and pass `--raw-file <dump.txt>` on every `record`; the gate then verifies each
+marker actually appears in the dumped native tool output and stamps the agent
+identity on the `NATIVE_MCP_OK` evidence.
+
 Do not start long fan-out work after a single `Transport closed`.
 
 ### Windows opens a second RStudio session and the first one aborts
@@ -275,7 +281,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.3.1
+git checkout v0.3.2
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

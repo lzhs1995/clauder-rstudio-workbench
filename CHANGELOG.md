@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.2 - 2026-05-31
+
+- Harden the `native-smoke` gate with a high-assurance `--require-raw-file` mode: every recorded step must supply `--raw-file` (a dump of the real native MCP tool output), and any `--marker` is verified to actually appear inside that file. A `record` without the raw file, or a marker absent from it, is BLOCKed. This raises the anti-fabrication bar beyond agent-self-reported strings.
+- Add `--agent {codex,claude,copilot}` provenance to `native-smoke`. The agent identity is stamped on the `start`/`record`/`complete` evidence and, when omitted, inferred from the native tool layer — so multi-agent setups can trace which agent produced an `NATIVE_MCP_OK` proof.
+- Document the addin-transient failure mode (first `execute_r_async` returns `RStudio addin is not running` -> retry on the **same** native layer, never restart) as both a failure mode in `cmaverse-paired-mval/references/failure-modes-and-pr.md` and a worked example in `references/native-mcp-gate.md`.
+- Add a CMAverse fan-out runbook: native-smoke must PASS (parent `transport_class=NATIVE_MCP_OK`) before a fan-out, plus the `Transport closed` recovery order (doctor -> confirm persistent entry/provenance -> reinstall -> native-smoke retry -> only then restart) directly in the CMAverse failure-modes reference.
+
 ## v0.3.1 - 2026-05-30
 
 - Add executable `native-smoke` gate. The command uses an agent-driven contract (`start` -> real native `list_sessions`/`execute_r`/`execute_r_async`/`get_async_result` -> `record` -> `complete`) and writes `transport_class=NATIVE_MCP_OK` only after all four native-wrapper steps are present. Python MCP stdio, HTTP fallback, and hand-written JSON do not count.
