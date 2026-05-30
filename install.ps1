@@ -19,6 +19,7 @@ param(
     [switch]$NoZipFallback,
     [switch]$InstallPython314,
     [switch]$SkipPrewarm,
+    [int]$BackupRetention = 5,
     [switch]$RequirePrewarm,
     [int]$PrewarmTimeoutSec = 60,
     [switch]$ConfigureWorkspaceMcp,
@@ -543,6 +544,30 @@ function Get-CollectionSkills {
         Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") })
 }
 
+function Get-SkillBackups($DestRoot, $SkillName) {
+    if (-not (Test-Path -LiteralPath $DestRoot)) { return @() }
+    return @(Get-ChildItem -LiteralPath $DestRoot -Directory -Filter "${SkillName}_bak_*" | Sort-Object LastWriteTime -Descending)
+}
+
+function Prune-SkillBackups($DestRoot, $SkillName) {
+    if ($BackupRetention -lt 0) { throw "BackupRetention must be >= 0" }
+    $backups = Get-SkillBackups $DestRoot $SkillName
+    if ($BackupRetention -eq 0) {
+        Write-Host "Backup retention disabled for $SkillName; existing backups: $($backups.Count)"
+        return
+    }
+    $remove = @($backups | Select-Object -Skip $BackupRetention)
+    if (-not $remove) { return }
+    foreach ($b in $remove) {
+        if ($DryRun) {
+            Write-Host "Would remove old skill backup $($b.FullName)"
+        } else {
+            Write-Host "Removing old skill backup $($b.FullName)"
+            Remove-Item -LiteralPath $b.FullName -Recurse -Force
+        }
+    }
+}
+
 function Install-OneSkill($Source, $DestRoot, [switch]$WriteInfo) {
     $name = Split-Path -Leaf $Source
     $dest = Join-Path $DestRoot $name
@@ -563,6 +588,7 @@ function Install-OneSkill($Source, $DestRoot, [switch]$WriteInfo) {
             Write-Host "Would copy backup $dest -> $backup"
             Write-Host "Would stage new skill $Source -> $staging"
             Write-Host "Would replace $dest with staged skill and keep backup"
+            Prune-SkillBackups -DestRoot $DestRoot -SkillName $name
         } else {
             Write-Host "Would stage and install $Source -> $dest"
         }
@@ -585,6 +611,7 @@ function Install-OneSkill($Source, $DestRoot, [switch]$WriteInfo) {
             Remove-Item -LiteralPath $old -Recurse -Force
         }
         if ($WriteInfo) { Write-InstallInfo $dest }
+        Prune-SkillBackups -DestRoot $DestRoot -SkillName $name
         Write-Host "Installed skill to $dest"
     }
     catch {

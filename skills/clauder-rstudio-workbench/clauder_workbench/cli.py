@@ -529,6 +529,9 @@ def _native_smoke_parent_ok(parent_docs: list[dict[str, Any]], task_key: str | N
             continue
         if doc.get("decision") != "PASS" or doc.get("transport_class") != "NATIVE_MCP_OK":
             continue
+        parent_ids = [str(x) for x in (doc.get("parent_evidence_ids") or []) if str(x)]
+        if len(parent_ids) != len(NATIVE_SMOKE_STEPS) or len(set(parent_ids)) != len(NATIVE_SMOKE_STEPS):
+            continue
         if task_key and doc.get("task_key") not in {task_key, None, ""}:
             continue
         if not _timestamp_fresh_enough(str(doc.get("timestamp_utc") or ""), max_age_min):
@@ -558,7 +561,7 @@ def _native_smoke_gate(contract: dict[str, Any], parent_evidence: list[str] | No
     key = task_key or contract.get("task_key")
     if not _native_smoke_parent_ok(parent_docs, str(key) if key else None, max_age):
         reasons.append(
-            "contract requires fresh native_smoke parent evidence with transport_class=NATIVE_MCP_OK; "
+            "contract requires fresh native_smoke parent evidence with transport_class=NATIVE_MCP_OK and four chained record parent ids; "
             "run native-smoke start -> native list_sessions/execute_r/execute_r_async/get_async_result -> "
             "native-smoke record/complete first"
         )
@@ -1206,7 +1209,7 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     require_native_smoke = args.require_native_smoke or bool(contract.get("requires_native_smoke"))
     if require_native_smoke and not _native_smoke_parent_ok(parent_docs, args.task_key or contract.get("task_key"), args.native_smoke_max_age_min):
         policy_violations.append("MISSING-NATIVE-SMOKE-EVIDENCE")
-        reasons.append("required native_smoke parent evidence with transport_class=NATIVE_MCP_OK is missing or stale")
+        reasons.append("required native_smoke parent evidence with transport_class=NATIVE_MCP_OK and four chained record parent ids is missing, stale, or incomplete")
     if args.io_mode == "durable_files" and args.outputs:
         policy_violations.append("P2 BIG-MODEL-LARGE-OUTPUTS")
         reasons.append("durable_files completion includes marshaled outputs")

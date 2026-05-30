@@ -12,6 +12,7 @@ from clauder_workbench.artifacts import artifact_ok, check_artifacts, parse_requ
 from clauder_workbench.cli import (
     _expected_clients,
     _job_complete_ok,
+    _native_smoke_parent_ok,
     _p6_durable_violations,
     _resource_gate_ok,
     _state_is_complete,
@@ -192,7 +193,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.3.3")
+        self.assertEqual(doc["producer_version"], "0.3.4")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -597,6 +598,44 @@ class HarnessUnitTests(unittest.TestCase):
             ):
                 self.assertEqual(cmd_completion_check(args), 0)
 
+    def test_native_smoke_parent_ok_requires_four_chained_parent_ids(self) -> None:
+        doc = build_evidence(
+            "native_smoke",
+            "PASS",
+            task_key="task-a",
+            transport_class="NATIVE_MCP_OK",
+            parent_evidence_ids=["p1", "p2", "p3", "p4"],
+        )
+        self.assertTrue(_native_smoke_parent_ok([doc], task_key="task-a", max_age_min=60))
+        empty_chain = dict(doc)
+        empty_chain["parent_evidence_ids"] = []
+        self.assertFalse(_native_smoke_parent_ok([empty_chain], task_key="task-a", max_age_min=60))
+        duplicate_chain = dict(doc)
+        duplicate_chain["parent_evidence_ids"] = ["p1", "p1", "p2", "p3"]
+        self.assertFalse(_native_smoke_parent_ok([duplicate_chain], task_key="task-a", max_age_min=60))
+
+    def test_completion_check_blocks_empty_chain_native_smoke_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            parent = build_evidence("native_smoke", "PASS", task_key="task-a", transport_class="NATIVE_MCP_OK")
+            parent_path = write_evidence(parent, evidence_dir=Path(td))
+            parser = build_parser()
+            args = parser.parse_args([
+                "completion-check",
+                "--mode",
+                "formal",
+                "--policy",
+                "strict",
+                "--task-key",
+                "task-a",
+                "--require-native-smoke",
+                "--parent-evidence",
+                str(parent_path),
+            ])
+            with mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))), mock.patch(
+                "clauder_workbench.cli.load_inflight", lambda task_key: None
+            ):
+                self.assertEqual(cmd_completion_check(args), 5)
+
     def test_installer_exposes_wrapper_options(self) -> None:
         text = Path("install.ps1").read_text(encoding="utf-8")
         self.assertIn("AddHarnessToPath", text)
@@ -605,8 +644,8 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.3.3", text)
-        self.assertIn("releases/download/v0.3.3/clauder-rstudio-workbench-v0.3.3.zip", text)
+        self.assertIn("--branch v0.3.4", text)
+        self.assertIn("releases/download/v0.3.4/clauder-rstudio-workbench-v0.3.4.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
         # The install/clone/zip/upgrade commands must not point at the old tag.
@@ -618,7 +657,7 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.3.3`", text)
+        self.assertIn("skill collection release `v0.3.4`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
@@ -628,6 +667,13 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("NoZipFallback", text)
         self.assertIn("Install-ClaudeRZipFallback", text)
         self.assertIn("InstallPython314", text)
+
+    def test_installer_exposes_backup_retention(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("BackupRetention = 5", text)
+        self.assertIn("function Prune-SkillBackups", text)
+        self.assertIn("Select-Object -Skip $BackupRetention", text)
+        self.assertIn("Would remove old skill backup", text)
 
     def test_installer_records_source_metadata(self) -> None:
         text = Path("install.ps1").read_text(encoding="utf-8")

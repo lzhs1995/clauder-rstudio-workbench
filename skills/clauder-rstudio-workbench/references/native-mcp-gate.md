@@ -91,6 +91,24 @@ v0.3.3 and later also copy each raw file into the evidence tree and store
 record evidence id per native step is BLOCKed; rerun old v0.3.2 smoke states
 rather than trying to complete them after upgrading.
 
+v0.3.4 and later apply the same chain requirement on the **consumer** side:
+`fanout-plan`, `fanout-run`, `fanout-poll`, `merge-gate`, and
+`completion-check` reject a `native_smoke` PASS unless it has four unique
+`parent_evidence_ids`. This is deliberate. Legacy or hand-written PASS evidence
+must not unlock formal long jobs.
+
+## Strict by-design rules
+
+- Do not mix agents inside one native smoke. A `codex` smoke must be recorded
+  from `codex-native`, a `claude` smoke from `claude-native`, and a `copilot`
+  smoke from `copilot-native`.
+- Do not disable raw proof for formal fan-out or paper outputs. Raw native tool
+  dumps are copied into the evidence tree because working-directory files can be
+  moved, edited, or deleted after the run.
+- Do not prune raw evidence automatically. Runtime skill backups have installer
+  retention; raw evidence is formal provenance and must be cleaned only by an
+  explicit maintenance decision.
+
 ## Transport closed recovery order
 
 Do not ask the user to restart Codex first. Use this order:

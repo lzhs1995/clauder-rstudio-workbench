@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.4 - 2026-05-31
+
+- Harden downstream native-smoke consumption: fan-out and completion gates now require a `native_smoke` parent evidence to carry four unique record `parent_evidence_ids`, so v0.3.2-era empty-chain PASS evidence no longer satisfies formal gates.
+- Add installer backup retention for runtime skill directories. `-BackupRetention 5` is the default; `0` disables pruning, and `-DryRun` reports which old `*_bak_*` directories would be removed.
+- Document the strict by-design policy: no mixed-agent native-smoke, no bypass for empty parent chains, and no automatic cleanup of raw formal evidence.
+
 ## v0.3.3 - 2026-05-31
 
 - Close the high-assurance `native-smoke` evidence chain. Each successful `record` now writes its `evidence_id` back into the native-smoke state, and `complete` BLOCKs unless all four native steps contribute parent evidence ids.
