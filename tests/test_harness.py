@@ -322,6 +322,118 @@ class HarnessUnitTests(unittest.TestCase):
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a"])), 0)
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 3)
 
+    def test_native_smoke_require_raw_file_blocks_record_without_raw_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "start", "--task-key", "task-a", "--session-name", "default",
+                    "--require-raw-file",
+                ])), 0)
+                rc = cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions",
+                    "--ok", "--session-name", "default",
+                ]))
+                self.assertEqual(rc, 3)
+
+    def test_native_smoke_require_raw_file_passes_full_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ls = root / "ls.txt"; ls.write_text("sessions: default", encoding="utf-8")
+            ex = root / "ex.txt"; ex.write_text("NATIVE_EXECUTE_OK pid=123", encoding="utf-8")
+            asy = root / "async.txt"; asy.write_text("submitted job123", encoding="utf-8")
+            res = root / "res.txt"; res.write_text("complete NATIVE_ASYNC_DONE", encoding="utf-8")
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "start", "--task-key", "task-a", "--session-name", "default",
+                    "--require-raw-file",
+                ])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions",
+                    "--ok", "--session-name", "default", "--raw-file", str(ls),
+                ])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "execute_r",
+                    "--ok", "--marker", "NATIVE_EXECUTE_OK", "--pid", "123", "--raw-file", str(ex),
+                ])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "execute_r_async",
+                    "--ok", "--job-id", "job123", "--raw-file", str(asy),
+                ])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "get_async_result",
+                    "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE", "--raw-file", str(res),
+                ])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
+
+    def test_native_smoke_require_raw_file_blocks_marker_absent_from_raw_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ex = root / "ex.txt"; ex.write_text("no marker present here", encoding="utf-8")
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "start", "--task-key", "task-a", "--session-name", "default",
+                    "--require-raw-file",
+                ])), 0)
+                rc = cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "execute_r",
+                    "--ok", "--marker", "NATIVE_EXECUTE_OK", "--pid", "123", "--raw-file", str(ex),
+                ]))
+                self.assertEqual(rc, 3)
+
+    def test_native_smoke_complete_stamps_agent_identity(self) -> None:
+        captured: list[dict] = []
+
+        def cap(doc, write=True):
+            captured.append(doc)
+            return int(doc.get("exit_code", 0))
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", cap):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--session-name", "default", "--agent", "codex"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions", "--ok", "--session-name", "default"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r", "--ok", "--marker", "NATIVE_EXECUTE_OK", "--pid", "123"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r_async", "--ok", "--job-id", "job123"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "get_async_result", "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
+        complete_doc = captured[-1]
+        self.assertEqual(complete_doc.get("transport_class"), "NATIVE_MCP_OK")
+        self.assertEqual(complete_doc.get("agent"), "codex")
+
+    def test_native_smoke_complete_infers_agent_from_tool_layer(self) -> None:
+        captured: list[dict] = []
+
+        def cap(doc, write=True):
+            captured.append(doc)
+            return int(doc.get("exit_code", 0))
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", cap):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--session-name", "default"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions", "--ok", "--session-name", "default", "--tool-layer", "copilot-native"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r", "--ok", "--marker", "NATIVE_EXECUTE_OK", "--pid", "123", "--tool-layer", "copilot-native"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r_async", "--ok", "--job-id", "job123", "--tool-layer", "copilot-native"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "get_async_result", "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE", "--tool-layer", "copilot-native"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
+        self.assertEqual(captured[-1].get("agent"), "copilot")
+
     def test_cold_start_retry_succeeds_on_second_attempt(self) -> None:
         calls = {"n": 0}
 

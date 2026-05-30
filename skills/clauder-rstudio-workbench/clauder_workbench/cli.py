@@ -563,6 +563,14 @@ def _native_smoke_gate(contract: dict[str, Any], parent_evidence: list[str] | No
     return True, reasons, parent_docs
 
 
+def _agent_from_tool_layer(steps: dict[str, Any]) -> str | None:
+    for entry in steps.values():
+        tool_layer = str(entry.get("tool_layer") or "")
+        if tool_layer.endswith("-native"):
+            return tool_layer[: -len("-native")]
+    return None
+
+
 def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, Any]) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if entry.get("transport_class") != "NATIVE_MCP_OK":
@@ -591,6 +599,8 @@ def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, 
             reasons.append("get_async_result needs a completion marker")
     raw_file = entry.get("raw_file")
     marker = entry.get("marker")
+    if state.get("require_raw_file") and not raw_file:
+        reasons.append(f"{step} requires --raw-file in high-assurance mode (--require-raw-file)")
     if raw_file and marker:
         try:
             raw = Path(raw_file).read_text(encoding="utf-8-sig", errors="replace")
@@ -648,6 +658,8 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             "status": "started",
             "started_at_utc": utc_now(),
             "session_name": args.session_name,
+            "agent": args.agent,
+            "require_raw_file": bool(args.require_raw_file),
             "required_steps": list(NATIVE_SMOKE_STEPS),
             "steps": {},
         }
@@ -662,6 +674,7 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             session_name=args.session_name,
             exit_code=PASS,
             extra={"state_path": str(path), "required_steps": list(NATIVE_SMOKE_STEPS)},
+            agent=args.agent,
         )
         return emit(doc)
 
@@ -724,6 +737,7 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             job_id=entry.get("job_id"),
             exit_code=PASS,
             extra={"entry": entry},
+            agent=args.agent or state.get("agent"),
         )
         return emit(doc)
 
@@ -755,6 +769,7 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
         state["completed_at_utc"] = utc_now()
         _write_native_smoke(task_key, state)
         parent_ids = [step.get("evidence_id") for step in steps.values() if step.get("evidence_id")]
+        smoke_agent = args.agent or state.get("agent") or _agent_from_tool_layer(steps)
         doc = build_evidence(
             "native_smoke",
             "PASS",
@@ -767,6 +782,7 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             job_id=steps.get("execute_r_async", {}).get("job_id"),
             exit_code=PASS,
             extra={"state_path": str(_native_smoke_path(task_key)), "steps": steps},
+            agent=smoke_agent,
         )
         return emit(doc)
 
@@ -1526,6 +1542,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--job-id")
     p.add_argument("--marker")
     p.add_argument("--raw-file")
+    p.add_argument("--agent", choices=["codex", "claude", "copilot"], help="Agent identity recorded in native_smoke evidence (provenance for multi-agent setups).")
+    p.add_argument("--require-raw-file", action="store_true", help="High-assurance mode: every recorded step must supply --raw-file (a dump of the real native MCP tool output); markers are verified to appear inside it.")
     p.add_argument("--max-age-min", type=float, default=20.0)
     p.add_argument("--force", action="store_true")
     p.add_argument("--reason")
