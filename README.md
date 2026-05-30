@@ -68,6 +68,40 @@ cd $dest
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
+## Running the CMAverse fan-out workflow
+
+Once installed, the `cmaverse-paired-mval` skill auto-loads in any agent that reads
+`skills/<name>/SKILL.md`. To trigger it, ask the agent to run the paired-mval
+CMAverse 4-way decomposition (the SKILL `description` matches on "CMAverse",
+"paired mval", "fan-out", "4-way decomposition"). The agent then drives this command
+chain (one RStudio session, N async R workers, autonomous merge):
+
+```powershell
+# 1. generate + validate a fan-out contract from your paired worker .R
+python skills\cmaverse-paired-mval\scripts\make_worker_contract.py `
+  --worker-file <paired_worker.R> --output-root "<OUTPUT_ROOT>" --run-id <RUN_ID> `
+  --mediators m1,m2,...,m7 --groups sy_female,sy_male --nboot 10 --seed 12345 --out task.yaml
+clauder-workbench fanout-plan  --contract task.yaml
+
+# 2. static-safety lint (BLOCKs any worker containing sink()), then run
+clauder-workbench worker-lint  --contract task.yaml
+clauder-workbench fanout-run   --contract task.yaml --max-parallel 3 --auto-scale --memory-threshold 85
+
+# 3. scientific validation + merge gate before claiming success
+python skills\cmaverse-paired-mval\scripts\cmaverse_validate.py --output-root "<RUN_DIR>" `
+  --mediators m1,m2,...,m7 --groups sy_female,sy_male
+clauder-workbench merge-gate   --contract task.yaml
+```
+
+`--auto-scale` makes the harness sample memory each poll cycle and raise concurrency
+by one (up to the worker count, or `--max-parallel-cap`) while memory stays under the
+threshold, throttling back when it crosses it (never killing a running job). Drop
+`--auto-scale` for a fixed `--max-parallel` ceiling. For the agent's **native** MCP
+transport (instead of `fanout-run`'s Python MCP stdio), use the native path documented
+in the skill: `fanout-plan` → native submit → `async-guard register-job` →
+`fanout-poll` → `merge-gate`. See `skills/cmaverse-paired-mval/SKILL.md` for the full
+workflow and the worker contract.
+
 ## Dry Run
 
 Preview changes without writing files or installing packages:
@@ -101,7 +135,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
-| `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness and the `cmaverse-paired-mval` domain skill. |
+| `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness, the `worker-lint` `sink()` BLOCK gate, `fanout-run --auto-scale` dynamic concurrency, and the `cmaverse-paired-mval` domain skill. |
 | `v0.2.4` | `v0.2.0-lzhs.1` | UTF-8 no-BOM writer for Codex/Copilot configs, fixes Chinese-path corruption in `[projects.''...'']` entries, adds `doctor --check-toml-parse` self-check with auto-rollback after `install.ps1 -ConfigureCodex`. |
 | `v0.2.3` | `v0.2.0-lzhs.1` | Adds ClaudeR zip fallback, source metadata in `INSTALL_INFO.json`, client-scoped `doctor`, Python 3.14 opt-in install, and workbench zip bootstrap docs. |
 | `v0.2.2` | `v0.2.0-lzhs.1` | Adds a user-level `clauder-workbench.cmd` wrapper, optional PATH update, clearer colleague Quick Start, and updated smoke transcript. |

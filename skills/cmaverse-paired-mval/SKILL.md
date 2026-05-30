@@ -61,12 +61,19 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
    clauder-workbench fanout-plan --contract task.yaml
    ```
 
-3. **Smoke first** (`nboot=10`), then run:
+3. **Lint the worker, then smoke first** (`nboot=10`), then run:
 
    ```powershell
+   clauder-workbench worker-lint --contract task.yaml
    clauder-workbench fanout-run --contract task.yaml --max-parallel 7 --first-artifact-timeout-min 15
    ```
 
+   > `worker-lint` (also run automatically inside `fanout-plan`/`fanout-run`)
+   > BLOCKs any worker whose `code_file` contains `sink(`. A `sink()`-wrapped
+   > worker keeps the detached Rterm alive after the model finishes, so the job
+   > never exits and the slot is never released. Log via `cat()` +
+   > `flush.console()` and `write_state()` only.
+   >
    > `fanout-run` submits and polls the workers itself **through the Python MCP
    > stdio client** (its evidence is stamped `MCP_STDIO_OK`). It does **not** drive
    > the agent's native `mcp__r_studio__` wrapper. If a task must be proven over the
@@ -76,9 +83,19 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
    > → `merge-gate`. `fanout-run --transport native-wrapper` deliberately BLOCKs and
    > points here, so it can never silently masquerade as a native submission.
    >
-   > `--max-parallel` is a **fixed, manually chosen** ceiling for this run. The
-   > harness does not auto-scale concurrency up or down mid-run; pick it from a
-   > resource probe (step 5) and re-run with a different value if needed.
+   > **Concurrency.** `--max-parallel` is the **starting** ceiling. By default it is
+   > also fixed for the whole run. Add `--auto-scale` to implement the
+   > best-practice §6 behavior: each poll cycle the harness samples system memory
+   > and, while memory stays under `--memory-threshold` (default 85%) and workers
+   > remain pending, raises concurrency by one up to the worker count (or
+   > `--max-parallel-cap`); when memory crosses the threshold it stops launching
+   > new workers and lets the in-flight ones drain (it never kills a running job).
+   > Every adjustment is recorded in the run's `scale_log`.
+   >
+   > ```powershell
+   > clauder-workbench fanout-run --contract task.yaml --max-parallel 3 `
+   >   --auto-scale --memory-threshold 85 --first-artifact-timeout-min 15
+   > ```
 
 4. **Validate** every mediator x group result before claiming success:
 
@@ -102,3 +119,10 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
   credentials only from the environment or an untracked config.
 - Never resubmit a long worker just because one MCP poll dropped: check the
   durable files and the Rterm process first.
+- **Never wrap the worker in `sink()`.** A `sink()`-wrapped worker keeps the
+  detached Rterm alive after the computation finishes, so the job never exits and
+  the fan-out slot is never released — recovery then needs a manual `cancel` after
+  confirming the durable output. Log via `cat()` + `flush.console()` and the
+  `write_state()` helper. This rule is enforced: `clauder-workbench worker-lint`
+  (run automatically by `fanout-plan`/`fanout-run`) BLOCKs any worker containing
+  `sink(`.

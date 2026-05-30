@@ -21,8 +21,37 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .resource import memory_used_percent
+from .worker_lint import lint_worker_file
 
 WORKER_FILE_KEYS = ("expected_state", "expected_manifest", "expected_validation")
+
+
+def lint_contract_workers(contract: dict[str, Any]) -> dict[str, Any]:
+    """Static-safety lint every worker code_file referenced by a contract.
+
+    Returns {"ok", "issues", "errors", "results"}. ``issues`` are real lint
+    findings (e.g. a worker wrapped in sink()) and are a hard BLOCK before any
+    submission. ``errors`` (e.g. file not found) are reported but do NOT block
+    here — missing/unreadable workers surface through normal submit/poll.
+    """
+    issues: list[str] = []
+    errors: list[str] = []
+    results: list[dict[str, Any]] = []
+    for w in contract.get("workers") or []:
+        if not isinstance(w, dict):
+            continue
+        code_file = w.get("code_file")
+        if not code_file:
+            continue
+        res = lint_worker_file(code_file)
+        res["worker_id"] = w.get("id")
+        results.append(res)
+        if res.get("error"):
+            errors.append(f"{w.get('id')}: {code_file}: {res['error']}")
+        issues.extend(res.get("issues", []))
+    return {"ok": not issues, "issues": issues, "errors": errors, "results": results}
+
+
 
 
 # --------------------------------------------------------------------------- #
@@ -295,6 +324,8 @@ def _validate_contract(contract: dict[str, Any]) -> list[str]:
 
 def plan_fanout(contract: dict[str, Any], *, advise_parallel: bool = True) -> dict[str, Any]:
     problems = _validate_contract(contract)
+    lint = lint_contract_workers(contract)
+    problems = problems + list(lint["issues"])  # sink()/unsafe worker = hard problem
     workers = contract.get("workers") or []
     rg = contract.get("resource_gate") or {}
     memory_threshold = float(rg.get("memory_threshold", 85.0)) if isinstance(rg, dict) else 85.0
@@ -433,6 +464,10 @@ def run_fanout(
     sleep_fn: Callable[[float], None] = time.sleep,
     register_fn: Callable[[str, str], None] | None = None,
     max_iterations: int | None = None,
+    auto_scale: bool = False,
+    memory_threshold: float = 85.0,
+    max_parallel_cap: int | None = None,
+    mem_probe_fn: Callable[[], float | None] | None = None,
 ) -> dict[str, Any]:
     """mcp-stdio 模式：提交 N 个 worker 并 file-poll 至完成。
 
@@ -442,10 +477,22 @@ def run_fanout(
     防误判：``run_started`` 之后写入的产出才算本轮完成（``fresh_after``）。
     ``reuse_existing=True`` 时（断点续跑）才把更早的完成产出当作已完成、跳过提交。
     ``first_artifact_timeout_min`` 用于尽早发现"提交成功但子 R 进程静默死亡"（一直无产出）。
+
+    ``auto_scale=True`` 时实现源文档 §6 的动态并发：以 ``max_parallel`` 为**起始**并发，
+    每个轮询周期前用 ``mem_probe_fn``（默认 ``memory_used_percent``）采样系统内存：
+      - 内存 < ``memory_threshold`` 且仍有 pending 且当前并发 < 上限 → 并发 +1（扩）；
+      - 内存 >= ``memory_threshold`` → 不再提交新 worker（把并发回压到当前在跑数，等其排空）。
+    上限默认是 worker 总数（也可由 ``max_parallel_cap`` 收紧）。运行中的 job 不会被杀，
+    回压只阻止**新**提交。每次调整记入 ``scale_log``。
     """
     problems = _validate_contract(contract)
     if problems:
         return {"ok": False, "problems": problems, "transport_class": "BLOCKED"}
+
+    lint = lint_contract_workers(contract)
+    if not lint["ok"]:
+        return {"ok": False, "problems": lint["issues"],
+                "transport_class": "BLOCKED", "lint": lint}
 
     run_started = time.time()
     fresh_boundary = run_started - 2.0  # 容忍文件系统 mtime 秒级粒度；旧产出仍远早于此
@@ -454,6 +501,19 @@ def run_fanout(
     level = int(max_parallel or contract.get("max_parallel") or 1)
     if level < 1:
         level = 1
+    # 动态扩并发的硬上限：不超过 worker 总数（再窄可由 max_parallel_cap 指定）
+    cap = max_parallel_cap if max_parallel_cap and max_parallel_cap > 0 else len(workers)
+    cap = max(1, min(cap, len(workers))) if workers else 1
+    if level > cap:
+        level = cap
+    probe = mem_probe_fn or memory_used_percent
+    rg = contract.get("resource_gate") or {}
+    if isinstance(rg, dict) and rg.get("memory_threshold") is not None:
+        try:
+            memory_threshold = float(rg.get("memory_threshold"))
+        except (TypeError, ValueError):
+            pass
+    scale_log: list[dict[str, Any]] = []
 
     # 续跑：仅当显式 reuse_existing 时，已完成的旧产出才计入 done（否则一律重新提交本轮）
     pending: list[str] = []
@@ -470,6 +530,31 @@ def run_fanout(
     iterations = 0
 
     while (pending or running) and not failed:
+        if auto_scale:
+            mem = probe()
+            old_level = level
+            action = "hold"
+            if mem is None:
+                action = "hold_mem_unknown"
+            elif mem >= memory_threshold:
+                # 回压：不再提交新 worker，等在跑的排空（不杀在跑 job）
+                if level > max(1, len(running)):
+                    level = max(1, len(running))
+                    action = "throttle"
+            elif pending and level < cap:
+                level += 1
+                action = "scale_up"
+            if action != "hold":
+                scale_log.append({
+                    "iteration": iterations,
+                    "memory_used_percent": mem,
+                    "memory_threshold": memory_threshold,
+                    "from_level": old_level,
+                    "to_level": level,
+                    "action": action,
+                    "running": len(running),
+                    "pending": len(pending),
+                })
         while pending and len(running) < level and not failed:
             wid = pending.pop(0)
             worker = by_id[wid]
@@ -523,4 +608,9 @@ def run_fanout(
         "submit_log": submit_log,
         "iterations": iterations,
         "max_parallel": level,
+        "auto_scale": auto_scale,
+        "start_max_parallel": int(max_parallel or contract.get("max_parallel") or 1),
+        "max_parallel_cap": cap,
+        "memory_threshold": memory_threshold,
+        "scale_log": scale_log,
     }

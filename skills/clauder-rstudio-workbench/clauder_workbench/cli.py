@@ -28,12 +28,14 @@ from .config import (
 from .evidence import build_evidence, load_json, print_json, stable_task_key, write_evidence
 from .fanout import (
     build_submit_code,
+    lint_contract_workers,
     load_fanout_contract,
     merge_gate,
     plan_fanout,
     poll_once,
     run_fanout,
 )
+from .worker_lint import lint_worker_file
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
 from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
 from .resource import decide_resource_gate
@@ -732,6 +734,39 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     return emit(doc)
 
 
+def cmd_worker_lint(args: argparse.Namespace) -> int:
+    """Static-safety lint for fan-out worker R scripts (forbids sink(), etc.)."""
+    if args.contract:
+        contract = load_fanout_contract(args.contract)
+        lint = lint_contract_workers(contract)
+        results = lint["results"]
+        issues = lint["issues"]
+        errors = lint["errors"]
+        task_key = contract.get("task_key")
+    else:
+        results = [lint_worker_file(p) for p in (args.code_file or [])]
+        issues = [i for r in results for i in r.get("issues", [])]
+        errors = [f"{r['path']}: {r['error']}" for r in results if r.get("error")]
+        task_key = None
+    # missing/unreadable files are a usage error; real lint findings are a BLOCK
+    if issues:
+        decision, exit_code = "BLOCK", BLOCK
+    elif errors:
+        decision, exit_code = "USAGE", 3
+    else:
+        decision, exit_code = "PASS", PASS
+    reasons = issues or errors or [f"{len(results)} worker file(s) passed worker-lint"]
+    doc = build_evidence(
+        "worker_lint",
+        decision,
+        reasons=reasons,
+        task_key=task_key,
+        exit_code=exit_code,
+        extra={"results": results, "issue_count": len(issues), "error_count": len(errors)},
+    )
+    return emit(doc)
+
+
 def cmd_fanout_plan(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     plan = plan_fanout(contract, advise_parallel=not args.no_advise)
@@ -822,6 +857,9 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         reuse_existing=args.reuse_existing,
         register_fn=register_fn,
         max_iterations=args.max_iterations,
+        auto_scale=args.auto_scale,
+        memory_threshold=args.memory_threshold,
+        max_parallel_cap=args.max_parallel_cap,
     )
     for wid in result.get("done", []):
         archive_inflight(f"{task_key}:{wid}", "worker complete")
@@ -832,6 +870,9 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         f"done={len(result.get('done', []))}/{worker_total} workers; "
         f"failed={result.get('failed')}; pending={result.get('pending')}; "
         f"still_running={result.get('still_running')}; max_parallel={result.get('max_parallel')}"
+        + (f"; auto_scale start={result.get('start_max_parallel')}->{result.get('max_parallel')} "
+           f"cap={result.get('max_parallel_cap')} scale_events={len(result.get('scale_log', []))}"
+           if result.get("auto_scale") else "")
     ]
     doc = build_evidence(
         "fanout_run",
@@ -1003,6 +1044,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
     p.add_argument("--require-job-complete", action="store_true")
 
+    p = sub.add_parser("worker-lint")
+    p.add_argument("--contract", help="Lint every worker code_file in this fan-out contract.")
+    p.add_argument("--code-file", action="append",
+                   help="Lint a specific worker .R file (repeatable). Alternative to --contract.")
+
     p = sub.add_parser("fanout-plan")
     p.add_argument("--contract", required=True)
     p.add_argument("--no-advise", action="store_true",
@@ -1022,6 +1068,15 @@ def build_parser() -> argparse.ArgumentParser:
                         "Default off (always resubmits this run and only counts fresh outputs).")
     p.add_argument("--submit-timeout", type=float, default=60.0)
     p.add_argument("--max-iterations", type=int)
+    p.add_argument("--auto-scale", action="store_true",
+                   help="Dynamic concurrency (best-practice §6): start at --max-parallel and raise "
+                        "concurrency by 1 each poll cycle while system memory stays below "
+                        "--memory-threshold and work remains; throttle (no new submissions) at/above it. "
+                        "Running jobs are never killed.")
+    p.add_argument("--memory-threshold", type=float, default=85.0,
+                   help="Memory %% ceiling for --auto-scale (default 85). At/above it, no new workers are submitted.")
+    p.add_argument("--max-parallel-cap", type=int,
+                   help="Hard upper bound for --auto-scale concurrency (default: worker count).")
     p.add_argument("--dry-run", action="store_true",
                    help="Validate contract and report plan without submitting any jobs.")
 
@@ -1054,6 +1109,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_resource_gate(args)
         if args.cmd == "completion-check":
             return cmd_completion_check(args)
+        if args.cmd == "worker-lint":
+            return cmd_worker_lint(args)
         if args.cmd == "fanout-plan":
             return cmd_fanout_plan(args)
         if args.cmd == "fanout-run":

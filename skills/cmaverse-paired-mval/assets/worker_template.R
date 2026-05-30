@@ -9,6 +9,12 @@
 #
 # NEVER hard-code credentials here. The optional durable-archive step reads any
 # account/token strictly from the environment or an untracked config file.
+#
+# NEVER wrap this worker in sink(). It runs in a detached Rterm; a sink()
+# connection keeps that process alive after the computation finishes, so the job
+# never exits and the fan-out slot is never released. Log with cat() +
+# flush.console() and write_state() only. (`clauder-workbench worker-lint` BLOCKs
+# any worker that contains sink().)
 # ---------------------------------------------------------------------------
 
 suppressPackageStartupMessages({

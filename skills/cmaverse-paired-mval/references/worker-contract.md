@@ -61,6 +61,13 @@ res_cma_<mediator>_aincc_2_1_list[[group]]   # group holds a bare cmest, no "0"/
 Save the full `cmest` (effects, `$data`, `$reg.output`, `$ref`, `$call`,
 bootstrap fields). Never save a compact result table or effect vector instead.
 
+**Logging rule (enforced): never wrap the worker in `sink()`.** In a detached
+Rterm an open `sink()` connection keeps the process alive after the model
+finishes, so the job never exits and the fan-out slot is never released. Log only
+via `cat()` + `flush.console()` and `write_state()`. `clauder-workbench
+worker-lint` (invoked automatically by `fanout-plan`/`fanout-run`) BLOCKs any
+worker whose `code_file` contains `sink(`.
+
 ## manifest fields (one row per mediator)
 
 `run_id`, `mediator`, `groups`, `nboot`, `seed`, `max_parallel`,

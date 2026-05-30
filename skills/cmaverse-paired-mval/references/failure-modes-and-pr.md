@@ -25,6 +25,17 @@ verification (returned `fs_id` + matching size) over the unrefreshed web view.
 Account identifiers are **never** stored in this skill — they come from the
 environment or an untracked config only.
 
+### sink()-wrapped worker hangs (Rterm will not exit)
+Wrapping a worker body in `sink()` (to capture its console output to a file) is a
+recorded trap: the detached Rterm finishes the model and writes its durable
+`state/manifest/validation`, but the open `sink()` connection keeps the **process
+alive**, so the fan-out slot is never released and `get_async_result` keeps
+reporting `running`. Recovery: confirm the RData + validation CSV are complete,
+then `cancel` the job to clean up the stuck Rterm. Prevention (enforced):
+`clauder-workbench worker-lint --contract task.yaml` — also run automatically
+inside `fanout-plan`/`fanout-run` — **BLOCKs** any worker containing `sink(`.
+Workers must log only via `cat()` + `flush.console()` and `write_state()`.
+
 ## Prohibitions
 
 - Do not edit the original R script and overwrite it.
