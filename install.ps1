@@ -18,12 +18,25 @@ param(
     [switch]$AddHarnessToPath,
     [switch]$NoZipFallback,
     [switch]$InstallPython314,
+    [switch]$SkipPrewarm,
+    [switch]$RequirePrewarm,
+    [int]$PrewarmTimeoutSec = 60,
+    [switch]$ConfigureWorkspaceMcp,
+    [string]$WorkspaceMcpPath = "",
     [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
 $script:ClaudeRSourceType = "unknown"
 $script:ClaudeRSourceUrl = $ClaudeRRepo
+$script:McpPrewarmResult = [ordered]@{
+    attempted = $false
+    decision = "not_run"
+    exit_code = $null
+    timeout_sec = $null
+    command = ""
+    output_tail = @()
+}
 
 if ($LogFile) {
     $logDir = Split-Path -Parent $LogFile
@@ -169,7 +182,7 @@ function Test-Prerequisites {
         Write-Warning "git not found. ClaudeR install will rely on zip fallback. Install Git for Windows: winget install --id Git.Git -e"
     }
 
-    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot -or $ConfigureWorkspaceMcp) {
         Require-Command "uv" "Install uv: winget install --id astral-sh.uv -e"
         Require-Command "uvx" "Install uv: winget install --id astral-sh.uv -e"
     }
@@ -285,12 +298,18 @@ function Write-InstallInfo($Dest) {
         claudeR_source_type = $script:ClaudeRSourceType
         claudeR_source_url = $script:ClaudeRSourceUrl
         claudeR_ref = $ClaudeRRef
+        claudeR_ref_requested = $ClaudeRRef
         claudeR_commit = (Get-ClaudeRCommit)
+        claudeR_head_commit = (Get-ClaudeRCommit)
+        claudeR_git_origin = (Get-ClaudeRGitOrigin)
         clauder_mcp_source = (Join-Path $ClaudeRDir "clauder-mcp")
         clauder_mcp_command = (Get-ClaudeRMcpExe)
         clauder_mcp_install_mode = "uv_tool_from_local_lzhs_fork"
+        clauder_mcp_install_from = (Join-Path $ClaudeRDir "clauder-mcp")
+        clauder_mcp_exe_sha256 = (Get-FileSha256 (Get-ClaudeRMcpExe))
         r_studio_startup_timeout_sec = 180.0
         uv_cache_dir = "C:\tmp\uv-cache"
+        prewarm_result = $script:McpPrewarmResult
         dev_sync = [bool]$DevSync
     }
     $path = Join-Path $Dest "INSTALL_INFO.json"
@@ -436,6 +455,25 @@ function Get-ClaudeRCommit {
     return "unknown"
 }
 
+function Get-ClaudeRGitOrigin {
+    if (Test-Path -LiteralPath (Join-Path $ClaudeRDir ".git")) {
+        try {
+            $value = & git -C $ClaudeRDir config --get remote.origin.url 2>$null
+            if ($LASTEXITCODE -eq 0 -and $value) { return (($value | Out-String).Trim()) }
+        } catch { return "unknown" }
+    }
+    return "unknown"
+}
+
+function Get-FileSha256($Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return "" }
+    try {
+        return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    } catch {
+        return ""
+    }
+}
+
 function Install-ClaudeRMcpTool {
     Write-Step "Installing persistent ClaudeR MCP entry from lzhs fork"
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
@@ -446,10 +484,24 @@ function Install-ClaudeRMcpTool {
     $args = @("tool", "install", "--force", "--from", $bridge, "clauder-mcp")
     Write-Host "+ uv $($args -join ' ')" -ForegroundColor DarkGray
     if (-not $DryRun) {
-        & uv @args
-        if ($LASTEXITCODE -ne 0) {
-            throw "uv tool install clauder-mcp failed with exit code ${LASTEXITCODE}."
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $uvOutput = & uv @args 2>&1
+            $uvExit = $LASTEXITCODE
         }
+        finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+        if ($uvExit -ne 0) {
+            $existing = Get-ClaudeRMcpExe
+            if ($existing -and (Test-Path -LiteralPath $existing)) {
+                Write-Warning "uv tool install clauder-mcp failed with exit code ${uvExit}; reusing existing persistent entry at $existing. This usually means the current agent MCP server has the exe open. Output: $($uvOutput | Out-String)"
+                return $existing
+            }
+            throw "uv tool install clauder-mcp failed with exit code ${uvExit}. Output: $($uvOutput | Out-String)"
+        }
+        $uvOutput | Out-Host
     }
     $exe = Get-ClaudeRMcpExe
     Write-Host "clauder-mcp persistent entry: $exe"
@@ -620,6 +672,76 @@ function Install-HarnessWrapper {
     } else {
         Write-Host "PATH unchanged. Run with -AddHarnessToPath to add $WorkbenchBinDir to the user PATH."
         Write-Host "Portable fallback: $python -m clauder_workbench doctor"
+    }
+}
+
+function Invoke-McpPrewarm {
+    if ($SkipPrewarm) {
+        $script:McpPrewarmResult = [ordered]@{
+            attempted = $false
+            decision = "skipped"
+            exit_code = $null
+            timeout_sec = $PrewarmTimeoutSec
+            command = ""
+            output_tail = @("Skipped by -SkipPrewarm")
+        }
+        return
+    }
+    if (-not ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot -or $ConfigureWorkspaceMcp)) {
+        return
+    }
+    Write-Step "Prewarming ClaudeR MCP persistent entry"
+    $python = Find-HarnessPython
+    $cmd = "$python -m clauder_workbench tool-surface --timeout $PrewarmTimeoutSec"
+    Write-Host "+ $cmd" -ForegroundColor DarkGray
+    if ($DryRun) {
+        $script:McpPrewarmResult = [ordered]@{
+            attempted = $true
+            decision = "dry_run"
+            exit_code = 0
+            timeout_sec = $PrewarmTimeoutSec
+            command = $cmd
+            output_tail = @("Dry run: would prewarm MCP tool surface")
+        }
+        return
+    }
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $python -m clauder_workbench tool-surface --timeout $PrewarmTimeoutSec 2>&1
+        $exit = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    $tail = @($output | Select-Object -Last 20 | ForEach-Object { "$_" })
+    $decision = if ($exit -eq 0) { "PASS" } else { "WARN" }
+    $script:McpPrewarmResult = [ordered]@{
+        attempted = $true
+        decision = $decision
+        exit_code = $exit
+        timeout_sec = $PrewarmTimeoutSec
+        command = $cmd
+        output_tail = $tail
+    }
+    $tail | Out-Host
+    if ($exit -ne 0) {
+        $msg = "MCP prewarm did not pass (exit=$exit). Persistent entry remains installed; run doctor/native-smoke before long jobs."
+        if ($RequirePrewarm) {
+            throw $msg
+        }
+        Write-Warning $msg
+    }
+}
+
+function Refresh-InstallInfo {
+    $targets = @()
+    $codexSkill = Join-Path $CodexHome "skills\clauder-rstudio-workbench"
+    if (Test-Path -LiteralPath $codexSkill) { $targets += $codexSkill }
+    $agentsSkill = Join-Path $AgentsHome "skills\clauder-rstudio-workbench"
+    if ($SyncAgentsSkill -and (Test-Path -LiteralPath $agentsSkill)) { $targets += $agentsSkill }
+    foreach ($target in $targets) {
+        Write-InstallInfo $target
     }
 }
 
@@ -806,10 +928,48 @@ function Write-CopilotConfig {
     }
 }
 
+function Write-WorkspaceMcpConfig {
+    if (-not $ConfigureWorkspaceMcp) { return }
+    Write-Step "Configuring workspace .mcp.json"
+    $target = $WorkspaceMcpPath
+    if (-not $target) {
+        $target = Join-Path (Get-Location) ".mcp.json"
+    }
+    $dir = Split-Path -Parent $target
+    if ($dir -and -not (Test-Path -LiteralPath $dir) -and -not $DryRun) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
+    if (-not (Test-Path -LiteralPath $target) -and -not $DryRun) {
+        Write-Utf8NoBom $target "{}"
+    }
+    Backup-File $target
+    $obj = [ordered]@{
+        mcpServers = [ordered]@{
+            "r-studio" = [ordered]@{
+                type = "local"
+                command = (Get-ClaudeRMcpExe)
+                args = @()
+                tools = @("*")
+                env = [ordered]@{
+                    USERPROFILE = $env:USERPROFILE
+                    NO_PROXY = "127.0.0.1,localhost"
+                    PYTHONIOENCODING = "utf-8"
+                    UV_CACHE_DIR = "C:\tmp\uv-cache"
+                }
+            }
+        }
+    }
+    $json = $obj | ConvertTo-Json -Depth 10
+    Write-Host $json
+    if (-not $DryRun) {
+        Write-Utf8NoBom $target $json
+    }
+}
+
 try {
     Test-Prerequisites
     if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Set-ClaudeRExistingSourceInfo; Write-Step "Skipping ClaudeR install" }
-    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) { Install-ClaudeRMcpTool | Out-Null }
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot -or $ConfigureWorkspaceMcp) { Install-ClaudeRMcpTool | Out-Null }
     Install-Skill
     Install-AgentsSkill
     Install-Harness
@@ -818,6 +978,9 @@ try {
     if ($ConfigureCodex) { Write-CodexConfig }
     if ($ConfigureClaudeCode) { Configure-ClaudeCode }
     if ($ConfigureCopilot) { Write-CopilotConfig }
+    if ($ConfigureWorkspaceMcp) { Write-WorkspaceMcpConfig }
+    Invoke-McpPrewarm
+    Refresh-InstallInfo
 
     Write-Step "Done"
     Write-Host "Restart Codex/Claude/Copilot after MCP configuration changes."

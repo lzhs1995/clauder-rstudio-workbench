@@ -8,6 +8,9 @@
 
 task_key: cmaverse_paired_mval_RUN1
 max_parallel: 7
+requires_native_smoke: true
+native_smoke:
+  max_age_min: 60
 artifacts:
   output_root: "<OUTPUT_ROOT>/RUN1/max_parallel_7"
   max_age_h: 24

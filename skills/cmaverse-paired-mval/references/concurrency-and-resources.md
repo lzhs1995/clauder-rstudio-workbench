@@ -5,6 +5,20 @@
 write at once, machine memory, free disk on the output drive, and (if enabled)
 whether the upload keeps pace with model output.
 
+## Native smoke first
+
+Before launching a CMAverse fan-out run, prove the current agent-native MCP
+wrapper path with `clauder-workbench native-smoke complete`. The generated
+contract sets `requires_native_smoke: true`, so `fanout-plan`, `fanout-run`,
+`fanout-poll`, and `merge-gate` require the resulting parent evidence. Python
+MCP stdio prewarm and HTTP fallback are diagnostics; they do not satisfy this
+native gate.
+
+If the native tool returns `Transport closed`, do not ask the user to restart
+Codex first. Run doctor/provenance checks, reinstall or prewarm the persistent
+`clauder-mcp.exe` entry if needed, and retry native-smoke. Restarting the agent
+is the last step after the persistent entry and provenance are already correct.
+
 ## Smoke / structure validation (`nboot=10`)
 
 In the case-study smoke (`groups=sy_female,sy_male`, `nboot=10`, no upload),

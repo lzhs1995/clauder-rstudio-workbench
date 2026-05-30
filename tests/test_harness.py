@@ -18,6 +18,7 @@ from clauder_workbench.cli import (
     build_parser,
     cmd_async_guard,
     cmd_completion_check,
+    cmd_native_smoke,
     parse_requirements,
 )
 from clauder_workbench.evidence import build_evidence, stable_task_key, write_evidence
@@ -191,7 +192,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.3.0")
+        self.assertEqual(doc["producer_version"], "0.3.1")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -280,6 +281,46 @@ class HarnessUnitTests(unittest.TestCase):
                 self.assertEqual(cmd_async_guard(pre), 0)
                 reg = parser.parse_args(["async-guard", "register-job", "--task-key", "task-a"])
                 self.assertEqual(cmd_async_guard(reg), 3)
+
+    def test_native_smoke_two_step_gate_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--session-name", "default"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions", "--ok", "--session-name", "default"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r", "--ok", "--marker", "NATIVE_EXECUTE_OK", "--pid", "123"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "execute_r_async", "--ok", "--job-id", "job123"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "get_async_result", "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
+
+    def test_native_smoke_rejects_stdio_impersonation(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a"])), 0)
+                rc = cmd_native_smoke(
+                    parser.parse_args([
+                        "native-smoke", "record", "--task-key", "task-a", "--step", "execute_r",
+                        "--ok", "--marker", "MCP_STDIO_OK", "--transport-class", "MCP_STDIO_OK",
+                    ])
+                )
+                self.assertEqual(rc, 3)
+
+    def test_native_smoke_complete_requires_all_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 3)
 
     def test_cold_start_retry_succeeds_on_second_attempt(self) -> None:
         calls = {"n": 0}
@@ -381,8 +422,8 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.3.0", text)
-        self.assertIn("releases/download/v0.3.0/clauder-rstudio-workbench-v0.3.0.zip", text)
+        self.assertIn("--branch v0.3.1", text)
+        self.assertIn("releases/download/v0.3.1/clauder-rstudio-workbench-v0.3.1.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
         # The install/clone/zip/upgrade commands must not point at the old tag.
@@ -392,7 +433,7 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.3.0`", text)
+        self.assertIn("skill collection release `v0.3.1`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
@@ -409,6 +450,9 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("workbench_ref", text)
         self.assertIn("claudeR_source_type", text)
         self.assertIn("configured_clients", text)
+        self.assertIn("clauder_mcp_install_from", text)
+        self.assertIn("clauder_mcp_exe_sha256", text)
+        self.assertIn("prewarm_result", text)
 
     def test_expected_clients_defaults_to_install_info(self) -> None:
         parser = build_parser()
@@ -428,6 +472,8 @@ class HarnessUnitTests(unittest.TestCase):
     def test_installer_uses_persistent_lzhs_mcp_entry(self) -> None:
         text = Path("install.ps1").read_text(encoding="utf-8")
         self.assertIn("Install-ClaudeRMcpTool", text)
+        self.assertIn("Invoke-McpPrewarm", text)
+        self.assertIn("ConfigureWorkspaceMcp", text)
         self.assertIn("uv_tool_from_local_lzhs_fork", text)
         self.assertIn("startup_timeout_sec = 180.0", text)
         self.assertIn("UV_CACHE_DIR", text)

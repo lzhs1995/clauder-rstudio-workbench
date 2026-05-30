@@ -15,6 +15,7 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
 - For running many parallel R workers from one session, read [parallel-async-fanout.md](references/parallel-async-fanout.md).
+- For native wrapper smoke and `Transport closed` recovery, read [native-mcp-gate.md](references/native-mcp-gate.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
 
@@ -44,6 +45,25 @@ For async long jobs, use the two-step hook:
 ```
 
 `async-guard submit --via-mcp-stdio --code-file <R>` is diagnostic MCP stdio mode only. Do not report it as native `mcp__r_studio__` wrapper execution.
+
+For native-wrapper long jobs, prove the current agent tool layer first with the
+two-step `native-smoke` gate. The harness does **not** call the native wrapper
+itself; the agent must run the real `mcp__r_studio__` tools and register their
+outputs:
+
+```powershell
+.\harness\run.ps1 native-smoke start --task-key <task> --session-name default
+# agent-native calls: list_sessions, execute_r, execute_r_async, get_async_result
+.\harness\run.ps1 native-smoke record --task-key <task> --step list_sessions --ok --session-name default
+.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID>
+.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID>
+.\harness\run.ps1 native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE
+.\harness\run.ps1 native-smoke complete --task-key <task>
+```
+
+`native-smoke complete` writes `transport_class=NATIVE_MCP_OK`. Python MCP
+stdio evidence, HTTP fallback, or hand-written JSON must not be used as this
+native parent evidence.
 
 ### Parallel Async Fan-out
 
@@ -115,14 +135,14 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 - **Windows multi-session warning**: do not trust a ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)` as a liveness probe. Use a patched build with a read-only PID check.
 - Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is bare `clauder-mcp`, missing `startup_timeout_sec`, missing `UV_CACHE_DIR`, or lacks LZHS fork provenance.
-- A Codex native-wrapper long job is ready only after `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test pass in the current Codex tool layer.
+- A Codex native-wrapper long job is ready only after `native-smoke complete` records `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test from the current Codex tool layer.
 - HTTP fallback can diagnose whether the Addin HTTP server is alive, but it is not MCP-only success evidence.
 - If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
 - After changing ClaudeR source, R package installation, or MCP config, restart the relevant agent/MCP process. Running agents may not hot-load changes.
 
 ## Compatible Release
 
-This skill collection release `v0.3.0` is paired with
+This skill collection release `v0.3.1` is paired with
 `lzhs1995/ClaudeR@v0.2.0-lzhs.1`. The collection includes this workbench skill
 and the companion `cmaverse-paired-mval` skill.
 
@@ -130,4 +150,4 @@ Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.0`, inherit that config-writer fix.
+`v0.3.1`, inherit that config-writer fix.

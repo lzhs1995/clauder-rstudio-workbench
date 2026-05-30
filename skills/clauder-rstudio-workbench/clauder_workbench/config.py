@@ -21,6 +21,8 @@ STATE_DIR = HOME / ".clauder_workbench"
 EVIDENCE_DIR = STATE_DIR / "evidence"
 INFLIGHT_DIR = STATE_DIR / "inflight"
 ARCHIVE_DIR = INFLIGHT_DIR / "archive"
+NATIVE_SMOKE_DIR = STATE_DIR / "native_smoke"
+NATIVE_SMOKE_ARCHIVE_DIR = NATIVE_SMOKE_DIR / "archive"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA") or (HOME / "AppData" / "Local"))
 DEFAULT_PYTHON314 = LOCALAPPDATA / "Programs" / "Python" / "Python314" / "python.exe"
@@ -47,6 +49,8 @@ def ensure_state_dirs() -> None:
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     INFLIGHT_DIR.mkdir(parents=True, exist_ok=True)
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    NATIVE_SMOKE_DIR.mkdir(parents=True, exist_ok=True)
+    NATIVE_SMOKE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def default_agent() -> str:

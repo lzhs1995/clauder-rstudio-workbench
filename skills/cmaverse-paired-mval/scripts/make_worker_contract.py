@@ -42,6 +42,9 @@ def parse_args(argv=None):
                    help=f"Env var prefix the worker reads (default {DEFAULT_PREFIX}).")
     p.add_argument("--session", default=None,
                    help="Optional RStudio session name to bind each worker to.")
+    p.add_argument("--no-require-native-smoke", action="store_true",
+                   help="Do not require a clauder-workbench native-smoke parent evidence before fan-out gates. "
+                        "Use only for diagnostic MCP-stdio smoke runs.")
     p.add_argument("--out", default="task.yaml", help="Output contract path.")
     p.add_argument("--format", choices=["yaml", "json"], default="yaml")
     return p.parse_args(argv)
@@ -95,6 +98,10 @@ def build_contract(args):
     contract = {
         "task_key": f"cmaverse_paired_mval_{args.run_id}",
         "max_parallel": args.max_parallel,
+        "requires_native_smoke": not args.no_require_native_smoke,
+        "native_smoke": {
+            "max_age_min": 60,
+        },
         "artifacts": {
             "output_root": level_dir,
             "max_age_h": 24,

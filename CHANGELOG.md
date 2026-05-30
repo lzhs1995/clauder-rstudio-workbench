@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1 - 2026-05-30
+
+- Add executable `native-smoke` gate. The command uses an agent-driven contract (`start` -> real native `list_sessions`/`execute_r`/`execute_r_async`/`get_async_result` -> `record` -> `complete`) and writes `transport_class=NATIVE_MCP_OK` only after all four native-wrapper steps are present. Python MCP stdio, HTTP fallback, and hand-written JSON do not count.
+- Add native-smoke parent-evidence checks to `fanout-plan`, `fanout-run`, `fanout-poll`, `merge-gate`, and `completion-check`. CMAverse-generated fan-out contracts now set `requires_native_smoke: true` by default; `--no-require-native-smoke` is available only for diagnostic MCP-stdio runs.
+- Harden `install.ps1` for MCP cold-start stability: optional prewarm after installing the persistent `clauder-mcp.exe`, `-SkipPrewarm`, `-RequirePrewarm`, `-PrewarmTimeoutSec`, and richer `INSTALL_INFO.json` provenance (`clauder_mcp_install_from`, executable SHA256, ClaudeR git origin/head, and prewarm result).
+- Add optional `-ConfigureWorkspaceMcp` / `-WorkspaceMcpPath` to migrate workspace `.mcp.json` off the cold `uvx --from ...` path and onto the persistent executable.
+- Document the anti-restart runbook: `Transport closed` -> doctor/provenance -> reinstall or prewarm persistent entry -> native-smoke retry -> only then ask the user to restart the agent.
+
 ## v0.3.0 - 2026-05-29
 
 - **Collection**: this repo is now a skill *collection*. `install.ps1` discovers and installs every `skills/<name>/` directory that contains a `SKILL.md`, not just the primary skill. `INSTALL_INFO.json` is still written into `clauder-rstudio-workbench`.

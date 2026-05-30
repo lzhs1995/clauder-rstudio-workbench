@@ -58,14 +58,18 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
      --mediators msat_c12_2,msat_c12_3,msat_c1_2,msat_c21_2,msat_c21_3,msat_c2_2,msateco_c2_2 `
      --groups sy_female,sy_male --nboot 10 --seed 12345 `
      --out task.yaml
-   clauder-workbench fanout-plan --contract task.yaml
+   clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default
+   # Run real native MCP tools: list_sessions, execute_r, execute_r_async, get_async_result.
+   # Record each result with native-smoke record (list_sessions / execute_r / execute_r_async / get_async_result), then complete it:
+   clauder-workbench native-smoke complete --task-key cmaverse_paired_mval_<RUN_ID>
+   clauder-workbench fanout-plan --contract task.yaml --parent-evidence <native_smoke_PASS.json>
    ```
 
 3. **Lint the worker, then smoke first** (`nboot=10`), then run:
 
    ```powershell
    clauder-workbench worker-lint --contract task.yaml
-   clauder-workbench fanout-run --contract task.yaml --max-parallel 7 --first-artifact-timeout-min 15
+   clauder-workbench fanout-run --contract task.yaml --parent-evidence <native_smoke_PASS.json> --max-parallel 7 --first-artifact-timeout-min 15
    ```
 
    > `worker-lint` (also run automatically inside `fanout-plan`/`fanout-run`)
@@ -103,7 +107,7 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
    python scripts\cmaverse_validate.py --output-root "<RUN_DIR>" `
      --mediators msat_c12_2,msat_c12_3,msat_c1_2,msat_c21_2,msat_c21_3,msat_c2_2,msateco_c2_2 `
      --groups sy_female,sy_male
-   clauder-workbench merge-gate --contract task.yaml
+   clauder-workbench merge-gate --contract task.yaml --parent-evidence <native_smoke_PASS.json>
    ```
 
 5. **Scale to formal run** only after a resource probe (concurrency-and-resources.md).
@@ -119,6 +123,10 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
   credentials only from the environment or an untracked config.
 - Never resubmit a long worker just because one MCP poll dropped: check the
   durable files and the Rterm process first.
+- Never start a CMAverse fan-out run without fresh `native-smoke` PASS evidence
+  from the current agent native MCP tool layer. The generated contract sets
+  `requires_native_smoke: true` by default; use `--no-require-native-smoke` only
+  for diagnostic MCP-stdio experiments, not for formal completion claims.
 - **Never wrap the worker in `sink()`.** A `sink()`-wrapped worker keeps the
   detached Rterm alive after the computation finishes, so the job never exits and
   the fan-out slot is never released — recovery then needs a manual `cancel` after
