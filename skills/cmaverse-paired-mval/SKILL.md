@@ -58,9 +58,16 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
      --mediators msat_c12_2,msat_c12_3,msat_c1_2,msat_c21_2,msat_c21_3,msat_c2_2,msateco_c2_2 `
      --groups sy_female,sy_male --nboot 10 --seed 12345 `
      --out task.yaml
-   clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default
-   # Run real native MCP tools: list_sessions, execute_r, execute_r_async, get_async_result.
-   # Record each result with native-smoke record (list_sessions / execute_r / execute_r_async / get_async_result), then complete it:
+   clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default --agent codex --require-raw-file
+   # Run real Codex native MCP tools and save each visible tool result to a raw text file:
+   #   list_sessions -> smoke_list_sessions.txt
+   #   execute_r("cat('NATIVE_EXECUTE_OK pid=', Sys.getpid(), '\n')") -> smoke_execute_r.txt
+   #   execute_r_async("cat('NATIVE_ASYNC_DONE pid=', Sys.getpid(), '\n')") -> smoke_execute_r_async.txt
+   #   get_async_result(<JOB_ID>) -> smoke_get_async_result.txt
+   clauder-workbench native-smoke record --task-key cmaverse_paired_mval_<RUN_ID> --step list_sessions --ok --session-name default --raw-file smoke_list_sessions.txt
+   clauder-workbench native-smoke record --task-key cmaverse_paired_mval_<RUN_ID> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID> --raw-file smoke_execute_r.txt
+   clauder-workbench native-smoke record --task-key cmaverse_paired_mval_<RUN_ID> --step execute_r_async --ok --job-id <JOB_ID> --raw-file smoke_execute_r_async.txt
+   clauder-workbench native-smoke record --task-key cmaverse_paired_mval_<RUN_ID> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE --raw-file smoke_get_async_result.txt
    clauder-workbench native-smoke complete --task-key cmaverse_paired_mval_<RUN_ID>
    clauder-workbench fanout-plan --contract task.yaml --parent-evidence <native_smoke_PASS.json>
    ```
@@ -126,7 +133,9 @@ M=0 and M=1 regions separately and then claim "same bootstrap".
 - Never start a CMAverse fan-out run without fresh `native-smoke` PASS evidence
   from the current agent native MCP tool layer. The generated contract sets
   `requires_native_smoke: true` by default; use `--no-require-native-smoke` only
-  for diagnostic MCP-stdio experiments, not for formal completion claims.
+  for diagnostic MCP-stdio experiments, not for formal completion claims. Formal
+  runs must use `--require-raw-file`; v0.3.3 and later require all four record
+  evidence ids to be chained into the final PASS and preserve raw output hashes.
 - **Never wrap the worker in `sink()`.** A `sink()`-wrapped worker keeps the
   detached Rterm alive after the computation finishes, so the job never exits and
   the fan-out slot is never released — recovery then needs a manual `cancel` after

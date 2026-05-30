@@ -52,18 +52,20 @@ itself; the agent must run the real `mcp__r_studio__` tools and register their
 outputs:
 
 ```powershell
-.\harness\run.ps1 native-smoke start --task-key <task> --session-name default
+.\harness\run.ps1 native-smoke start --task-key <task> --session-name default --agent codex --require-raw-file
 # agent-native calls: list_sessions, execute_r, execute_r_async, get_async_result
-.\harness\run.ps1 native-smoke record --task-key <task> --step list_sessions --ok --session-name default
-.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID>
-.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID>
-.\harness\run.ps1 native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE
+.\harness\run.ps1 native-smoke record --task-key <task> --step list_sessions --ok --session-name default --raw-file <list_sessions_raw.txt>
+.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID> --raw-file <execute_r_raw.txt>
+.\harness\run.ps1 native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID> --raw-file <execute_r_async_raw.txt>
+.\harness\run.ps1 native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE --raw-file <get_async_result_raw.txt>
 .\harness\run.ps1 native-smoke complete --task-key <task>
 ```
 
 `native-smoke complete` writes `transport_class=NATIVE_MCP_OK`. Python MCP
 stdio evidence, HTTP fallback, or hand-written JSON must not be used as this
-native parent evidence.
+native parent evidence. In high-assurance mode, every record evidence id is
+chained into the final parent evidence list, and each raw output file is hashed
+and copied under `<USER_HOME>\.clauder_workbench\evidence\raw`.
 
 ### Parallel Async Fan-out
 
@@ -142,7 +144,7 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This skill collection release `v0.3.2` is paired with
+This skill collection release `v0.3.3` is paired with
 `lzhs1995/ClaudeR@v0.2.0-lzhs.1`. The collection includes this workbench skill
 and the companion `cmaverse-paired-mval` skill.
 
@@ -150,4 +152,4 @@ Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.2`, inherit that config-writer fix.
+`v0.3.3`, inherit that config-writer fix.

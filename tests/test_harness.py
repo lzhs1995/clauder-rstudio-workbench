@@ -192,7 +192,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.3.2")
+        self.assertEqual(doc["producer_version"], "0.3.3")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -287,7 +287,9 @@ class HarnessUnitTests(unittest.TestCase):
             root = Path(td)
             with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
                 "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
-            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+            ), mock.patch("clauder_workbench.cli.EVIDENCE_DIR", root / "evidence"), mock.patch(
+                "clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))
+            ):
                 parser = build_parser()
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--session-name", "default"])), 0)
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions", "--ok", "--session-name", "default"])), 0)
@@ -301,7 +303,9 @@ class HarnessUnitTests(unittest.TestCase):
             root = Path(td)
             with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
                 "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
-            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+            ), mock.patch("clauder_workbench.cli.EVIDENCE_DIR", root / "evidence"), mock.patch(
+                "clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))
+            ):
                 parser = build_parser()
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a"])), 0)
                 rc = cmd_native_smoke(
@@ -371,6 +375,14 @@ class HarnessUnitTests(unittest.TestCase):
                     "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE", "--raw-file", str(res),
                 ])), 0)
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
+                state = json.loads((root / "native_smoke" / "task-a.json").read_text(encoding="utf-8"))
+                for step in ("list_sessions", "execute_r", "execute_r_async", "get_async_result"):
+                    entry = state["steps"][step]
+                    self.assertTrue(entry.get("evidence_id"))
+                    proof = entry.get("raw_file_proof")
+                    self.assertTrue(proof)
+                    self.assertEqual(len(proof["sha256"]), 64)
+                    self.assertTrue(Path(proof["evidence_copy"]).exists())
 
     def test_native_smoke_require_raw_file_blocks_marker_absent_from_raw_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -378,7 +390,9 @@ class HarnessUnitTests(unittest.TestCase):
             ex = root / "ex.txt"; ex.write_text("no marker present here", encoding="utf-8")
             with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
                 "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
-            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+            ), mock.patch("clauder_workbench.cli.EVIDENCE_DIR", root / "evidence"), mock.patch(
+                "clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))
+            ):
                 parser = build_parser()
                 self.assertEqual(cmd_native_smoke(parser.parse_args([
                     "native-smoke", "start", "--task-key", "task-a", "--session-name", "default",
@@ -412,6 +426,7 @@ class HarnessUnitTests(unittest.TestCase):
         complete_doc = captured[-1]
         self.assertEqual(complete_doc.get("transport_class"), "NATIVE_MCP_OK")
         self.assertEqual(complete_doc.get("agent"), "codex")
+        self.assertEqual(len(complete_doc.get("parent_evidence_ids") or []), 4)
 
     def test_native_smoke_complete_infers_agent_from_tool_layer(self) -> None:
         captured: list[dict] = []
@@ -433,6 +448,62 @@ class HarnessUnitTests(unittest.TestCase):
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "get_async_result", "--ok", "--job-id", "job123", "--marker", "NATIVE_ASYNC_DONE", "--tool-layer", "copilot-native"])), 0)
                 self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a"])), 0)
         self.assertEqual(captured[-1].get("agent"), "copilot")
+
+    def test_native_smoke_agent_derives_tool_layer(self) -> None:
+        captured: list[dict] = []
+
+        def cap(doc, write=True):
+            captured.append(doc)
+            return int(doc.get("exit_code", 0))
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", cap):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--agent", "claude"])), 0)
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions", "--ok", "--session-count", "1"])), 0)
+        self.assertEqual(captured[-1]["extra"]["entry"]["tool_layer"], "claude-native")
+
+    def test_native_smoke_agent_tool_layer_mismatch_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", root / "native_smoke"), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", root / "native_smoke" / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                self.assertEqual(cmd_native_smoke(parser.parse_args(["native-smoke", "start", "--task-key", "task-a", "--agent", "codex"])), 0)
+                rc = cmd_native_smoke(parser.parse_args([
+                    "native-smoke", "record", "--task-key", "task-a", "--step", "list_sessions",
+                    "--ok", "--session-count", "1", "--tool-layer", "copilot-native",
+                ]))
+                self.assertEqual(rc, 3)
+
+    def test_native_smoke_complete_blocks_legacy_state_without_evidence_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            native_dir = root / "native_smoke"
+            native_dir.mkdir()
+            (native_dir / "task-a.json").write_text(json.dumps({
+                "task_key": "task-a",
+                "status": "recording",
+                "started_at_utc": "2026-05-31T00:00:00Z",
+                "session_name": "default",
+                "required_steps": ["list_sessions", "execute_r", "execute_r_async", "get_async_result"],
+                "steps": {
+                    "list_sessions": {"step": "list_sessions", "ok": True, "recorded_at_utc": "2026-05-31T00:00:00Z", "tool_layer": "codex-native", "transport_class": "NATIVE_MCP_OK", "session_count": 1},
+                    "execute_r": {"step": "execute_r", "ok": True, "recorded_at_utc": "2026-05-31T00:00:00Z", "tool_layer": "codex-native", "transport_class": "NATIVE_MCP_OK", "marker": "NATIVE_EXECUTE_OK", "pid": "123"},
+                    "execute_r_async": {"step": "execute_r_async", "ok": True, "recorded_at_utc": "2026-05-31T00:00:00Z", "tool_layer": "codex-native", "transport_class": "NATIVE_MCP_OK", "job_id": "job123"},
+                    "get_async_result": {"step": "get_async_result", "ok": True, "recorded_at_utc": "2026-05-31T00:00:00Z", "tool_layer": "codex-native", "transport_class": "NATIVE_MCP_OK", "job_id": "job123", "marker": "NATIVE_ASYNC_DONE"},
+                },
+            }), encoding="utf-8")
+            with mock.patch("clauder_workbench.cli.NATIVE_SMOKE_DIR", native_dir), mock.patch(
+                "clauder_workbench.cli.NATIVE_SMOKE_ARCHIVE_DIR", native_dir / "archive"
+            ), mock.patch("clauder_workbench.cli.emit", lambda doc, write=True: int(doc.get("exit_code", 0))):
+                parser = build_parser()
+                rc = cmd_native_smoke(parser.parse_args(["native-smoke", "complete", "--task-key", "task-a", "--max-age-min", "999999"]))
+                self.assertEqual(rc, 3)
 
     def test_cold_start_retry_succeeds_on_second_attempt(self) -> None:
         calls = {"n": 0}
@@ -534,8 +605,8 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.3.2", text)
-        self.assertIn("releases/download/v0.3.2/clauder-rstudio-workbench-v0.3.2.zip", text)
+        self.assertIn("--branch v0.3.3", text)
+        self.assertIn("releases/download/v0.3.3/clauder-rstudio-workbench-v0.3.3.zip", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("-AddHarnessToPath", text)
         # The install/clone/zip/upgrade commands must not point at the old tag.
@@ -547,7 +618,7 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.3.2`", text)
+        self.assertIn("skill collection release `v0.3.3`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
