@@ -302,5 +302,20 @@ class AutoScaleTests(unittest.TestCase):
             self.assertLessEqual(result["max_parallel"], 2)
 
 
+class FanoutDocumentationConsistencyTests(unittest.TestCase):
+    def test_parallel_reference_matches_auto_scale_implementation(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        text = (
+            repo
+            / "skills"
+            / "clauder-rstudio-workbench"
+            / "references"
+            / "parallel-async-fanout.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("--auto-scale", text)
+        self.assertNotIn("does not yet auto-scale", text)
+        self.assertIn("scale_log", text)
+
+
 if __name__ == "__main__":
     unittest.main()

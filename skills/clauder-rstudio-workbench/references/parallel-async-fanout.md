@@ -126,13 +126,24 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 - `merge-gate`: `0 PASS` / `5 CONTRACT_FAILED` (not all complete) / `3 BLOCK`
   (all complete but with violations such as stale outputs).
 
-## Dynamic concurrency (current limitation)
+## Dynamic concurrency
 
-`fanout-run` fills up to `max_parallel` slots and holds that level for the run.
-It does not yet auto-scale concurrency mid-run. Use `fanout-plan` to get a
-memory-aware starting recommendation, and `resource-gate advise/enforce` between
-batches if you want to step concurrency up manually. Automatic resource-gated
-scaling is on the roadmap.
+`fanout-run` treats `--max-parallel` as the starting concurrency ceiling. Without
+`--auto-scale`, that ceiling stays fixed for the whole run. With `--auto-scale`,
+the harness samples system memory each poll cycle and raises concurrency by one
+while memory stays below `--memory-threshold` (default `85`) and workers remain
+pending, up to the worker count or `--max-parallel-cap`.
+
+When memory is at or above the threshold, `fanout-run` stops launching new
+workers and lets existing workers drain; it never kills an already-running job
+just to reduce concurrency. Each decision is written to `scale_log` in the run
+result/evidence so a reviewer can see whether a run used fixed or dynamic
+parallelism.
+
+This auto-scaling path belongs to `fanout-run`'s Python MCP stdio mode. The
+agent-native wrapper path is still explicit: plan the workers, submit through
+the native tool layer, register real job ids with `async-guard`, then use
+`fanout-poll` and `merge-gate`.
 
 ## Failure handling
 
