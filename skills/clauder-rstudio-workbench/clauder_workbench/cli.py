@@ -18,6 +18,8 @@ from .config import (
     CONTRACT_FAILED,
     DISCOVERY_DIR,
     LOCAL_CLAUDER_BRIDGE,
+    NATIVE_SMOKE_ARCHIVE_DIR,
+    NATIVE_SMOKE_DIR,
     PASS,
     PYTHON314,
     TRANSPORT_UNSTABLE,
@@ -25,7 +27,7 @@ from .config import (
     WINDOWS_STORE_PYTHON,
     python_command,
 )
-from .evidence import build_evidence, load_json, print_json, stable_task_key, write_evidence
+from .evidence import build_evidence, load_json, print_json, stable_task_key, utc_now, write_evidence
 from .fanout import (
     build_submit_code,
     lint_contract_workers,
@@ -208,6 +210,9 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
 
     source_url = str(install_info.get("claudeR_source_url") or "")
     source_path = str(install_info.get("clauder_mcp_source") or "")
+    command_info = str(install_info.get("clauder_mcp_command") or "")
+    install_from = str(install_info.get("clauder_mcp_install_from") or "")
+    exe_sha256 = str(install_info.get("clauder_mcp_exe_sha256") or "")
     install_mode = str(install_info.get("clauder_mcp_install_mode") or "")
     provenance_ok = (
         "lzhs1995/ClaudeR" in source_url
@@ -215,10 +220,20 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
         or "projects/ClaudeR" in source_url
         or "projects\\ClaudeR" in source_path
         or "projects/ClaudeR" in source_path
+        or "projects\\ClaudeR" in install_from
+        or "projects/ClaudeR" in install_from
     )
     if persistent and install_info:
         if install_mode and install_mode != "uv_tool_from_local_lzhs_fork":
             result["warnings"].append(f"unexpected clauder_mcp_install_mode={install_mode}")
+        if command_info and command and Path(command_info) != Path(command):
+            result["warnings"].append(f"INSTALL_INFO clauder_mcp_command differs from Codex command: {command_info}")
+        if command and not Path(command).exists():
+            result["reasons"].append(f"persistent clauder-mcp.exe does not exist: {command}")
+        if source_path and not Path(source_path).exists():
+            result["reasons"].append(f"INSTALL_INFO clauder_mcp_source does not exist: {source_path}")
+        if not exe_sha256:
+            result["warnings"].append("INSTALL_INFO missing clauder_mcp_exe_sha256")
         if not provenance_ok:
             result["reasons"].append("INSTALL_INFO does not prove lzhs ClaudeR fork provenance")
 
@@ -438,6 +453,325 @@ def make_task_key(args: argparse.Namespace) -> str:
         session_name=getattr(args, "session_name", "") or "",
         transport_scope=getattr(args, "transport_scope", "") or "",
     )
+
+
+NATIVE_SMOKE_STEPS = ("list_sessions", "execute_r", "execute_r_async", "get_async_result")
+
+
+def _safe_task_key(task_key: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in task_key)[:128] or "task"
+
+
+def _native_smoke_path(task_key: str) -> Path:
+    NATIVE_SMOKE_DIR.mkdir(parents=True, exist_ok=True)
+    return NATIVE_SMOKE_DIR / f"{_safe_task_key(task_key)}.json"
+
+
+def _load_native_smoke(task_key: str) -> dict[str, Any] | None:
+    path = _native_smoke_path(task_key)
+    if not path.exists():
+        return None
+    return load_json(path)
+
+
+def _write_native_smoke(task_key: str, state: dict[str, Any]) -> Path:
+    path = _native_smoke_path(task_key)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def _archive_native_smoke(task_key: str, reason: str) -> str | None:
+    path = _native_smoke_path(task_key)
+    if not path.exists():
+        return None
+    NATIVE_SMOKE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    target = NATIVE_SMOKE_ARCHIVE_DIR / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{_safe_task_key(task_key)}_{reason}.json"
+    path.replace(target)
+    return str(target)
+
+
+def _load_parent_docs(paths: list[str] | None) -> tuple[list[dict[str, Any]], list[str]]:
+    docs: list[dict[str, Any]] = []
+    reasons: list[str] = []
+    for path in paths or []:
+        try:
+            docs.append(load_json(path))
+        except Exception as exc:
+            reasons.append(f"could not read parent evidence {path}: {exc}")
+    return docs, reasons
+
+
+def _parse_utc(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _timestamp_fresh_enough(timestamp_utc: str | None, max_age_min: float) -> bool:
+    dt = _parse_utc(timestamp_utc)
+    if dt is None:
+        return False
+    age_sec = (datetime.now(timezone.utc) - dt).total_seconds()
+    return age_sec <= max_age_min * 60
+
+
+def _native_smoke_parent_ok(parent_docs: list[dict[str, Any]], task_key: str | None = None, max_age_min: float = 60.0) -> bool:
+    for doc in parent_docs:
+        if doc.get("harness_name") != "native_smoke":
+            continue
+        if doc.get("decision") != "PASS" or doc.get("transport_class") != "NATIVE_MCP_OK":
+            continue
+        if task_key and doc.get("task_key") not in {task_key, None, ""}:
+            continue
+        if not _timestamp_fresh_enough(str(doc.get("timestamp_utc") or ""), max_age_min):
+            continue
+        return True
+    return False
+
+
+def _contract_requires_native_smoke(contract: dict[str, Any]) -> bool:
+    if bool(contract.get("requires_native_smoke")):
+        return True
+    transport = str(contract.get("transport") or "").lower()
+    return transport in {"native-wrapper", "native_wrapper", "native"}
+
+
+def _native_smoke_gate(contract: dict[str, Any], parent_evidence: list[str] | None, task_key: str | None = None) -> tuple[bool, list[str], list[dict[str, Any]]]:
+    parent_docs, reasons = _load_parent_docs(parent_evidence)
+    if not _contract_requires_native_smoke(contract):
+        return True, reasons, parent_docs
+    max_age = 60.0
+    native_cfg = contract.get("native_smoke") or {}
+    if isinstance(native_cfg, dict) and native_cfg.get("max_age_min") is not None:
+        try:
+            max_age = float(native_cfg["max_age_min"])
+        except (TypeError, ValueError):
+            pass
+    key = task_key or contract.get("task_key")
+    if not _native_smoke_parent_ok(parent_docs, str(key) if key else None, max_age):
+        reasons.append(
+            "contract requires fresh native_smoke parent evidence with transport_class=NATIVE_MCP_OK; "
+            "run native-smoke start -> native list_sessions/execute_r/execute_r_async/get_async_result -> "
+            "native-smoke record/complete first"
+        )
+        return False, reasons, parent_docs
+    return True, reasons, parent_docs
+
+
+def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, Any]) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    if entry.get("transport_class") != "NATIVE_MCP_OK":
+        reasons.append(f"{step} transport_class must be NATIVE_MCP_OK")
+    tool_layer = str(entry.get("tool_layer") or "")
+    if not tool_layer.endswith("-native"):
+        reasons.append(f"{step} must be recorded from an agent native wrapper tool layer")
+    if not entry.get("ok"):
+        reasons.append(f"{step} is not recorded as ok")
+    if step == "list_sessions":
+        if not entry.get("session_name") and int(entry.get("session_count") or 0) < 1:
+            reasons.append("list_sessions needs --session-name or --session-count >= 1")
+    elif step == "execute_r":
+        if not entry.get("marker"):
+            reasons.append("execute_r needs a native output marker")
+    elif step == "execute_r_async":
+        if not entry.get("job_id"):
+            reasons.append("execute_r_async needs the real job_id")
+    elif step == "get_async_result":
+        if not entry.get("job_id"):
+            reasons.append("get_async_result needs the same job_id")
+        async_job = (state.get("steps") or {}).get("execute_r_async", {}).get("job_id")
+        if async_job and entry.get("job_id") != async_job:
+            reasons.append("get_async_result job_id does not match execute_r_async job_id")
+        if not entry.get("marker"):
+            reasons.append("get_async_result needs a completion marker")
+    raw_file = entry.get("raw_file")
+    marker = entry.get("marker")
+    if raw_file and marker:
+        try:
+            raw = Path(raw_file).read_text(encoding="utf-8-sig", errors="replace")
+            if str(marker) not in raw:
+                reasons.append(f"marker not found in raw_file for {step}")
+        except Exception as exc:
+            reasons.append(f"could not read raw_file for {step}: {exc}")
+    return not reasons, reasons
+
+
+def cmd_native_smoke(args: argparse.Namespace) -> int:
+    task_key = make_task_key(args)
+    if args.action == "list":
+        states: list[dict[str, Any]] = []
+        NATIVE_SMOKE_DIR.mkdir(parents=True, exist_ok=True)
+        for path in NATIVE_SMOKE_DIR.glob("*.json"):
+            if path.name == "archive":
+                continue
+            try:
+                states.append(load_json(path))
+            except Exception:
+                continue
+        doc = build_evidence("native_smoke_list", "PASS", reasons=["listed native smoke states"], exit_code=PASS, extra={"states": states})
+        return emit(doc)
+
+    if args.action == "cancel":
+        archived = _archive_native_smoke(task_key, args.reason or "cancel")
+        doc = build_evidence(
+            "native_smoke_cancel",
+            "PASS",
+            reasons=["archived native smoke state" if archived else "no native smoke state found"],
+            task_key=task_key,
+            exit_code=PASS,
+            extra={"archived_path": archived},
+        )
+        return emit(doc)
+
+    if args.action == "start":
+        existing = _load_native_smoke(task_key)
+        if existing and not args.force:
+            doc = build_evidence(
+                "native_smoke_start",
+                "BLOCK",
+                reasons=[f"native smoke state already exists for task_key={task_key}; use --force or cancel it"],
+                task_key=task_key,
+                policy_violations=["NATIVE-SMOKE-DUPLICATE-START"],
+                exit_code=BLOCK,
+                extra={"state": existing},
+            )
+            return emit(doc)
+        if existing and args.force:
+            _archive_native_smoke(task_key, "force")
+        state = {
+            "task_key": task_key,
+            "status": "started",
+            "started_at_utc": utc_now(),
+            "session_name": args.session_name,
+            "required_steps": list(NATIVE_SMOKE_STEPS),
+            "steps": {},
+        }
+        path = _write_native_smoke(task_key, state)
+        doc = build_evidence(
+            "native_smoke_start",
+            "PASS",
+            reasons=[
+                "native smoke started; now run real agent-native list_sessions, execute_r, execute_r_async, and get_async_result, then record each step"
+            ],
+            task_key=task_key,
+            session_name=args.session_name,
+            exit_code=PASS,
+            extra={"state_path": str(path), "required_steps": list(NATIVE_SMOKE_STEPS)},
+        )
+        return emit(doc)
+
+    state = _load_native_smoke(task_key)
+    if not state:
+        doc = build_evidence(
+            "native_smoke",
+            "BLOCK",
+            reasons=[f"native smoke state missing for task_key={task_key}; run native-smoke start first"],
+            task_key=task_key,
+            policy_violations=["NATIVE-SMOKE-WITHOUT-START"],
+            exit_code=BLOCK,
+        )
+        return emit(doc)
+
+    if args.action == "record":
+        if args.step not in NATIVE_SMOKE_STEPS:
+            doc = build_evidence("native_smoke_record", "BLOCK", reasons=[f"unknown step: {args.step}"], task_key=task_key, exit_code=BLOCK)
+            return emit(doc)
+        entry = {
+            "step": args.step,
+            "ok": bool(args.ok),
+            "recorded_at_utc": utc_now(),
+            "tool_layer": args.tool_layer,
+            "transport_class": args.transport_class,
+            "session_name": args.session_name or state.get("session_name"),
+            "session_count": args.session_count,
+            "pid": args.pid,
+            "job_id": args.job_id,
+            "marker": args.marker,
+            "raw_file": args.raw_file,
+        }
+        ok, reasons = _native_smoke_step_valid(args.step, entry, state)
+        if not ok:
+            doc = build_evidence(
+                "native_smoke_record",
+                "BLOCK",
+                reasons=reasons,
+                task_key=task_key,
+                transport_class="BLOCKED",
+                session_name=entry.get("session_name"),
+                job_id=entry.get("job_id"),
+                policy_violations=["NATIVE-SMOKE-INVALID-STEP"],
+                exit_code=BLOCK,
+                extra={"entry": entry},
+            )
+            return emit(doc)
+        state.setdefault("steps", {})[args.step] = entry
+        state["status"] = "recording"
+        state["updated_at_utc"] = utc_now()
+        _write_native_smoke(task_key, state)
+        doc = build_evidence(
+            "native_smoke_record",
+            "PASS",
+            reasons=[f"recorded native smoke step: {args.step}"],
+            task_key=task_key,
+            transport_class="NATIVE_MCP_OK",
+            session_name=entry.get("session_name"),
+            pid=entry.get("pid"),
+            job_id=entry.get("job_id"),
+            exit_code=PASS,
+            extra={"entry": entry},
+        )
+        return emit(doc)
+
+    if args.action == "complete":
+        steps = state.get("steps") or {}
+        reasons: list[str] = []
+        for step in NATIVE_SMOKE_STEPS:
+            entry = steps.get(step)
+            if not entry:
+                reasons.append(f"missing native smoke step: {step}")
+                continue
+            ok, step_reasons = _native_smoke_step_valid(step, entry, state)
+            reasons.extend(step_reasons)
+            if not _timestamp_fresh_enough(str(entry.get("recorded_at_utc") or ""), args.max_age_min):
+                reasons.append(f"native smoke step is stale: {step}")
+        if reasons:
+            doc = build_evidence(
+                "native_smoke",
+                "BLOCK",
+                reasons=reasons,
+                task_key=task_key,
+                transport_class="BLOCKED",
+                policy_violations=["NATIVE-SMOKE-INCOMPLETE"],
+                exit_code=BLOCK,
+                extra={"state": state},
+            )
+            return emit(doc)
+        state["status"] = "complete"
+        state["completed_at_utc"] = utc_now()
+        _write_native_smoke(task_key, state)
+        parent_ids = [step.get("evidence_id") for step in steps.values() if step.get("evidence_id")]
+        doc = build_evidence(
+            "native_smoke",
+            "PASS",
+            reasons=["native wrapper smoke passed: list_sessions + execute_r + execute_r_async/get_async_result"],
+            parent_evidence_ids=[str(x) for x in parent_ids if x],
+            task_key=task_key,
+            transport_class="NATIVE_MCP_OK",
+            session_name=state.get("session_name") or steps.get("list_sessions", {}).get("session_name"),
+            pid=steps.get("execute_r", {}).get("pid"),
+            job_id=steps.get("execute_r_async", {}).get("job_id"),
+            exit_code=PASS,
+            extra={"state_path": str(_native_smoke_path(task_key)), "steps": steps},
+        )
+        return emit(doc)
+
+    doc = build_evidence("native_smoke", "BLOCK", reasons=[f"unknown action: {args.action}"], task_key=task_key, exit_code=BLOCK)
+    return emit(doc)
 
 
 def cmd_async_guard(args: argparse.Namespace) -> int:
@@ -751,12 +1085,8 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     policy_violations: list[str] = []
     reasons = [check["reason"] for check in artifacts["checks"] if not check["ok"]]
 
-    parent_docs = []
-    for path in args.parent_evidence or []:
-        try:
-            parent_docs.append(load_json(path))
-        except Exception as exc:
-            reasons.append(f"could not read parent evidence {path}: {exc}")
+    parent_docs, parent_reasons = _load_parent_docs(args.parent_evidence)
+    reasons.extend(parent_reasons)
 
     require_transport_class = args.require_transport_class or contract.get("require_transport_class")
     if require_transport_class:
@@ -768,6 +1098,10 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     if require_preflight and not any(doc.get("harness_name") == "preflight" for doc in parent_docs):
         policy_violations.append("MISSING-PREFLIGHT-EVIDENCE")
         reasons.append("required preflight parent evidence is missing")
+    require_native_smoke = args.require_native_smoke or bool(contract.get("requires_native_smoke"))
+    if require_native_smoke and not _native_smoke_parent_ok(parent_docs, args.task_key or contract.get("task_key"), args.native_smoke_max_age_min):
+        policy_violations.append("MISSING-NATIVE-SMOKE-EVIDENCE")
+        reasons.append("required native_smoke parent evidence with transport_class=NATIVE_MCP_OK is missing or stale")
     if args.io_mode == "durable_files" and args.outputs:
         policy_violations.append("P2 BIG-MODEL-LARGE-OUTPUTS")
         reasons.append("durable_files completion includes marshaled outputs")
@@ -871,6 +1205,21 @@ def cmd_worker_lint(args: argparse.Namespace) -> int:
 
 def cmd_fanout_plan(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
+    task_key = contract.get("task_key") or "fanout"
+    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    if not native_ok:
+        doc = build_evidence(
+            "fanout_plan",
+            "BLOCK",
+            reasons=native_reasons,
+            parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+            task_key=task_key,
+            transport_class="BLOCKED",
+            policy_violations=["MISSING-NATIVE-SMOKE-EVIDENCE"],
+            exit_code=BLOCK,
+            extra={"contract": str(args.contract)},
+        )
+        return emit(doc)
     plan = plan_fanout(contract, advise_parallel=not args.no_advise)
     submit_codes = {}
     for worker in contract.get("workers") or []:
@@ -888,6 +1237,7 @@ def cmd_fanout_plan(args: argparse.Namespace) -> int:
         "fanout_plan",
         decision,
         reasons=reasons,
+        parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
         task_key=plan["task_key"],
         exit_code=exit_code,
         extra=plan | {"submit_codes": submit_codes, "contract": str(args.contract)},
@@ -898,6 +1248,21 @@ def cmd_fanout_plan(args: argparse.Namespace) -> int:
 def cmd_fanout_run(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     transport = (args.transport or contract.get("transport") or "mcp-stdio").lower()
+    task_key = contract.get("task_key") or "fanout"
+    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    if not native_ok:
+        doc = build_evidence(
+            "fanout_run",
+            "BLOCK",
+            reasons=native_reasons,
+            parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+            task_key=task_key,
+            transport_class="BLOCKED",
+            policy_violations=["MISSING-NATIVE-SMOKE-EVIDENCE"],
+            exit_code=BLOCK,
+            extra={"contract": str(args.contract), "transport": transport},
+        )
+        return emit(doc)
     if transport != "mcp-stdio":
         doc = build_evidence(
             "fanout_run",
@@ -917,14 +1282,13 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
     session_name = args.session_name or contract.get("session_name") or ""
     poll_interval = float(args.poll_interval_sec or contract.get("poll_interval_sec") or 30.0)
     job_timeout = float(args.job_timeout_min or contract.get("job_timeout_min") or 180.0)
-    task_key = contract.get("task_key") or "fanout"
-
     if args.dry_run:
         plan = plan_fanout(contract, advise_parallel=True)
         doc = build_evidence(
             "fanout_run",
             "PASS" if plan["ok"] else "CONTRACT_FAILED",
             reasons=["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
+            parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
             task_key=task_key,
             transport_class="N/A",
             exit_code=PASS if plan["ok"] else CONTRACT_FAILED,
@@ -980,6 +1344,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         "fanout_run",
         decision,
         reasons=reasons,
+        parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
         task_key=task_key,
         transport_class=result.get("transport_class", "MCP_STDIO_OK"),
         session_name=session_name,
@@ -991,6 +1356,21 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
 
 def cmd_fanout_poll(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
+    task_key = contract.get("task_key") or "fanout"
+    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    if not native_ok:
+        doc = build_evidence(
+            "fanout_poll",
+            "BLOCK",
+            reasons=native_reasons,
+            parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+            task_key=task_key,
+            transport_class="BLOCKED",
+            policy_violations=["MISSING-NATIVE-SMOKE-EVIDENCE"],
+            exit_code=BLOCK,
+            extra={"contract": str(args.contract)},
+        )
+        return emit(doc)
     poll = poll_once(contract)
     exit_code = PASS if poll["all_complete"] else WARN
     decision = "PASS" if poll["all_complete"] else "WARN"
@@ -1001,7 +1381,8 @@ def cmd_fanout_poll(args: argparse.Namespace) -> int:
         "fanout_poll",
         decision,
         reasons=reasons,
-        task_key=contract.get("task_key"),
+        parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+        task_key=task_key,
         exit_code=exit_code,
         extra=poll | {"contract": str(args.contract)},
     )
@@ -1010,6 +1391,21 @@ def cmd_fanout_poll(args: argparse.Namespace) -> int:
 
 def cmd_merge_gate(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
+    task_key = contract.get("task_key") or "fanout"
+    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    if not native_ok:
+        doc = build_evidence(
+            "merge_gate",
+            "BLOCK",
+            reasons=native_reasons,
+            parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+            task_key=task_key,
+            transport_class="BLOCKED",
+            policy_violations=["MISSING-NATIVE-SMOKE-EVIDENCE"],
+            exit_code=BLOCK,
+            extra={"contract": str(args.contract)},
+        )
+        return emit(doc)
     gate = merge_gate(contract)
     artifact_paths: list[str] = []
     for s in gate["statuses"]:
@@ -1030,7 +1426,8 @@ def cmd_merge_gate(args: argparse.Namespace) -> int:
         "merge_gate",
         decision,
         reasons=reasons,
-        task_key=contract.get("task_key"),
+        parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
+        task_key=task_key,
         artifact_paths=artifact_paths,
         policy_violations=gate["violations"],
         exit_code=exit_code,
@@ -1117,6 +1514,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=float, default=30.0)
     p.add_argument("--reason")
 
+    p = sub.add_parser("native-smoke")
+    p.add_argument("action", choices=["start", "record", "complete", "list", "cancel"])
+    add_common_task_args(p)
+    p.add_argument("--step", choices=list(NATIVE_SMOKE_STEPS))
+    p.add_argument("--ok", action="store_true")
+    p.add_argument("--tool-layer", choices=["codex-native", "claude-native", "copilot-native"], default="codex-native")
+    p.add_argument("--transport-class", choices=["NATIVE_MCP_OK", "MCP_STDIO_OK", "HTTP_ONLY_DIAGNOSTIC", "RSCRIPT_ONLY", "BLOCKED"], default="NATIVE_MCP_OK")
+    p.add_argument("--session-count", type=int, default=0)
+    p.add_argument("--pid")
+    p.add_argument("--job-id")
+    p.add_argument("--marker")
+    p.add_argument("--raw-file")
+    p.add_argument("--max-age-min", type=float, default=20.0)
+    p.add_argument("--force", action="store_true")
+    p.add_argument("--reason")
+
     p = sub.add_parser("resource-gate")
     p.add_argument("mode", choices=["advise", "enforce"])
     p.add_argument("--task-key")
@@ -1138,6 +1551,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--require-file", action="append", default=[])
     p.add_argument("--require-transport-class")
     p.add_argument("--require-preflight", action="store_true")
+    p.add_argument("--require-native-smoke", action="store_true")
+    p.add_argument("--native-smoke-max-age-min", type=float, default=60.0)
     p.add_argument("--transport-class")
     p.add_argument("--io-mode", choices=["marshal_small", "durable_files", "hybrid"], default="durable_files")
     p.add_argument("--outputs", nargs="*", default=[])
@@ -1153,11 +1568,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("fanout-plan")
     p.add_argument("--contract", required=True)
+    p.add_argument("--parent-evidence", nargs="*", default=[])
     p.add_argument("--no-advise", action="store_true",
                    help="Skip memory-based parallelism advice; only validate the contract.")
 
     p = sub.add_parser("fanout-run")
     p.add_argument("--contract", required=True)
+    p.add_argument("--parent-evidence", nargs="*", default=[])
     p.add_argument("--transport", choices=["mcp-stdio", "native-wrapper"], default=None)
     p.add_argument("--session-name", default="")
     p.add_argument("--max-parallel", type=int)
@@ -1184,9 +1601,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("fanout-poll")
     p.add_argument("--contract", required=True)
+    p.add_argument("--parent-evidence", nargs="*", default=[])
 
     p = sub.add_parser("merge-gate")
     p.add_argument("--contract", required=True)
+    p.add_argument("--parent-evidence", nargs="*", default=[])
 
     return parser
 
@@ -1207,6 +1626,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_connect(args)
         if args.cmd == "async-guard":
             return cmd_async_guard(args)
+        if args.cmd == "native-smoke":
+            return cmd_native_smoke(args)
         if args.cmd == "resource-gate":
             return cmd_resource_gate(args)
         if args.cmd == "completion-check":

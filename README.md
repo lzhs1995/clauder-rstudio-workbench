@@ -27,7 +27,7 @@ The installer is Windows-first. It does not modify MCP client configuration unle
 Open PowerShell and run the install path you need. For Codex:
 
 ```powershell
-git clone --branch v0.3.0 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.3.1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -57,10 +57,10 @@ To make the short `clauder-workbench doctor` command available in future termina
 If `git clone` is blocked by a proxy or reset connection, use the supported tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.0.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.0"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.1.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.1"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.0/clauder-rstudio-workbench-v0.3.0.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.1/clauder-rstudio-workbench-v0.3.1.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -81,7 +81,11 @@ chain (one RStudio session, N async R workers, autonomous merge):
 python skills\cmaverse-paired-mval\scripts\make_worker_contract.py `
   --worker-file <paired_worker.R> --output-root "<OUTPUT_ROOT>" --run-id <RUN_ID> `
   --mediators m1,m2,...,m7 --groups sy_female,sy_male --nboot 10 --seed 12345 --out task.yaml
-clauder-workbench fanout-plan  --contract task.yaml
+clauder-workbench native-smoke start --task-key cmaverse_paired_mval_<RUN_ID> --session-name default
+# Run the real Codex native MCP tools now:
+#   list_sessions -> execute_r -> execute_r_async -> get_async_result
+# Then record each result with native-smoke record and finish with native-smoke complete.
+clauder-workbench fanout-plan  --contract task.yaml --parent-evidence <native_smoke_PASS.json>
 
 # 2. static-safety lint (BLOCKs any worker containing sink()), then run
 clauder-workbench worker-lint  --contract task.yaml
@@ -90,7 +94,7 @@ clauder-workbench fanout-run   --contract task.yaml --max-parallel 3 --auto-scal
 # 3. scientific validation + merge gate before claiming success
 python skills\cmaverse-paired-mval\scripts\cmaverse_validate.py --output-root "<RUN_DIR>" `
   --mediators m1,m2,...,m7 --groups sy_female,sy_male
-clauder-workbench merge-gate   --contract task.yaml
+clauder-workbench merge-gate   --contract task.yaml --parent-evidence <native_smoke_PASS.json>
 ```
 
 `--auto-scale` makes the harness sample memory each poll cycle and raise concurrency
@@ -135,6 +139,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.3.1` | `v0.2.0-lzhs.1` | Hardens native MCP stability gates: adds executable `native-smoke` evidence flow, installer MCP prewarm/provenance fields, workspace MCP config support, and fan-out/cmaverse parent-evidence checks so long jobs cannot start from an unproven native wrapper. |
 | `v0.3.0` | `v0.2.0-lzhs.1` | Becomes a skill collection (installer auto-discovers all `skills/<name>/`); adds the parallel async fan-out harness, the `worker-lint` `sink()` BLOCK gate, `fanout-run --auto-scale` dynamic concurrency, and the `cmaverse-paired-mval` domain skill. |
 | `v0.2.4` | `v0.2.0-lzhs.1` | UTF-8 no-BOM writer for Codex/Copilot configs, fixes Chinese-path corruption in `[projects.''...'']` entries, adds `doctor --check-toml-parse` self-check with auto-rollback after `install.ps1 -ConfigureCodex`. |
 | `v0.2.3` | `v0.2.0-lzhs.1` | Adds ClaudeR zip fallback, source metadata in `INSTALL_INFO.json`, client-scoped `doctor`, Python 3.14 opt-in install, and workbench zip bootstrap docs. |
@@ -236,9 +241,20 @@ The Codex `r-studio` MCP entry must use the persistent
 `UV_CACHE_DIR = C:\tmp\uv-cache`. If it still uses `uvx --from`, rerun
 `install.ps1 -ConfigureCodex` to install the hot entry from the local LZHS fork.
 Only after the config/provenance check passes should a native wrapper smoke be
-accepted: `list_sessions`, short `execute_r`, then
-`execute_r_async -> get_async_result`. Do not start long fan-out work after a
-single `Transport closed`.
+accepted. In v0.3.1 and later, record that smoke with the executable gate:
+
+```powershell
+clauder-workbench native-smoke start --task-key <task> --session-name default
+# Use the real agent-native MCP tools, not Python stdio:
+# list_sessions, execute_r, execute_r_async, get_async_result
+clauder-workbench native-smoke record --task-key <task> --step list_sessions --ok --session-name default
+clauder-workbench native-smoke record --task-key <task> --step execute_r --ok --marker NATIVE_EXECUTE_OK --pid <R_PID>
+clauder-workbench native-smoke record --task-key <task> --step execute_r_async --ok --job-id <JOB_ID>
+clauder-workbench native-smoke record --task-key <task> --step get_async_result --ok --job-id <JOB_ID> --marker NATIVE_ASYNC_DONE
+clauder-workbench native-smoke complete --task-key <task>
+```
+
+Do not start long fan-out work after a single `Transport closed`.
 
 ### Windows opens a second RStudio session and the first one aborts
 
@@ -259,7 +275,7 @@ To upgrade the skill and reinstall the paired ClaudeR release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.3.0
+git checkout v0.3.1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

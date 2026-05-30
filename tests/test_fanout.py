@@ -6,6 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
+from clauder_workbench.evidence import build_evidence, write_evidence
 from clauder_workbench.fanout import (
     _minimal_yaml,
     build_submit_code,
@@ -271,6 +272,44 @@ class FanoutTests(unittest.TestCase):
             self.assertEqual(doc["transport_class"], "BLOCKED")
             self.assertTrue(any("native-wrapper" in r or "fanout-plan" in r
                                 for r in doc["reasons"]))
+
+    def test_fanout_plan_blocks_when_native_smoke_required_without_parent(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            text = CONTRACT_TEMPLATE.format(root=str(root).replace("\\", "/"))
+            text = text.replace("transport: mcp-stdio\n", "transport: mcp-stdio\nrequires_native_smoke: true\n")
+            contract = root / "task.yaml"
+            contract.write_text(text, encoding="utf-8")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = cli.main(["fanout-plan", "--contract", str(contract)])
+            self.assertEqual(rc, cli.BLOCK)
+            doc = json.loads(buf.getvalue())
+            self.assertEqual(doc["policy_violations"], ["MISSING-NATIVE-SMOKE-EVIDENCE"])
+
+    def test_fanout_plan_accepts_native_smoke_parent(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            text = CONTRACT_TEMPLATE.format(root=str(root).replace("\\", "/"))
+            text = text.replace("transport: mcp-stdio\n", "transport: mcp-stdio\nrequires_native_smoke: true\n")
+            contract = root / "task.yaml"
+            contract.write_text(text, encoding="utf-8")
+            ev = build_evidence("native_smoke", "PASS", task_key="t_demo", transport_class="NATIVE_MCP_OK")
+            ev_path = write_evidence(ev, evidence_dir=root)
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = cli.main(["fanout-plan", "--contract", str(contract), "--parent-evidence", str(ev_path)])
+            self.assertEqual(rc, cli.PASS)
+            doc = json.loads(buf.getvalue())
+            self.assertEqual(doc["decision"], "PASS")
 
 
 class FanoutSchemaPackagingTests(unittest.TestCase):

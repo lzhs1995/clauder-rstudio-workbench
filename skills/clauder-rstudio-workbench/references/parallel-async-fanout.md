@@ -108,13 +108,17 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 #     resume a partially-finished run (skip already-complete workers)
 .\harness\run.ps1 fanout-run --contract task.yaml --reuse-existing
 
-# 2b. native-wrapper mode: agent submits each worker's submit code via its own
-#     mcp__r_studio__ wrapper, records the real job_id, then you poll/gate:
+# 2b. native-wrapper mode: first prove the current agent-native tool layer,
+#     then submit each worker via mcp__r_studio__, record the real job_id, and poll/gate:
+.\harness\run.ps1 native-smoke start --task-key cmaverse_msat_decomp --session-name default
+# agent runs real native list_sessions / execute_r / execute_r_async / get_async_result
+# and records each with native-smoke record
+.\harness\run.ps1 native-smoke complete --task-key cmaverse_msat_decomp
 .\harness\run.ps1 async-guard register-job --task-key cmaverse_msat_decomp:msat_c12_2 --job-id <real_job_id>
-.\harness\run.ps1 fanout-poll --contract task.yaml
+.\harness\run.ps1 fanout-poll --contract task.yaml --parent-evidence <native_smoke_PASS.json>
 
 # 3. Merge gate: passes only when ALL workers are complete with manifest+validation
-.\harness\run.ps1 merge-gate --contract task.yaml
+.\harness\run.ps1 merge-gate --contract task.yaml --parent-evidence <native_smoke_PASS.json>
 ```
 
 ### Exit codes

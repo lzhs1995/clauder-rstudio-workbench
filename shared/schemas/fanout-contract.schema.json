@@ -15,6 +15,19 @@
       "minimum": 1,
       "description": "Default concurrency level if not overridden on the CLI."
     },
+    "requires_native_smoke": {
+      "type": "boolean",
+      "description": "When true, fanout-plan/run/poll/merge-gate require fresh parent evidence from clauder-workbench native-smoke complete before proceeding."
+    },
+    "native_smoke": {
+      "type": "object",
+      "properties": {
+        "max_age_min": {
+          "type": "number",
+          "description": "Maximum age, in minutes, of accepted native-smoke parent evidence."
+        }
+      }
+    },
     "artifacts": {
       "type": "object",
       "properties": {
