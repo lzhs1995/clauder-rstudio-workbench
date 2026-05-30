@@ -6,7 +6,7 @@ import re
 import time
 from typing import Any
 
-from .config import LOCAL_CLAUDER_BRIDGE
+from .config import CODEX_CONFIG, LOCAL_CLAUDER_BRIDGE
 
 
 EXPECTED_R_STUDIO_TOOLS = {
@@ -18,18 +18,56 @@ EXPECTED_R_STUDIO_TOOLS = {
 }
 
 
-def _server_env() -> dict[str, str]:
+def _load_codex_rstudio_server() -> tuple[str, list[str], dict[str, str]] | None:
+    if not CODEX_CONFIG.exists():
+        return None
+    try:
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+        raw = CODEX_CONFIG.read_bytes()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            raw = raw[3:]
+        data = tomllib.loads(raw.decode("utf-8"))
+        server = ((data.get("mcp_servers") or {}).get("r-studio") or {}) if isinstance(data, dict) else {}
+        command = str(server.get("command") or "")
+        if not command:
+            return None
+        raw_args = server.get("args") or []
+        if isinstance(raw_args, str):
+            args = [raw_args]
+        else:
+            args = [str(a) for a in raw_args]
+        raw_env = (server.get("env") or {}) if isinstance(server, dict) else {}
+        env = {str(k): str(v) for k, v in raw_env.items() if v is not None}
+        return command, args, env
+    except Exception:
+        return None
+
+
+def _server_spec() -> tuple[str, list[str], dict[str, str]]:
+    configured = _load_codex_rstudio_server()
+    if configured:
+        return configured
+    if LOCAL_CLAUDER_BRIDGE and LOCAL_CLAUDER_BRIDGE.exists():
+        return "uvx", ["--from", str(LOCAL_CLAUDER_BRIDGE), "clauder-mcp"], {}
+    return "uvx", ["clauder-mcp"], {}
+
+
+def _server_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("USERPROFILE", str(os.environ.get("USERPROFILE") or os.path.expanduser("~")))
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("NO_PROXY", "127.0.0.1,localhost")
+    if extra:
+        env.update(extra)
     return env
 
 
 def _server_args() -> tuple[str, list[str]]:
-    if LOCAL_CLAUDER_BRIDGE and LOCAL_CLAUDER_BRIDGE.exists():
-        return "uvx", ["--from", str(LOCAL_CLAUDER_BRIDGE), "clauder-mcp"]
-    return "uvx", ["clauder-mcp"]
+    command, args, _env = _server_spec()
+    return command, args
 
 
 def _result_text(result: Any) -> str:
@@ -71,8 +109,8 @@ async def _session_run(timeout: float, runner: Any) -> dict[str, Any]:
     except Exception as exc:  # pragma: no cover - depends on optional package
         return {"ok": False, "reason": f"mcp python package unavailable: {exc}"}
 
-    command, args = _server_args()
-    params = StdioServerParameters(command=command, args=args, env=_server_env())
+    command, args, env_extra = _server_spec()
+    params = StdioServerParameters(command=command, args=args, env=_server_env(env_extra))
 
     async def run() -> dict[str, Any]:
         async with stdio_client(params) as (read, write):

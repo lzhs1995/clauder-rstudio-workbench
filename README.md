@@ -146,26 +146,35 @@ Installer prerequisites:
 
 ## MCP Command
 
-The preferred Codex configuration points to the local cloned ClaudeR source:
+The preferred Codex configuration uses a persistent `clauder-mcp.exe` entry
+installed from the local `lzhs1995/ClaudeR` fork clone. This avoids the repeated
+`uvx --from ...` cold-start path that can exceed a client startup timeout on a
+new machine or after cache eviction.
 
 ```toml
 [mcp_servers.r-studio]
-command = "uvx"
-args = ["--from", "<USER_HOME>\\projects\\ClaudeR\\clauder-mcp", "clauder-mcp"]
+command = "<USER_HOME>\\.local\\bin\\clauder-mcp.exe"
+startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
 USERPROFILE = "<USER_HOME>"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "C:\\tmp\\uv-cache"
 ```
 
-The ClaudeR release also supports Git-subdirectory execution:
+`install.ps1 -ConfigureCodex` creates this entry by running:
 
 ```text
-uvx --from git+https://github.com/lzhs1995/ClaudeR.git@v0.2.0-lzhs.1#subdirectory=clauder-mcp clauder-mcp
+uv tool install --force --from <USER_HOME>\projects\ClaudeR\clauder-mcp clauder-mcp
 ```
 
-Local clone is the default installer path because it is easier to inspect, patch, and debug.
+The source is still the patched fork, not upstream ClaudeR and not PyPI. Never
+use a bare `uvx clauder-mcp` or `uv tool install clauder-mcp`; those can resolve
+to the upstream package and lose the LZHS async progress, multiple-session, and
+Copilot changes. `uvx --from <USER_HOME>\projects\ClaudeR\clauder-mcp
+clauder-mcp` remains valid only as a development diagnostic path, not the
+stable colleague install path.
 
 ## Validation
 
@@ -216,7 +225,20 @@ Restart the client. Codex, Claude Code, and Copilot CLI do not reliably hot-load
 
 ### Codex shows `Transport closed`
 
-Treat this as a transport-layer failure until proven otherwise. Check that RStudio is open, `library(ClaudeR); claudeAddin()` is running, and the discovery session appears. If HTTP/Addin is alive but the Codex native wrapper is stale, restart Codex before rerunning a long job.
+Treat this as a transport-layer failure until proven otherwise. First run:
+
+```powershell
+clauder-workbench doctor --expect-client codex --check-toml-parse
+```
+
+The Codex `r-studio` MCP entry must use the persistent
+`<USER_HOME>\.local\bin\clauder-mcp.exe`, `startup_timeout_sec = 180.0`, and
+`UV_CACHE_DIR = C:\tmp\uv-cache`. If it still uses `uvx --from`, rerun
+`install.ps1 -ConfigureCodex` to install the hot entry from the local LZHS fork.
+Only after the config/provenance check passes should a native wrapper smoke be
+accepted: `list_sessions`, short `execute_r`, then
+`execute_r_async -> get_async_result`. Do not start long fan-out work after a
+single `Transport closed`.
 
 ### Windows opens a second RStudio session and the first one aborts
 

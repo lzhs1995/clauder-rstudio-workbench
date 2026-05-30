@@ -170,6 +170,7 @@ function Test-Prerequisites {
     }
 
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Require-Command "uv" "Install uv: winget install --id astral-sh.uv -e"
         Require-Command "uvx" "Install uv: winget install --id astral-sh.uv -e"
     }
     if ($ConfigureClaudeCode) {
@@ -196,6 +197,7 @@ function Test-Prerequisites {
         Write-Host "git: not found; zip fallback is enabled"
     }
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) {
+        Write-Host "uv: $((Get-Command uv).Source)"
         Write-Host "uvx: $((Get-Command uvx).Source)"
     }
 }
@@ -283,6 +285,12 @@ function Write-InstallInfo($Dest) {
         claudeR_source_type = $script:ClaudeRSourceType
         claudeR_source_url = $script:ClaudeRSourceUrl
         claudeR_ref = $ClaudeRRef
+        claudeR_commit = (Get-ClaudeRCommit)
+        clauder_mcp_source = (Join-Path $ClaudeRDir "clauder-mcp")
+        clauder_mcp_command = (Get-ClaudeRMcpExe)
+        clauder_mcp_install_mode = "uv_tool_from_local_lzhs_fork"
+        r_studio_startup_timeout_sec = 180.0
+        uv_cache_dir = "C:\tmp\uv-cache"
         dev_sync = [bool]$DevSync
     }
     $path = Join-Path $Dest "INSTALL_INFO.json"
@@ -405,6 +413,47 @@ function Set-ClaudeRExistingSourceInfo {
         $script:ClaudeRSourceType = "zip"
         $script:ClaudeRSourceUrl = $ClaudeRDir
     }
+}
+
+
+function Get-ClaudeRMcpExe {
+    # Stable install path used by `uv tool install`. Prefer it over any PATH entry
+    # so a stray PyPI/upstream `clauder-mcp` cannot shadow the lzhs fork install.
+    $candidate = Join-Path $env:USERPROFILE ".local\bin\clauder-mcp.exe"
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    $cmd = Get-Command "clauder-mcp" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $candidate
+}
+
+function Get-ClaudeRCommit {
+    if (Test-Path -LiteralPath (Join-Path $ClaudeRDir ".git")) {
+        try {
+            $value = & git -C $ClaudeRDir rev-parse HEAD 2>$null
+            if ($LASTEXITCODE -eq 0 -and $value) { return (($value | Out-String).Trim()) }
+        } catch { return "unknown" }
+    }
+    return "unknown"
+}
+
+function Install-ClaudeRMcpTool {
+    Write-Step "Installing persistent ClaudeR MCP entry from lzhs fork"
+    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    if (-not (Test-Path -LiteralPath (Join-Path $bridge "pyproject.toml"))) {
+        throw "ClaudeR MCP bridge source missing or invalid: $bridge"
+    }
+    Require-Command "uv" "Install uv: winget install --id astral-sh.uv -e"
+    $args = @("tool", "install", "--force", "--from", $bridge, "clauder-mcp")
+    Write-Host "+ uv $($args -join ' ')" -ForegroundColor DarkGray
+    if (-not $DryRun) {
+        & uv @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv tool install clauder-mcp failed with exit code ${LASTEXITCODE}."
+        }
+    }
+    $exe = Get-ClaudeRMcpExe
+    Write-Host "clauder-mcp persistent entry: $exe"
+    return $exe
 }
 
 function Install-ClaudeR {
@@ -611,16 +660,25 @@ function Write-CodexConfig {
     Backup-File $config
 
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    $mcpExe = Get-ClaudeRMcpExe
+    if (-not (Test-Path -LiteralPath $mcpExe) -and -not $DryRun) {
+        $mcpExe = Install-ClaudeRMcpTool
+    }
     $userProfile = $env:USERPROFILE
+    $uvCacheDir = "C:\tmp\uv-cache"
+    if (-not (Test-Path -LiteralPath $uvCacheDir) -and -not $DryRun) {
+        New-Item -ItemType Directory -Force -Path $uvCacheDir | Out-Null
+    }
     $block = @"
 [mcp_servers.r-studio]
-command = "uvx"
-args = ["--from", "$($bridge.Replace('\', '\\'))", "clauder-mcp"]
+command = "$($mcpExe.Replace('\', '\\'))"
+startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
 USERPROFILE = "$($userProfile.Replace('\', '\\'))"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "$($uvCacheDir.Replace('\', '\\'))"
 "@
 
     Write-Host "Codex MCP block:"
@@ -678,7 +736,7 @@ function Configure-ClaudeCode {
     Write-Step "Configuring Claude Code MCP"
     $claudeJson = Join-Path $env:USERPROFILE ".claude.json"
     Backup-File $claudeJson
-    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
+    $mcpExe = Get-ClaudeRMcpExe
     $removeArgs = @(
         "mcp", "remove", "r-studio", "-s", "user"
     )
@@ -694,7 +752,8 @@ function Configure-ClaudeCode {
         "-e", "USERPROFILE=$env:USERPROFILE",
         "-e", "PYTHONIOENCODING=utf-8",
         "-e", "NO_PROXY=127.0.0.1,localhost",
-        "r-studio", "--", "uvx", "--from", $bridge, "clauder-mcp"
+        "-e", "UV_CACHE_DIR=C:\tmp\uv-cache",
+        "r-studio", "--", $mcpExe
     )
     Invoke-Checked "claude" $addArgs
     Verify-ClaudeCodeMcp
@@ -728,12 +787,13 @@ function Write-CopilotConfig {
         mcpServers = [ordered]@{
             "r-studio" = [ordered]@{
                 type = "local"
-                command = "uvx"
-                args = @("--from", $bridge, "clauder-mcp")
+                command = (Get-ClaudeRMcpExe)
+                args = @()
                 env = [ordered]@{
                     USERPROFILE = $env:USERPROFILE
                     PYTHONIOENCODING = "utf-8"
                     NO_PROXY = "127.0.0.1,localhost"
+                    UV_CACHE_DIR = "C:\tmp\uv-cache"
                 }
                 tools = @("*")
             }
@@ -749,6 +809,7 @@ function Write-CopilotConfig {
 try {
     Test-Prerequisites
     if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Set-ClaudeRExistingSourceInfo; Write-Step "Skipping ClaudeR install" }
+    if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot) { Install-ClaudeRMcpTool | Out-Null }
     Install-Skill
     Install-AgentsSkill
     Install-Harness

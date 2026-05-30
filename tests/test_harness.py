@@ -22,7 +22,7 @@ from clauder_workbench.cli import (
 )
 from clauder_workbench.evidence import build_evidence, stable_task_key, write_evidence
 from clauder_workbench.inflight import archive_inflight, load_inflight, write_inflight
-from clauder_workbench.mcp_client import _retry_if_cold_timeout, extract_job_id
+from clauder_workbench.mcp_client import _retry_if_cold_timeout, _server_args, extract_job_id
 from clauder_workbench.resource import decide_resource_gate
 from clauder_workbench.transport import classify_transport
 
@@ -424,6 +424,87 @@ class HarnessUnitTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["doctor"])
         self.assertEqual(_expected_clients(args, {}), ["codex"])
+
+    def test_installer_uses_persistent_lzhs_mcp_entry(self) -> None:
+        text = Path("install.ps1").read_text(encoding="utf-8")
+        self.assertIn("Install-ClaudeRMcpTool", text)
+        self.assertIn("uv_tool_from_local_lzhs_fork", text)
+        self.assertIn("startup_timeout_sec = 180.0", text)
+        self.assertIn("UV_CACHE_DIR", text)
+        self.assertIn("clauder_mcp_source", text)
+        self.assertIn("clauder_mcp_command", text)
+        main_start = text.index("try {\n    Test-Prerequisites")
+        self.assertLess(
+            text.index("Install-ClaudeRMcpTool | Out-Null", main_start),
+            text.index("    Install-Skill", main_start),
+        )
+
+    def test_codex_rstudio_mcp_check_accepts_persistent_lzhs_entry(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            exe = root / "clauder-mcp.exe"
+            exe.write_text("", encoding="utf-8")
+            cfg = root / "config.toml"
+            cfg.write_text(
+                f"""[mcp_servers.r-studio]\ncommand = \"{exe.as_posix()}\"\nstartup_timeout_sec = 180.0\n\n[mcp_servers.r-studio.env]\nUSERPROFILE = \"C:/Users/LZHS\"\nPYTHONIOENCODING = \"utf-8\"\nNO_PROXY = \"127.0.0.1,localhost\"\nUV_CACHE_DIR = \"C:/tmp/uv-cache\"\n""",
+                encoding="utf-8",
+            )
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_rstudio_mcp_config({
+                    "clauder_mcp_install_mode": "uv_tool_from_local_lzhs_fork",
+                    "clauder_mcp_source": "C:/Users/LZHS/projects/ClaudeR/clauder-mcp",
+                })
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["persistent_entry"])
+        self.assertEqual(result["startup_timeout_sec"], 180.0)
+
+    def test_codex_rstudio_mcp_check_blocks_bare_upstream_risk(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_text(
+                """[mcp_servers.r-studio]\ncommand = \"uvx\"\nargs = [\"clauder-mcp\"]\nstartup_timeout_sec = 180.0\n""",
+                encoding="utf-8",
+            )
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
+                result = cli_mod._check_codex_rstudio_mcp_config({})
+        self.assertFalse(result["ok"], result)
+        self.assertTrue(result["bare_mcp"])
+        self.assertIn("bare clauder-mcp", " ".join(result["reasons"]))
+
+    def test_codex_rstudio_mcp_check_warns_uvx_local_dev_path(self) -> None:
+        from clauder_workbench import cli as cli_mod
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bridge = root / "ClaudeR" / "clauder-mcp"
+            bridge.mkdir(parents=True)
+            cfg = root / "config.toml"
+            cfg.write_text(
+                f"""[mcp_servers.r-studio]\ncommand = \"uvx\"\nargs = [\"--from\", \"{bridge.as_posix()}\", \"clauder-mcp\"]\nstartup_timeout_sec = 180.0\n\n[mcp_servers.r-studio.env]\nUV_CACHE_DIR = \"C:/tmp/uv-cache\"\n""",
+                encoding="utf-8",
+            )
+            with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg), mock.patch.object(cli_mod, "LOCAL_CLAUDER_BRIDGE", bridge):
+                result = cli_mod._check_codex_rstudio_mcp_config({})
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["uvx_from_local_bridge"])
+        self.assertTrue(any("dev/diagnostic" in w for w in result["warnings"]))
+
+    def test_mcp_client_prefers_codex_persistent_entry(self) -> None:
+        from clauder_workbench import mcp_client as mcp_mod
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            exe = root / "clauder-mcp.exe"
+            exe.write_text("", encoding="utf-8")
+            cfg = root / "config.toml"
+            cfg.write_text(
+                f"""[mcp_servers.r-studio]\ncommand = \"{exe.as_posix()}\"\nstartup_timeout_sec = 180.0\n\n[mcp_servers.r-studio.env]\nUV_CACHE_DIR = \"C:/tmp/uv-cache\"\n""",
+                encoding="utf-8",
+            )
+            with mock.patch.object(mcp_mod, "CODEX_CONFIG", cfg):
+                command, args = _server_args()
+        self.assertEqual(command.replace("\\", "/"), exe.as_posix())
+        self.assertEqual(args, [])
 
     # v0.2.4: install.ps1 UTF-8 + TOML 自检测试
     def test_installer_has_utf8_no_bom_helpers(self) -> None:

@@ -130,6 +130,102 @@ def _check_codex_toml_parseable() -> dict[str, Any]:
         return result
 
 
+
+def _load_codex_toml() -> dict[str, Any]:
+    try:
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+        raw = CODEX_CONFIG.read_bytes()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            raw = raw[3:]
+        return tomllib.loads(raw.decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate that Codex uses the stable lzhs ClaudeR MCP launch path."""
+    install_info = install_info or {}
+    result: dict[str, Any] = {
+        "ok": True,
+        "warnings": [],
+        "reasons": [],
+        "path": str(CODEX_CONFIG),
+    }
+    if not CODEX_CONFIG.exists():
+        result["ok"] = False
+        result["reasons"].append(f"Codex config missing: {CODEX_CONFIG}")
+        return result
+
+    data = _load_codex_toml()
+    server = ((data.get("mcp_servers") or {}).get("r-studio") or {}) if isinstance(data, dict) else {}
+    env = (server.get("env") or {}) if isinstance(server, dict) else {}
+    command = str(server.get("command") or "")
+    args = server.get("args") or []
+    if isinstance(args, str):
+        args = [args]
+    args = [str(a) for a in args]
+    startup_timeout = server.get("startup_timeout_sec")
+    try:
+        startup_timeout_float = float(startup_timeout)
+    except (TypeError, ValueError):
+        startup_timeout_float = None
+
+    local_bridge = str(LOCAL_CLAUDER_BRIDGE)
+    local_bridge_norm = local_bridge.replace("\\", "/").lower()
+    persistent = command.lower().endswith("clauder-mcp.exe")
+    uvx_from_local = (
+        command.lower() == "uvx"
+        and "--from" in args
+        and any(local_bridge_norm == a.replace("\\", "/").lower() for a in args)
+    )
+    bare_mcp = (command.lower() in {"uvx", "uv"} and "clauder-mcp" in args and "--from" not in args)
+
+    result.update({
+        "command": command,
+        "args": args,
+        "startup_timeout_sec": startup_timeout,
+        "env": {k: env.get(k) for k in ("USERPROFILE", "PYTHONIOENCODING", "NO_PROXY", "UV_CACHE_DIR")},
+        "persistent_entry": persistent,
+        "uvx_from_local_bridge": uvx_from_local,
+        "bare_mcp": bare_mcp,
+    })
+
+    if bare_mcp:
+        result["reasons"].append("r-studio MCP uses bare clauder-mcp without --from; this can pull upstream/PyPI and lose lzhs fork features")
+    elif not persistent:
+        if uvx_from_local:
+            result["warnings"].append("r-studio MCP still uses uvx --from local lzhs fork; valid for dev/diagnostic but not stable colleague install")
+        else:
+            result["reasons"].append("r-studio MCP command is neither persistent clauder-mcp.exe nor uvx --from the local lzhs fork")
+
+    if startup_timeout_float is None or startup_timeout_float < 180:
+        result["reasons"].append("r-studio startup_timeout_sec is missing or below 180 seconds")
+    if not env.get("UV_CACHE_DIR"):
+        result["warnings"].append("r-studio MCP env missing UV_CACHE_DIR; cache parity/prewarm is weaker")
+
+    source_url = str(install_info.get("claudeR_source_url") or "")
+    source_path = str(install_info.get("clauder_mcp_source") or "")
+    install_mode = str(install_info.get("clauder_mcp_install_mode") or "")
+    provenance_ok = (
+        "lzhs1995/ClaudeR" in source_url
+        or "projects\\ClaudeR" in source_url
+        or "projects/ClaudeR" in source_url
+        or "projects\\ClaudeR" in source_path
+        or "projects/ClaudeR" in source_path
+    )
+    if persistent and install_info:
+        if install_mode and install_mode != "uv_tool_from_local_lzhs_fork":
+            result["warnings"].append(f"unexpected clauder_mcp_install_mode={install_mode}")
+        if not provenance_ok:
+            result["reasons"].append("INSTALL_INFO does not prove lzhs ClaudeR fork provenance")
+
+    result["ok"] = not result["reasons"]
+    return result
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     reasons: list[str] = []
     warnings: list[str] = []
@@ -144,11 +240,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         warnings.append(f"local patched ClaudeR bridge missing: {LOCAL_CLAUDER_BRIDGE}")
     if not DISCOVERY_DIR.exists():
         warnings.append(f"discovery directory missing: {DISCOVERY_DIR}")
+    codex_rstudio_mcp_info: dict[str, Any] = {}
     if "codex" in expected_clients:
         if not CODEX_CONFIG.exists():
             warnings.append(f"Codex config missing: {CODEX_CONFIG}")
-        elif not codex_config_mentions_local_bridge():
-            warnings.append("Codex config does not mention local patched ClaudeR bridge")
+        else:
+            codex_rstudio_mcp_info = _check_codex_rstudio_mcp_config(install_info)
+            reasons.extend(codex_rstudio_mcp_info.get("reasons", []))
+            warnings.extend(codex_rstudio_mcp_info.get("warnings", []))
+            if not codex_config_mentions_local_bridge() and not codex_rstudio_mcp_info.get("persistent_entry"):
+                warnings.append("Codex config does not mention local patched ClaudeR bridge")
     if "claude" in expected_clients and not CLAUDE_JSON.exists():
         warnings.append(f"Claude Code user config missing: {CLAUDE_JSON}")
     if "copilot" in expected_clients and not COPILOT_CONFIG.exists():
@@ -187,6 +288,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "expected_clients": expected_clients,
             "discovery_sessions": discovery_sessions(),
             "toml_parse_check": toml_parse_info,
+            "codex_rstudio_mcp_check": codex_rstudio_mcp_info,
         },
     )
     return emit(doc)
