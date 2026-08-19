@@ -21,7 +21,19 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 
 ## Executable Harness Layer
 
-Use these commands from this skill directory or after `install.ps1` installs the editable Python package:
+Use the matching entrypoint from this skill directory, or use the installed
+`clauder-workbench` command after either installer installs the Python package:
+
+```bash
+./harness/run.sh doctor
+./harness/run.sh doctor --expect-client codex --check-toml-parse
+./harness/run.sh transport-classify
+./harness/run.sh tool-surface
+./harness/run.sh resource-gate advise --current-parallel 1 --memory-threshold 85
+./harness/run.sh completion-check --mode formal --require-file validation::/path/validation.csv,min_rows=1,max_age_h=24
+```
+
+On Windows PowerShell:
 
 ```powershell
 .\harness\run.ps1 doctor
@@ -85,7 +97,7 @@ Run many independent R workers from one RStudio session and gate the autonomous 
 - Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
 - Python MCP stdio: independent MCP probe against the configured `clauder-mcp` server. Valid MCP evidence, but label it `MCP_STDIO_OK`, not native wrapper success.
 - HTTP fallback: diagnostic only for MCP-only tasks. It can prove the Addin HTTP server is alive, not that MCP/native wrapper is healthy.
-- `Rscript.exe`: offline R process only. It never proves RStudio/ClaudeR/MCP readiness.
+- `Rscript`/`Rscript.exe`: offline R process only. It never proves RStudio/ClaudeR/MCP readiness.
 
 `transport-classify` ignores agent-supplied `--native-ok`, `--mcp-stdio-ok`, `--http-ok`, and `--rscript-ok` hints unless `--allow-agent-hints` is explicitly passed for diagnostic/test use.
 
@@ -95,19 +107,26 @@ Stable installs must launch Codex `r-studio` through a persistent executable ins
 
 ```toml
 [mcp_servers.r-studio]
-command = "<USER_HOME>\\.local\\bin\\clauder-mcp.exe"
+command = "/Users/<USER>/.local/bin/clauder-mcp"
 startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
-USERPROFILE = "<USER_HOME>"
+HOME = "/Users/<USER>"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
-UV_CACHE_DIR = "C:\\tmp\\uv-cache"
+UV_CACHE_DIR = "/Users/<USER>/Library/Caches/uv"
 ```
 
-`install.ps1 -ConfigureCodex` must install that executable with `uv tool install --force --from <USER_HOME>\projects\ClaudeR\clauder-mcp clauder-mcp`. This is still the user-maintained `lzhs1995/ClaudeR@v0.2.0-lzhs.1` fork, not upstream ClaudeR. Never use bare `uvx clauder-mcp` or bare `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop async progress, multiple-session, and Copilot support.
+On macOS, `install.sh --configure-codex` installs that executable with
+`uv tool install --force --from <USER_HOME>/projects/ClaudeR/clauder-mcp
+clauder-mcp`. Windows uses `install.ps1 -ConfigureCodex`,
+`clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The local Mac
+candidate is the user-maintained fork branch based on upstream ClaudeR `0.8.1`
+and MCP bridge `0.10.0`. Never use bare `uvx clauder-mcp` or bare
+`uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
+fork compatibility changes.
 
-Cold start means every MCP launch asks `uvx --from ...` to resolve/build before serving JSON-RPC. Warm start means the uv cache helps but the launch still goes through `uvx`. Hot/persistent start means Codex launches `clauder-mcp.exe` directly. Long async/fan-out tasks require the hot path plus a native smoke in the current tool layer.
+Cold start means every MCP launch asks `uvx --from ...` to resolve/build before serving JSON-RPC. Warm start means the uv cache helps but the launch still goes through `uvx`. Hot/persistent start means Codex launches `clauder-mcp` (`clauder-mcp.exe` on Windows) directly. Long async/fan-out tasks require the hot path plus a native smoke in the current tool layer.
 
 ## Core Workflow
 
@@ -136,7 +155,7 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 ## Required Safety Rules
 
 - **Windows multi-session warning**: do not trust a ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)` as a liveness probe. Use a patched build with a read-only PID check.
-- Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is bare `clauder-mcp`, missing `startup_timeout_sec`, missing `UV_CACHE_DIR`, or lacks LZHS fork provenance.
+- Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is not the persistent absolute executable, is missing `startup_timeout_sec` or `UV_CACHE_DIR`, or lacks local fork provenance.
 - A Codex native-wrapper long job is ready only after `native-smoke complete` records `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test from the current Codex tool layer.
 - HTTP fallback can diagnose whether the Addin HTTP server is alive, but it is not MCP-only success evidence.
 - If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
@@ -144,12 +163,13 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This skill collection release `v0.3.4` is paired with
-`lzhs1995/ClaudeR@v0.2.0-lzhs.1`. The collection includes this workbench skill
-and the companion `cmaverse-paired-mval` skill.
+This local skill collection release `v0.4.0` candidate is paired with the
+`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.8.1` and MCP
+bridge `0.10.0`. The collection includes this workbench skill and the companion
+`cmaverse-paired-mval` skill.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4`, inherit that config-writer fix.
+`v0.3.4` and the local `v0.4.0` candidate, inherit that config-writer fix.

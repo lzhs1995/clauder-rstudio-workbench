@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.0 - local candidate, 2026-08-19
+
+- Rebase the paired ClaudeR fork on upstream R package 0.8.1 and MCP bridge
+  0.10.0 while retaining safe Windows PID checks, async progress, multi-session
+  metadata, parallel job guidance, and GitHub Copilot setup.
+- Add `install.sh` and `harness/run.sh`, platform-aware doctor/provenance checks,
+  POSIX paths, macOS uv cache discovery, and native macOS memory sampling.
+- Install the MCP bridge from the local ClaudeR worktree into the persistent
+  `~/.local/bin/clauder-mcp` entry and atomically update Codex configuration and
+  runtime skills with backups and TOML rollback validation.
+- Preserve original job ids through fan-out polling and final collection, and
+  surface intermediate async progress from worker sidecars.
+- Validate the candidate locally on macOS with R CMD check, Python tests, a
+  real RStudio/MCP workflow suite, multi-session cleanup, and a three-worker
+  150,000-fit IV bootstrap fan-out. This entry does not represent a tag or
+  published release.
+
 ## v0.3.4 - 2026-05-31
 
 - Harden downstream native-smoke consumption: fan-out and completion gates now require a `native_smoke` parent evidence to carry four unique record `parent_evidence_ids`, so v0.3.2-era empty-chain PASS evidence no longer satisfies formal gates.

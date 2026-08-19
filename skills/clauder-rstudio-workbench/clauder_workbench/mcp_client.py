@@ -6,7 +6,7 @@ import re
 import time
 from typing import Any
 
-from .config import CODEX_CONFIG, LOCAL_CLAUDER_BRIDGE
+from .config import CODEX_CONFIG, HOME, IS_WINDOWS, LOCAL_CLAUDER_BRIDGE, UV_CACHE_DIR
 
 
 EXPECTED_R_STUDIO_TOOLS = {
@@ -57,9 +57,13 @@ def _server_spec() -> tuple[str, list[str], dict[str, str]]:
 
 def _server_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ)
-    env.setdefault("USERPROFILE", str(os.environ.get("USERPROFILE") or os.path.expanduser("~")))
+    env.setdefault("HOME", str(HOME))
+    if IS_WINDOWS:
+        env.setdefault("USERPROFILE", str(os.environ.get("USERPROFILE") or HOME))
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("NO_PROXY", "127.0.0.1,localhost")
+    if UV_CACHE_DIR:
+        env.setdefault("UV_CACHE_DIR", str(UV_CACHE_DIR))
     if extra:
         env.update(extra)
     return env

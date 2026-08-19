@@ -57,6 +57,11 @@ the contract so `merge-gate` rejects old outputs.
 > Write artifacts atomically (temp file + rename) so the poller never reads a
 > half-written manifest/validation.
 
+During `fanout-run`, the harness also polls `get_async_result` with each
+worker's original `job_id` and records the replies in `progress_log`. After the
+file gate completes it collects each result with the same id into
+`final_collect_log`; it never resubmits merely because a job is still running.
+
 ## Contract (`task.yaml`)
 
 ```yaml

@@ -47,7 +47,7 @@ The final evidence must have:
 
 - `fanout-run` Python MCP stdio evidence (`MCP_STDIO_OK`)
 - HTTP fallback evidence
-- `Rscript.exe` evidence
+- `Rscript`/`Rscript.exe` evidence
 - a hand-written JSON file
 - native-smoke records missing the real async `job_id`
 
@@ -114,11 +114,13 @@ must not unlock formal long jobs.
 Do not ask the user to restart Codex first. Use this order:
 
 1. Run `clauder-workbench doctor --expect-client codex --check-toml-parse`.
-2. Confirm Codex config uses `<USER_HOME>\.local\bin\clauder-mcp.exe`,
-   `startup_timeout_sec = 180.0`, `UV_CACHE_DIR`, and LZHS fork provenance.
-3. Re-run installer with `install.ps1 -ConfigureCodex` if the config still uses
-   `uvx` or bare `clauder-mcp`.
+2. Confirm Codex config uses the persistent executable
+   `<USER_HOME>/.local/bin/clauder-mcp` on macOS/Linux or
+   `<USER_HOME>\.local\bin\clauder-mcp.exe` on Windows, plus
+   `startup_timeout_sec = 180.0`, `UV_CACHE_DIR`, and local fork provenance.
+3. Re-run `install.sh --configure-codex` on macOS/Linux or
+   `install.ps1 -ConfigureCodex` on Windows if the config still uses `uvx` or a
+   bare `clauder-mcp` command.
 4. Run the native-smoke sequence above.
 5. Only if the configured persistent entry is correct and repeated native-smoke
    attempts still fail should the user restart the agent.
-

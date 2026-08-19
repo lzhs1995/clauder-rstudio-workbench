@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .artifacts import check_artifacts, parse_requirement
 from .config import (
     AGENTS_INSTALL_INFO,
@@ -20,14 +21,18 @@ from .config import (
     CONTRACT_FAILED,
     DISCOVERY_DIR,
     EVIDENCE_DIR,
+    HOME,
+    IS_WINDOWS,
     LOCAL_CLAUDER_BRIDGE,
     NATIVE_SMOKE_ARCHIVE_DIR,
     NATIVE_SMOKE_DIR,
     PASS,
+    PERSISTENT_MCP,
     PYTHON314,
     TRANSPORT_UNSTABLE,
     WARN,
     WINDOWS_STORE_PYTHON,
+    UV_CACHE_DIR,
     python_command,
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, utc_now, write_evidence
@@ -151,7 +156,7 @@ def _load_codex_toml() -> dict[str, Any]:
 
 
 def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Validate that Codex uses the stable lzhs ClaudeR MCP launch path."""
+    """Validate that Codex uses a persistent MCP entry from the local fork."""
     install_info = install_info or {}
     result: dict[str, Any] = {
         "ok": True,
@@ -180,7 +185,8 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
 
     local_bridge = str(LOCAL_CLAUDER_BRIDGE)
     local_bridge_norm = local_bridge.replace("\\", "/").lower()
-    persistent = command.lower().endswith("clauder-mcp.exe")
+    expected_name = "clauder-mcp.exe" if IS_WINDOWS else "clauder-mcp"
+    persistent = bool(command) and not args and Path(command).name.lower() == expected_name
     uvx_from_local = (
         command.lower() == "uvx"
         and "--from" in args
@@ -192,24 +198,28 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
         "command": command,
         "args": args,
         "startup_timeout_sec": startup_timeout,
-        "env": {k: env.get(k) for k in ("USERPROFILE", "PYTHONIOENCODING", "NO_PROXY", "UV_CACHE_DIR")},
+        "env": {k: env.get(k) for k in ("HOME", "USERPROFILE", "PYTHONIOENCODING", "NO_PROXY", "UV_CACHE_DIR")},
+        "platform": "windows" if IS_WINDOWS else sys.platform,
+        "expected_persistent_command": str(PERSISTENT_MCP),
         "persistent_entry": persistent,
         "uvx_from_local_bridge": uvx_from_local,
         "bare_mcp": bare_mcp,
     })
 
     if bare_mcp:
-        result["reasons"].append("r-studio MCP uses bare clauder-mcp without --from; this can pull upstream/PyPI and lose lzhs fork features")
+        result["reasons"].append("r-studio MCP uses bare clauder-mcp without --from; this can pull an unpinned PyPI build and lose local fork features")
     elif not persistent:
         if uvx_from_local:
-            result["warnings"].append("r-studio MCP still uses uvx --from local lzhs fork; valid for dev/diagnostic but not stable colleague install")
+            result["warnings"].append("r-studio MCP still uses uvx --from the local fork; valid for development but not the stable persistent install")
         else:
-            result["reasons"].append("r-studio MCP command is neither persistent clauder-mcp.exe nor uvx --from the local lzhs fork")
+            result["reasons"].append(f"r-studio MCP command is neither persistent {expected_name} nor uvx --from the local fork")
 
     if startup_timeout_float is None or startup_timeout_float < 180:
         result["reasons"].append("r-studio startup_timeout_sec is missing or below 180 seconds")
     if not env.get("UV_CACHE_DIR"):
         result["warnings"].append("r-studio MCP env missing UV_CACHE_DIR; cache parity/prewarm is weaker")
+    if not IS_WINDOWS and not env.get("HOME"):
+        result["warnings"].append("r-studio MCP env missing HOME; session discovery may inherit an unexpected home directory")
 
     source_url = str(install_info.get("claudeR_source_url") or "")
     source_path = str(install_info.get("clauder_mcp_source") or "")
@@ -227,18 +237,19 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
         or "projects/ClaudeR" in install_from
     )
     if persistent and install_info:
-        if install_mode and install_mode != "uv_tool_from_local_lzhs_fork":
+        accepted_modes = {"uv_tool_from_local_fork", "uv_tool_from_local_lzhs_fork"}
+        if install_mode and install_mode not in accepted_modes:
             result["warnings"].append(f"unexpected clauder_mcp_install_mode={install_mode}")
         if command_info and command and Path(command_info) != Path(command):
             result["warnings"].append(f"INSTALL_INFO clauder_mcp_command differs from Codex command: {command_info}")
         if command and not Path(command).exists():
-            result["reasons"].append(f"persistent clauder-mcp.exe does not exist: {command}")
+            result["reasons"].append(f"persistent clauder-mcp does not exist: {command}")
         if source_path and not Path(source_path).exists():
             result["reasons"].append(f"INSTALL_INFO clauder_mcp_source does not exist: {source_path}")
         if not exe_sha256:
             result["warnings"].append("INSTALL_INFO missing clauder_mcp_exe_sha256")
         if not provenance_ok:
-            result["reasons"].append("INSTALL_INFO does not prove lzhs ClaudeR fork provenance")
+            result["reasons"].append("INSTALL_INFO does not prove local ClaudeR fork provenance")
 
     result["ok"] = not result["reasons"]
     return result
@@ -250,9 +261,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     install_info, install_info_path = _load_install_info()
     expected_clients = _expected_clients(args, install_info)
     py_smoke = run_python_smoke()
-    if not PYTHON314.exists():
-        warnings.append(f"default Python314 missing: {PYTHON314}; using {python_command()}")
-    if str(WINDOWS_STORE_PYTHON).lower() in current_python().lower():
+    if not PYTHON314 or not PYTHON314.exists():
+        warnings.append(f"preferred harness Python missing: {PYTHON314}; using {python_command()}")
+    if IS_WINDOWS and str(WINDOWS_STORE_PYTHON).lower() in current_python().lower():
         reasons.append("current python appears to be WindowsApps redirector")
     if not LOCAL_CLAUDER_BRIDGE.exists():
         warnings.append(f"local patched ClaudeR bridge missing: {LOCAL_CLAUDER_BRIDGE}")
@@ -296,6 +307,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "current_python": current_python(),
             "python_smoke": py_smoke,
             "local_bridge": str(LOCAL_CLAUDER_BRIDGE),
+            "persistent_mcp": str(PERSISTENT_MCP),
+            "uv_cache_dir": str(UV_CACHE_DIR),
+            "home": str(HOME),
+            "platform": "windows" if IS_WINDOWS else sys.platform,
             "discovery_dir": str(DISCOVERY_DIR),
             "codex_config": str(CODEX_CONFIG),
             "claude_json": str(CLAUDE_JSON),
@@ -1421,6 +1436,14 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
             },
         )
 
+    def poll_fn(job_id: str) -> dict[str, Any]:
+        return call_tool(
+            "get_async_result",
+            {"job_id": job_id},
+            timeout=args.submit_timeout,
+            retries=0,
+        )
+
     result = run_fanout(
         contract,
         submit_fn=submit_fn,
@@ -1430,6 +1453,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         first_artifact_timeout_min=args.first_artifact_timeout_min,
         reuse_existing=args.reuse_existing,
         register_fn=register_fn,
+        poll_fn=poll_fn,
         max_iterations=args.max_iterations,
         auto_scale=args.auto_scale,
         memory_threshold=args.memory_threshold,
@@ -1554,6 +1578,7 @@ def add_common_task_args(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clauder_workbench")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("doctor")
@@ -1593,7 +1618,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--async-poll-attempts", type=int, default=2)
     p.add_argument("--transport-class")
     p.add_argument("--pid")
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
 
     p = sub.add_parser("connect")
     p.add_argument("--session-name", default="")
@@ -1658,7 +1683,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--policy", choices=["auto", "strict", "warn", "skip"], default="auto")
     p.add_argument("--contract")
     p.add_argument("--task-key")
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
     p.add_argument("--require-file", action="append", default=[])
     p.add_argument("--require-transport-class")
     p.add_argument("--require-preflight", action="store_true")
@@ -1679,13 +1704,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("fanout-plan")
     p.add_argument("--contract", required=True)
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
     p.add_argument("--no-advise", action="store_true",
                    help="Skip memory-based parallelism advice; only validate the contract.")
 
     p = sub.add_parser("fanout-run")
     p.add_argument("--contract", required=True)
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
     p.add_argument("--transport", choices=["mcp-stdio", "native-wrapper"], default=None)
     p.add_argument("--session-name", default="")
     p.add_argument("--max-parallel", type=int)
@@ -1712,11 +1737,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("fanout-poll")
     p.add_argument("--contract", required=True)
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
 
     p = sub.add_parser("merge-gate")
     p.add_argument("--contract", required=True)
-    p.add_argument("--parent-evidence", nargs="*", default=[])
+    p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
 
     return parser
 

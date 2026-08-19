@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 
+IS_WINDOWS = os.name == "nt"
+
+
 def _home() -> Path:
-    return Path(os.environ.get("USERPROFILE") or Path.home()).expanduser()
+    if IS_WINDOWS:
+        return Path(os.environ.get("USERPROFILE") or Path.home()).expanduser()
+    return Path(os.environ.get("HOME") or Path.home()).expanduser()
 
 
 def _env_path(name: str, default: Path | None = None) -> Path | None:
@@ -25,11 +31,23 @@ NATIVE_SMOKE_DIR = STATE_DIR / "native_smoke"
 NATIVE_SMOKE_ARCHIVE_DIR = NATIVE_SMOKE_DIR / "archive"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA") or (HOME / "AppData" / "Local"))
-DEFAULT_PYTHON314 = LOCALAPPDATA / "Programs" / "Python" / "Python314" / "python.exe"
+DEFAULT_PYTHON314 = (
+    LOCALAPPDATA / "Programs" / "Python" / "Python314" / "python.exe"
+    if IS_WINDOWS
+    else Path(sys.executable)
+)
 PYTHON_EXE = _env_path("CLAUDER_WORKBENCH_PYTHON", DEFAULT_PYTHON314)
 PYTHON314 = PYTHON_EXE
 WINDOWS_STORE_PYTHON = LOCALAPPDATA / "Microsoft" / "WindowsApps" / "python3.exe"
 LOCAL_CLAUDER_BRIDGE = _env_path("CLAUDER_WORKBENCH_CLAUDER_MCP", HOME / "projects" / "ClaudeR" / "clauder-mcp")
+PERSISTENT_MCP = _env_path(
+    "CLAUDER_WORKBENCH_MCP_COMMAND",
+    HOME / ".local" / "bin" / ("clauder-mcp.exe" if IS_WINDOWS else "clauder-mcp"),
+)
+UV_CACHE_DIR = _env_path(
+    "CLAUDER_WORKBENCH_UV_CACHE_DIR",
+    Path("C:/tmp/uv-cache") if IS_WINDOWS else HOME / "Library" / "Caches" / "uv",
+)
 DISCOVERY_DIR = _env_path("CLAUDER_WORKBENCH_DISCOVERY_DIR", HOME / ".claude_r_sessions")
 CODEX_CONFIG = _env_path("CLAUDER_WORKBENCH_CODEX_CONFIG", HOME / ".codex" / "config.toml")
 CODEX_INSTALL_INFO = _env_path("CLAUDER_WORKBENCH_CODEX_INSTALL_INFO", HOME / ".codex" / "skills" / "clauder-rstudio-workbench" / "INSTALL_INFO.json")
@@ -60,10 +78,11 @@ def default_agent() -> str:
 def python_command() -> str:
     if PYTHON_EXE and PYTHON_EXE.exists():
         return str(PYTHON_EXE)
-    found = shutil.which("python")
-    if found:
-        return found
-    return "python"
+    for candidate in ("python3", "python"):
+        found = shutil.which(candidate)
+        if found:
+            return found
+    return "python3" if not IS_WINDOWS else "python"
 
 
 def normalize_path(value: str | None) -> str:

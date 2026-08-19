@@ -1,11 +1,55 @@
 from __future__ import annotations
 
+import os
+import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 
 def memory_used_percent() -> float | None:
+    try:
+        import psutil
+
+        return float(psutil.virtual_memory().percent)
+    except (ImportError, AttributeError):
+        pass
+
+    if os.name != "nt":
+        if sys.platform == "darwin":
+            try:
+                vm = subprocess.run(
+                    ["vm_stat"], capture_output=True, text=True, check=True, timeout=10
+                ).stdout
+                total = int(subprocess.run(
+                    ["sysctl", "-n", "hw.memsize"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=10,
+                ).stdout.strip())
+                page_match = re.search(r"page size of\s+(\d+) bytes", vm)
+                if not page_match or total <= 0:
+                    return None
+                page_size = int(page_match.group(1))
+                pages: dict[str, int] = {}
+                for line in vm.splitlines():
+                    match = re.match(r"Pages (free|inactive|speculative):\s+(\d+)\.", line)
+                    if match:
+                        pages[match.group(1)] = int(match.group(2))
+                available = sum(pages.get(name, 0) for name in ("free", "inactive", "speculative")) * page_size
+                return round((1 - min(available, total) / total) * 100, 2)
+            except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+                return None
+        try:
+            total_pages = int(os.sysconf("SC_PHYS_PAGES"))
+            available_pages = int(os.sysconf("SC_AVPHYS_PAGES"))
+            if total_pages > 0:
+                return round((1 - available_pages / total_pages) * 100, 2)
+        except (AttributeError, OSError, TypeError, ValueError):
+            return None
+
     try:
         proc = subprocess.run(
             [

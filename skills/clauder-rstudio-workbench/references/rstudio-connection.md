@@ -2,23 +2,28 @@
 
 ## Recommended Codex MCP Config
 
-Use the patched ClaudeR bridge from a local clone:
+Use the persistent patched ClaudeR bridge installed from the local clone:
 
 ```toml
 [mcp_servers.r-studio]
-command = "uvx"
-args = ["--from", "<USER_HOME>\\projects\\ClaudeR\\clauder-mcp", "clauder-mcp"]
+command = "/Users/<USER>/.local/bin/clauder-mcp"
+startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
-USERPROFILE = "<USER_HOME>"
+HOME = "/Users/<USER>"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
+UV_CACHE_DIR = "/Users/<USER>/Library/Caches/uv"
 ```
 
-The same release can also run from Git:
+On Windows the command is
+`<USER_HOME>\\.local\\bin\\clauder-mcp.exe`, the home variable is
+`USERPROFILE`, and the uv cache uses a Windows path.
+
+For development diagnostics only, the bridge can run from the local source:
 
 ```text
-uvx --from git+https://github.com/lzhs1995/ClaudeR.git@v0.2.0-lzhs.1#subdirectory=clauder-mcp clauder-mcp
+uvx --from <USER_HOME>/projects/ClaudeR/clauder-mcp clauder-mcp
 ```
 
 ## Startup
@@ -41,7 +46,8 @@ Then in the agent:
 ClaudeR writes session discovery files to:
 
 ```text
-<USER_HOME>\.claude_r_sessions
+<USER_HOME>/.claude_r_sessions
 ```
 
-If `list_sessions` is empty, check that `USERPROFILE` in the MCP environment points to the real user home where R writes discovery files.
+If `list_sessions` is empty, check that `HOME` on macOS/Linux or `USERPROFILE`
+on Windows points to the real user home where R writes discovery files.

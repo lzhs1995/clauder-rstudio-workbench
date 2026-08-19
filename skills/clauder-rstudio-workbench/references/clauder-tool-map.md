@@ -17,4 +17,4 @@
 - Native `mcp__r_studio__` wrappers are the preferred Codex route when available.
 - MCP stdio against the same `clauder-mcp` command is still MCP transport, but label it separately from native wrappers.
 - HTTP fallback is diagnostic only for MCP-only tasks.
-- `Rscript.exe` is useful for offline package tests but does not prove RStudio MCP readiness.
+- `Rscript` (`Rscript.exe` on Windows) is useful for offline package tests but does not prove RStudio MCP readiness.

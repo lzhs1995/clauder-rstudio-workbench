@@ -2,6 +2,34 @@
 
 This file records sanitized smoke evidence for the public sharing package. Private user paths are replaced with `<USER_HOME>`, `<TEMP>`, or `<REPO>`.
 
+## v0.4.0 macOS Candidate Smoke
+
+Observed: 2026-08-19 Asia/Kolkata
+
+Commands:
+
+```bash
+./install.sh --clauder-dir <USER_HOME>/projects/ClaudeR --configure-codex --sync-agents-skill
+<USER_HOME>/.local/bin/clauder-workbench doctor --expect-client codex --check-toml-parse
+python -m unittest discover -s tests -v
+```
+
+Local result:
+
+- R package 0.8.1 and MCP bridge 0.10.0 installed from the local ClaudeR
+  worktree; the persistent MCP command and Codex TOML parse check passed.
+- Real MCP stdio preflight found the live RStudio session and exercised sync
+  and async execution; this evidence is intentionally labeled `MCP_STDIO_OK`,
+  not `NATIVE_MCP_OK`.
+- Migrated IV, DID, RDD, balance/sensitivity, plotting, file, routing, and async
+  workflows passed.
+- Three async workers completed 150,000 IV bootstrap fits with stable job ids,
+  visible intermediate progress, merge-gate PASS, and strict formal
+  completion-check PASS.
+- The original Windows package inventory was rechecked in isolated R processes:
+  744 namespaces loaded, one R base component was valid, and the only missing
+  packages remained Windows-only `R2wd` and R-4.6-incompatible `pryr`.
+
 ## v0.2.3 Proxy-Resilience Smoke
 
 Observed: 2026-05-29 Asia/Shanghai

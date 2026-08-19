@@ -80,6 +80,7 @@ class FanoutTests(unittest.TestCase):
         code = build_submit_code(worker)
         self.assertIn('Sys.setenv("K" = "v")', code)
         self.assertIn('source("C:/tmp/w1.R"', code)
+        self.assertIn("local = TRUE", code)
 
     def test_plan_validates_and_advises(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -156,6 +157,35 @@ class FanoutTests(unittest.TestCase):
             self.assertEqual(set(result["done"]), {"w1", "w2"})
             self.assertEqual(set(submitted), {"w1", "w2"})
             self.assertEqual(len(registered), 2)
+
+    def test_run_fanout_polls_and_collects_original_job_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            contract = load_fanout_contract(_write_contract(root))
+            polled: list[str] = []
+
+            def submit_fn(code: str) -> dict:
+                wid = "w1" if "w1" in code else "w2"
+                _complete_worker(root, wid)
+                return {"ok": True, "job_id": f"job_{wid}", "text": "started"}
+
+            def poll_fn(job_id: str) -> dict:
+                polled.append(job_id)
+                return {"ok": True, "text": f"complete {job_id}"}
+
+            result = run_fanout(
+                contract,
+                submit_fn=submit_fn,
+                poll_fn=poll_fn,
+                max_parallel=2,
+                poll_interval_sec=0,
+                sleep_fn=lambda s: None,
+                max_iterations=5,
+            )
+            self.assertTrue(result["ok"])
+            self.assertEqual(set(polled), {"job_w1", "job_w2"})
+            self.assertTrue(result["progress_log"])
+            self.assertTrue(result["final_collect_log"])
 
     def test_run_fanout_reports_submit_failure(self) -> None:
         with tempfile.TemporaryDirectory() as d:

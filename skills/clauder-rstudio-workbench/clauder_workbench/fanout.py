@@ -383,7 +383,10 @@ def build_submit_code(worker: dict[str, Any]) -> str:
     if isinstance(env, dict):
         for key, value in env.items():
             lines.append(f"Sys.setenv({json.dumps(str(key))} = {json.dumps(str(value), ensure_ascii=False)})")
-    lines.append(f'source({json.dumps(code_file, ensure_ascii=False)}, encoding = "UTF-8", local = FALSE)')
+    # The async bridge injects clauder_progress() into the evaluation
+    # environment. local=TRUE keeps sourced workers in that environment so
+    # progress sidecars and output marshaling remain available.
+    lines.append(f'source({json.dumps(code_file, ensure_ascii=False)}, encoding = "UTF-8", local = TRUE)')
     return "\n".join(lines)
 
 
@@ -463,6 +466,7 @@ def run_fanout(
     reuse_existing: bool = False,
     sleep_fn: Callable[[float], None] = time.sleep,
     register_fn: Callable[[str, str], None] | None = None,
+    poll_fn: Callable[[str], dict[str, Any]] | None = None,
     max_iterations: int | None = None,
     auto_scale: bool = False,
     memory_threshold: float = 85.0,
@@ -527,6 +531,8 @@ def run_fanout(
     running: dict[str, dict[str, Any]] = {}
     failed: list[str] = []
     submit_log: list[dict[str, Any]] = []
+    progress_log: list[dict[str, Any]] = []
+    final_collect_log: list[dict[str, Any]] = []
     iterations = 0
 
     while (pending or running) and not failed:
@@ -574,6 +580,19 @@ def run_fanout(
 
         for wid in list(running.keys()):
             worker = by_id[wid]
+            job_id = running[wid]["job_id"]
+            if poll_fn:
+                try:
+                    poll_result = poll_fn(job_id)
+                except Exception as exc:
+                    poll_result = {"ok": False, "text": f"{type(exc).__name__}: {exc}"}
+                progress_log.append({
+                    "iteration": iterations,
+                    "id": wid,
+                    "job_id": job_id,
+                    "ok": bool(poll_result.get("ok")),
+                    "text": str(poll_result.get("text") or poll_result.get("reason") or "")[:4000],
+                })
             # 只有本轮 run 开始后写入的产出才算完成（reuse_existing 时放宽）
             status = worker_status(
                 contract, worker, fresh_after=None if reuse_existing else fresh_boundary
@@ -598,6 +617,31 @@ def run_fanout(
         if (pending or running) and not failed:
             sleep_fn(poll_interval_sec)
 
+    # Collect each submitted async result using the original job_id. This
+    # releases callr/progress tempfiles and proves that polling never resubmits.
+    if poll_fn:
+        for entry in submit_log:
+            job_id = entry.get("job_id")
+            if not entry.get("ok") or not job_id:
+                continue
+            collected: dict[str, Any] = {}
+            for attempt in range(1, 4):
+                try:
+                    collected = poll_fn(str(job_id))
+                except Exception as exc:
+                    collected = {"ok": False, "text": f"{type(exc).__name__}: {exc}"}
+                text = str(collected.get("text") or collected.get("reason") or "")
+                final_collect_log.append({
+                    "id": entry.get("id"),
+                    "job_id": job_id,
+                    "attempt": attempt,
+                    "ok": bool(collected.get("ok")),
+                    "text": text[:4000],
+                })
+                if "still running" not in text.lower():
+                    break
+                sleep_fn(min(poll_interval_sec, 1.0))
+
     return {
         "ok": not failed and not pending and not running,
         "transport_class": "MCP_STDIO_OK",
@@ -606,6 +650,8 @@ def run_fanout(
         "pending": pending,
         "still_running": list(running.keys()),
         "submit_log": submit_log,
+        "progress_log": progress_log,
+        "final_collect_log": final_collect_log,
         "iterations": iterations,
         "max_parallel": level,
         "auto_scale": auto_scale,
