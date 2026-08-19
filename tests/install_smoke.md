@@ -9,7 +9,7 @@ Observed: 2026-08-19 Asia/Kolkata
 Commands:
 
 ```bash
-./install.sh --clauder-dir <USER_HOME>/projects/ClaudeR --configure-codex --sync-agents-skill
+./install.sh --clauder-dir <USER_HOME>/projects/ClaudeR --configure-codex --sync-agents-skill --backup-retention 0
 <USER_HOME>/.local/bin/clauder-workbench doctor --expect-client codex --check-toml-parse
 python -m unittest discover -s tests -v
 ```

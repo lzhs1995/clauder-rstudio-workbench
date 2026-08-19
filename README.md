@@ -2,10 +2,10 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.0` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
+The `v0.4.1` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
 on upstream ClaudeR `0.8.1` / `clauder-mcp 0.10.0`.
 
-**Platform status:** the local `v0.4.0` candidate uses `install.sh` on
+**Platform status:** the local `v0.4.1` candidate uses `install.sh` on
 macOS/Linux. `install.ps1` remains available for the published Windows flow.
 
 ## Skills in This Collection
@@ -19,7 +19,7 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
 
 - The patched ClaudeR R package from the local `lzhs1995/ClaudeR` worktree.
 - Every skill in this collection under `<CODEX_HOME>/skills` (and `<AGENTS_HOME>/skills` with `-SyncAgentsSkill`).
-- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, fan-out, resource gate, and completion gate checks.
+- The `clauder_workbench` Python harness package for doctor, transport classification, async guard, fan-out, recoverable soak monitoring, resource gate, and completion gate checks.
 - Optional MCP configuration for Codex, Claude Code, or GitHub Copilot CLI.
 
 Neither installer modifies MCP client configuration unless an explicit configure switch is passed.
@@ -30,12 +30,12 @@ On macOS/Linux:
 
 ```bash
 cd "$HOME/projects/clauder-rstudio-workbench"
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill
+./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --backup-retention 0
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
 These commands intentionally use the recovered local candidate branch. There
-is no `v0.4.0` remote tag or release until this branch is reviewed and
+is no `v0.4.1` remote tag or release until this branch is reviewed and
 explicitly published.
 
 On Windows PowerShell:
@@ -122,18 +122,37 @@ in the skill: `fanout-plan` → native submit → `async-guard register-job` →
 `fanout-poll` → `merge-gate`. See `skills/cmaverse-paired-mval/SKILL.md` for the full
 workflow and the worker contract.
 
+For a formal long soak, start the recoverable monitor before submitting native
+workers and require its evidence at completion:
+
+```bash
+clauder-workbench soak-monitor run --contract task.json \
+  --evidence-dir /absolute/run/evidence/native --expected-pid 39875 \
+  --port 8788 --stop-file /absolute/run/evidence/native/stop.monitor
+clauder-workbench completion-check --mode formal --task-key <task> \
+  --require-soak-monitor --parent-evidence <soak_monitor_PASS.json>
+```
+
+The monitor isolates macOS process-enumeration errors, preserves one logical
+run across supervised recovery, counts every scheduled heartbeat slot, and
+never turns its independent stdio heartbeat into native-wrapper proof.
+
 ## Dry Run
 
 Preview changes without writing files or installing packages:
 
 ```bash
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --dry-run
+./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --backup-retention 0 --dry-run
 ```
 
 On Windows, use `install.ps1 -DryRun -ConfigureCodex`.
 
 Use `--skip-harness` on macOS/Linux or `-SkipHarness` on Windows only when you
 want to install the Markdown skill without the executable Python gate.
+
+On macOS/Linux, `--backup-retention 0` is the default and keeps every existing
+runtime skill backup. Pass a positive count only when you explicitly want the
+installer to prune older per-skill backups after a successful replacement.
 
 ## Install Choices
 
@@ -160,6 +179,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.4.1` | local fork based on upstream `0.8.1` | Adds recoverable long-soak monitoring, exact scheduled heartbeat accounting, supervised checkpoint recovery, macOS-safe process enumeration, and a monitor-aware formal completion gate. |
 | `v0.4.0` | local fork based on upstream `0.8.1` | Adds macOS/Linux installers and harness entrypoints, platform-aware doctor/provenance checks, POSIX resource sampling, and retains async progress, parallel metadata, Copilot support, and safe Windows PID discovery. |
 | `v0.3.4` | `v0.2.0-lzhs.1` | Closes the downstream gate: fan-out, merge, and completion checks now reject stale `native-smoke` PASS evidence unless it carries four unique record `parent_evidence_ids`. Adds installer `-BackupRetention 5` and documents strict single-agent/raw-proof behavior as by design. |
 | `v0.3.3` | `v0.2.0-lzhs.1` | Closes the high-assurance `native-smoke` chain: each record evidence id is saved into state and `complete` requires all four parent evidence ids; raw native output files are hashed, size/mtime stamped, and copied into the evidence tree; agent and native tool-layer must match. CMAverse examples now default to `--agent codex --require-raw-file`. |
@@ -318,7 +338,7 @@ To upgrade the local macOS/Linux candidate and reinstall the paired ClaudeR work
 ```bash
 cd "$HOME/projects/clauder-rstudio-workbench"
 git fetch origin
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill
+./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --backup-retention 0
 ```
 
 For the published Windows release:
@@ -351,7 +371,7 @@ Development sync:
 
 ```bash
 cd "$HOME/projects/clauder-rstudio-workbench"
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --skip-r-package --skip-mcp --sync-agents-skill
+./install.sh --clauder-dir "$HOME/projects/ClaudeR" --skip-r-package --skip-mcp --sync-agents-skill --backup-retention 0
 ```
 
 Windows developers can use the existing `install.ps1 -DevSync` flow. On

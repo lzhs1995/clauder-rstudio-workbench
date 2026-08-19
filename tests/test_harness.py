@@ -202,7 +202,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.4.0")
+        self.assertEqual(doc["producer_version"], "0.4.1")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -653,8 +653,8 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_readme_quickstart_uses_local_candidate_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("local `v0.4.0` candidate", text)
-        self.assertIn("no `v0.4.0` remote tag or release", text)
+        self.assertIn("local `v0.4.1` candidate", text)
+        self.assertIn("no `v0.4.1` remote tag or release", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("./install.sh --clauder-dir", text)
         self.assertIn("-AddHarnessToPath", text)
@@ -667,7 +667,7 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.4.0`", text)
+        self.assertIn("skill collection release `v0.4.1`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
@@ -867,6 +867,60 @@ class HarnessUnitTests(unittest.TestCase):
             self.assertEqual(installed, link)
             self.assertTrue(link.is_symlink())
             self.assertEqual((link / "SKILL.md").read_text(encoding="utf-8"), "installed")
+
+    def test_posix_installer_backup_retention_defaults_to_keep_all(self) -> None:
+        from clauder_workbench.installer import build_parser as build_installer_parser
+
+        args = build_installer_parser().parse_args([])
+        self.assertEqual(args.backup_retention, 0)
+
+    def test_posix_installer_prunes_only_backups_older_than_retention(self) -> None:
+        from clauder_workbench.installer import _prune_skill_backups
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            backups = [root / f"demo_bak_20260819_00000{i}" for i in range(4)]
+            for backup in backups:
+                backup.mkdir()
+
+            removed = _prune_skill_backups(root, "demo", 2)
+
+            self.assertEqual(set(removed), set(backups[:2]))
+            self.assertEqual(
+                sorted(path.name for path in root.glob("demo_bak_*")),
+                sorted(path.name for path in backups[2:]),
+            )
+
+    def test_posix_installer_retention_zero_preserves_backups(self) -> None:
+        from clauder_workbench.installer import _prune_skill_backups
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            backup = root / "demo_bak_20260819_000001"
+            backup.mkdir()
+
+            self.assertEqual(_prune_skill_backups(root, "demo", 0), [])
+            self.assertTrue(backup.exists())
+
+    def test_posix_installer_reads_component_versions(self) -> None:
+        from clauder_workbench.installer import _description_version, _pyproject_version
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            description = root / "DESCRIPTION"
+            description.write_text("Package: ClaudeR\nVersion: 0.8.1\n", encoding="utf-8")
+            pyproject = root / "pyproject.toml"
+            pyproject.write_text('[project]\nname = "clauder-mcp"\nversion = "0.10.0"\n', encoding="utf-8")
+
+            self.assertEqual(_description_version(description), "0.8.1")
+            self.assertEqual(_pyproject_version(pyproject), "0.10.0")
+
+    def test_posix_installer_records_dirty_git_state(self) -> None:
+        from clauder_workbench.installer import _git_dirty
+
+        result = mock.Mock(stdout=" M README.md\n")
+        with mock.patch("clauder_workbench.installer.subprocess.run", return_value=result):
+            self.assertTrue(_git_dirty(Path("/tmp/demo")))
 
     # v0.2.4: install.ps1 UTF-8 + TOML 自检测试
     def test_installer_has_utf8_no_bom_helpers(self) -> None:

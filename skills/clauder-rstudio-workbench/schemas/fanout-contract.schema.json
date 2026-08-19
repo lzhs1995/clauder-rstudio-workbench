@@ -50,6 +50,36 @@
         }
       }
     },
+    "require_soak_monitor": {
+      "type": "boolean",
+      "description": "Require fresh matching soak_monitor PASS evidence during strict completion-check."
+    },
+    "soak_monitor_max_age_min": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Maximum age of accepted soak_monitor parent evidence."
+    },
+    "monitor": {
+      "type": "object",
+      "description": "Long-soak resource, heartbeat, recovery, and safety policy.",
+      "properties": {
+        "sample_sec": {"type": "number", "exclusiveMinimum": 0},
+        "heartbeat_sec": {"type": "number", "exclusiveMinimum": 0},
+        "heartbeat_timeout_sec": {"type": "number", "exclusiveMinimum": 0},
+        "min_heartbeat_success_rate": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "max_heartbeat_gap_sec": {"type": "number", "exclusiveMinimum": 0},
+        "heartbeat_p95_max_sec": {"type": "number", "exclusiveMinimum": 0},
+        "max_state_gap_sec": {"type": "number", "exclusiveMinimum": 0},
+        "memory_hold_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "memory_abort_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "memory_abort_samples": {"type": "integer", "minimum": 1},
+        "min_disk_free_gb": {"type": "number", "minimum": 0},
+        "transport_stall_sec": {"type": "number", "exclusiveMinimum": 0},
+        "max_supervised_restarts": {"type": "integer", "minimum": 0},
+        "restart_backoff_sec": {"type": "number", "minimum": 0},
+        "critical_metric_failure_samples": {"type": "integer", "minimum": 1}
+      }
+    },
     "meta": {
       "type": "object",
       "description": "Free-form, non-enforced metadata (nboot, groups, expected_validation_rows, ...)."

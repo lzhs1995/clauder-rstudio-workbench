@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.4.1 - local candidate, 2026-08-20
+
+- Add macOS/Linux `--backup-retention`; it defaults to `0` so upgrades preserve
+  every runtime skill backup unless the operator explicitly opts into pruning.
+- Record workbench/ClaudeR dirty-tree state and explicit ClaudeR/MCP component
+  versions in macOS/Linux `INSTALL_INFO.json` for auditable local upgrades.
+- Add the recoverable `soak-monitor` harness with exact scheduled heartbeat
+  accounting, atomic checkpoints, supervised recovery, and durable resource,
+  progress, event, and raw heartbeat evidence.
+- Make macOS process enumeration defensive: `psutil` `cmdline()` permission and
+  `SystemError` failures are recorded as non-critical metric errors instead of
+  terminating a formal long run.
+- Add contract monitor policy, `completion-check --require-soak-monitor`, and
+  fault-injection coverage for recovery, missed slots, safety cancellation, and
+  matching monitor provenance.
+
 ## v0.4.0 - local candidate, 2026-08-19
 
 - Rebase the paired ClaudeR fork on upstream R package 0.8.1 and MCP bridge

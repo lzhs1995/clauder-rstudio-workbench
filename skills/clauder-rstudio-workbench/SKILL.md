@@ -14,6 +14,7 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - Before formal long-running RStudio work, run the executable harness layer below. Markdown is advisory; harness evidence is the completion gate.
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
+- For recoverable long-soak monitoring, read [soak-monitor.md](references/soak-monitor.md).
 - For running many parallel R workers from one session, read [parallel-async-fanout.md](references/parallel-async-fanout.md).
 - For native wrapper smoke and `Transport closed` recovery, read [native-mcp-gate.md](references/native-mcp-gate.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
@@ -30,6 +31,7 @@ Use the matching entrypoint from this skill directory, or use the installed
 ./harness/run.sh transport-classify
 ./harness/run.sh tool-surface
 ./harness/run.sh resource-gate advise --current-parallel 1 --memory-threshold 85
+./harness/run.sh soak-monitor status --contract /path/task.json --evidence-dir /path/evidence --expected-pid 1234 --stop-file /path/stop.monitor
 ./harness/run.sh completion-check --mode formal --require-file validation::/path/validation.csv,min_rows=1,max_age_h=24
 ```
 
@@ -47,6 +49,11 @@ On Windows PowerShell:
 The harness writes JSON evidence under `<USER_HOME>\.clauder_workbench\evidence`, following [evidence.schema.json](schemas/evidence.schema.json), and returns stable exit codes: `0 PASS`, `2 WARN`, `3 BLOCK`, `4 TRANSPORT_UNSTABLE`, `5 CONTRACT_FAILED`.
 
 Formal completion must pass `completion-check`. Completion evidence can be supplied through `--contract task.yaml` or CLI flags such as `--require-file`, `--require-transport-class`, `--require-preflight`, `--state-file`, and `--require-resource-gate`.
+
+Formal soak completion should also require a fresh matching `soak_monitor` PASS
+with `--require-soak-monitor`. The monitor uses an independent MCP stdio
+heartbeat and records `extra.monitored_transport=NATIVE_MCP_OK`; it never
+substitutes for the agent-native smoke chain.
 
 For async long jobs, use the two-step hook:
 
@@ -126,6 +133,10 @@ and MCP bridge `0.10.0`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
+The macOS/Linux installer keeps all runtime skill backups by default. Use
+`--backup-retention 0` to make that policy explicit; pass a positive number only
+when older backup pruning is intended.
+
 Cold start means every MCP launch asks `uvx --from ...` to resolve/build before serving JSON-RPC. Warm start means the uv cache helps but the launch still goes through `uvx`. Hot/persistent start means Codex launches `clauder-mcp` (`clauder-mcp.exe` on Windows) directly. Long async/fan-out tasks require the hot path plus a native smoke in the current tool layer.
 
 ## Core Workflow
@@ -157,13 +168,14 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 - **Windows multi-session warning**: do not trust a ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)` as a liveness probe. Use a patched build with a read-only PID check.
 - Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is not the persistent absolute executable, is missing `startup_timeout_sec` or `UV_CACHE_DIR`, or lacks local fork provenance.
 - A Codex native-wrapper long job is ready only after `native-smoke complete` records `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test from the current Codex tool layer.
+- A formal soak is complete only when its recoverable `soak-monitor` evidence also passes the schedule, latency, resource, state-gap, and restart-budget checks.
 - HTTP fallback can diagnose whether the Addin HTTP server is alive, but it is not MCP-only success evidence.
 - If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
 - After changing ClaudeR source, R package installation, or MCP config, restart the relevant agent/MCP process. Running agents may not hot-load changes.
 
 ## Compatible Release
 
-This local skill collection release `v0.4.0` candidate is paired with the
+This local skill collection release `v0.4.1` candidate is paired with the
 `lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.8.1` and MCP
 bridge `0.10.0`. The collection includes this workbench skill and the companion
 `cmaverse-paired-mval` skill.
@@ -172,4 +184,4 @@ Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4` and the local `v0.4.0` candidate, inherit that config-writer fix.
+`v0.3.4` and the local `v0.4.1` candidate, inherit that config-writer fix.

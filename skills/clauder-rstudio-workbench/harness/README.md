@@ -25,6 +25,7 @@ clauder-workbench doctor
 - `connect`: records connection route classification.
 - `async-guard`: pre-submit/register-job/list/complete/cancel guard with in-flight registry.
 - `resource-gate`: advise/enforce dynamic concurrency.
+- `soak-monitor`: recoverable scheduled resource/progress/heartbeat monitoring for formal long runs.
 - `completion-check`: validates artifacts, evidence, and policy rules.
 
 By default, `transport-classify` and `tool-surface` use independent MCP stdio
@@ -59,6 +60,13 @@ output is still advancing.
 
 `submit --via-mcp-stdio --code-file <R>` is available only for diagnostic MCP
 stdio workflows. It must not be labeled as native wrapper execution.
+
+## Recoverable Soak Monitor
+
+Start `soak-monitor run` before native worker submission, inspect it with
+`soak-monitor status`, and pass its final PASS evidence to
+`completion-check --require-soak-monitor`. The monitor's independent heartbeat
+is `MCP_STDIO_OK`; it observes but never replaces native-wrapper proof.
 
 ## Completion Contract Examples
 

@@ -49,6 +49,7 @@ from .worker_lint import lint_worker_file
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
 from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
 from .resource import decide_resource_gate
+from .soak_monitor import build_monitor_config, monitor_status, run_soak_monitor
 from .transport import (
     classify_transport,
     codex_config_mentions_local_bridge,
@@ -1074,6 +1075,21 @@ def cmd_resource_gate(args: argparse.Namespace) -> int:
     return emit(doc)
 
 
+def cmd_soak_monitor(args: argparse.Namespace) -> int:
+    config = build_monitor_config(
+        contract_path=args.contract,
+        evidence_dir=args.evidence_dir,
+        expected_pid=args.expected_pid,
+        port=args.port,
+        stop_file=args.stop_file,
+        monitored_transport=args.monitored_transport,
+    )
+    if args.action == "status":
+        print_json(monitor_status(config))
+        return PASS
+    return emit(run_soak_monitor(config, resume=args.resume))
+
+
 def parse_requirements(values: list[str] | None) -> list[dict[str, Any]]:
     reqs: list[dict[str, Any]] = []
     for value in values or []:
@@ -1178,6 +1194,24 @@ def _job_complete_ok(parent_docs: list[dict[str, Any]], task_key: str | None) ->
     )
 
 
+def _soak_monitor_parent_ok(
+    parent_docs: list[dict[str, Any]],
+    task_key: str | None,
+    max_age_min: float | None,
+) -> bool:
+    return any(
+        doc.get("harness_name") == "soak_monitor"
+        and doc.get("decision") == "PASS"
+        and doc.get("transport_class") == "MCP_STDIO_OK"
+        and _matching_task(doc, task_key)
+        and _fresh_enough(doc, max_age_min)
+        and (doc.get("extra") or {}).get("monitored_transport") == "NATIVE_MCP_OK"
+        and bool(((doc.get("extra") or {}).get("summary") or {}).get("checks"))
+        and all(bool(value) for value in (((doc.get("extra") or {}).get("summary") or {}).get("checks") or {}).values())
+        for doc in parent_docs
+    )
+
+
 def _p6_durable_violations(requirements: list[dict[str, Any]], artifact_checks: list[dict[str, Any]]) -> list[str]:
     violations: list[str] = []
     for req, check in zip(requirements, artifact_checks):
@@ -1254,6 +1288,14 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
         if not gate_ok:
             policy_violations.append("P5 CONCURRENCY-WITHOUT-GATE")
             reasons.append("fresh matching resource_gate increase_by_1 evidence is missing")
+    require_soak_monitor = args.require_soak_monitor or bool(contract.get("require_soak_monitor"))
+    if require_soak_monitor:
+        max_age_min = args.soak_monitor_max_age_min
+        if contract.get("soak_monitor_max_age_min") is not None:
+            max_age_min = float(contract["soak_monitor_max_age_min"])
+        if not _soak_monitor_parent_ok(parent_docs, args.task_key or contract.get("task_key"), max_age_min):
+            policy_violations.append("MISSING-SOAK-MONITOR-EVIDENCE")
+            reasons.append("fresh matching soak_monitor PASS evidence for NATIVE_MCP_OK is missing, stale, or incomplete")
     p6_violations = _p6_durable_violations(requirements, artifacts["checks"])
     if p6_violations:
         policy_violations.append("P6 COMPLETION-WITHOUT-DURABLE")
@@ -1678,6 +1720,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rterm-unresponsive", action="store_true")
     p.add_argument("--mcp-unresponsive", action="store_true")
 
+    p = sub.add_parser("soak-monitor")
+    p.add_argument("action", choices=["run", "status"])
+    p.add_argument("--contract", required=True)
+    p.add_argument("--evidence-dir", required=True)
+    p.add_argument("--expected-pid", type=int, required=True)
+    p.add_argument("--port", type=int, default=8788)
+    p.add_argument("--stop-file", required=True)
+    p.add_argument("--monitored-transport", choices=["NATIVE_MCP_OK", "MCP_STDIO_OK"], default="NATIVE_MCP_OK")
+    p.add_argument("--resume", action="store_true")
+
     p = sub.add_parser("completion-check")
     p.add_argument("--mode", choices=["formal", "diagnostic"], default="formal")
     p.add_argument("--policy", choices=["auto", "strict", "warn", "skip"], default="auto")
@@ -1695,6 +1747,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--state-file")
     p.add_argument("--require-resource-gate", action="store_true")
     p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
+    p.add_argument("--require-soak-monitor", action="store_true")
+    p.add_argument("--soak-monitor-max-age-min", type=float, default=120.0)
     p.add_argument("--require-job-complete", action="store_true")
 
     p = sub.add_parser("worker-lint")
@@ -1766,6 +1820,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_native_smoke(args)
         if args.cmd == "resource-gate":
             return cmd_resource_gate(args)
+        if args.cmd == "soak-monitor":
+            return cmd_soak_monitor(args)
         if args.cmd == "completion-check":
             return cmd_completion_check(args)
         if args.cmd == "worker-lint":

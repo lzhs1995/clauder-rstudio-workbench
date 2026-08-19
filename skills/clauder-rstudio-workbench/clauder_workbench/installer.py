@@ -37,6 +37,40 @@ def _git_value(repo: Path, *args: str) -> str:
         return "unknown"
 
 
+def _git_dirty(repo: Path) -> bool | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return bool(result.stdout.strip())
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _pyproject_version(path: Path) -> str:
+    try:
+        try:
+            import tomllib
+        except ImportError:  # pragma: no cover - Python 3.10 fallback
+            import tomli as tomllib  # type: ignore[no-redef]
+        return str(tomllib.loads(path.read_text(encoding="utf-8"))["project"]["version"])
+    except (KeyError, OSError, ValueError):
+        return "unknown"
+
+
+def _description_version(path: Path) -> str:
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("Version:"):
+                return line.partition(":")[2].strip() or "unknown"
+    except OSError:
+        pass
+    return "unknown"
+
+
 def _sha256(path: Path) -> str:
     if not path.exists() or not path.is_file():
         return ""
@@ -140,7 +174,43 @@ def _skill_sources(repo_root: Path) -> list[Path]:
     )
 
 
-def _install_skill(source: Path, destination_root: Path, *, dry_run: bool = False) -> Path:
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be zero or greater")
+    return parsed
+
+
+def _prune_skill_backups(
+    destination_root: Path,
+    skill_name: str,
+    retention: int,
+    *,
+    dry_run: bool = False,
+) -> list[Path]:
+    if retention == 0:
+        return []
+    backups = sorted(
+        (path for path in destination_root.glob(f"{skill_name}_bak_*") if path.is_dir()),
+        key=lambda path: path.name,
+        reverse=True,
+    )
+    stale = backups[retention:]
+    for path in stale:
+        action = "Would remove" if dry_run else "Removing"
+        print(f"{action} old skill backup: {path}")
+        if not dry_run:
+            shutil.rmtree(path)
+    return stale
+
+
+def _install_skill(
+    source: Path,
+    destination_root: Path,
+    *,
+    backup_retention: int = 0,
+    dry_run: bool = False,
+) -> Path:
     destination = destination_root / source.name
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup = destination_root / f"{source.name}_bak_{stamp}"
@@ -154,6 +224,7 @@ def _install_skill(source: Path, destination_root: Path, *, dry_run: bool = Fals
             return destination
         raise RuntimeError(f"Refusing to replace broken skill symlink: {destination} -> {target}")
     if dry_run:
+        _prune_skill_backups(destination_root, source.name, backup_retention, dry_run=True)
         return destination
     destination_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, staging)
@@ -171,6 +242,7 @@ def _install_skill(source: Path, destination_root: Path, *, dry_run: bool = Fals
     finally:
         if staging.exists():
             shutil.rmtree(staging)
+    _prune_skill_backups(destination_root, source.name, backup_retention)
     return destination
 
 
@@ -182,6 +254,7 @@ def _write_install_info(
     mcp_command: Path,
     uv_cache_dir: Path,
     configured_clients: list[str],
+    backup_retention: int,
     dry_run: bool,
 ) -> None:
     info: dict[str, Any] = {
@@ -190,17 +263,22 @@ def _write_install_info(
         "workbench_version": __version__,
         "git_commit": _git_value(repo_root, "rev-parse", "HEAD"),
         "git_branch_or_tag": _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD"),
+        "workbench_dirty": _git_dirty(repo_root),
         "workbench_source_type": "git" if (repo_root / ".git").exists() else "directory",
         "workbench_source_url": _git_value(repo_root, "config", "--get", "remote.origin.url"),
         "installed_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "installed_from": str(repo_root),
         "install_destination": str(destination),
         "configured_clients": configured_clients,
+        "skill_backup_retention": backup_retention,
         "claudeR_source_type": "git" if (clauder_dir / ".git").exists() else "directory",
         "claudeR_source_url": _git_value(clauder_dir, "config", "--get", "remote.origin.url"),
         "claudeR_ref": _git_value(clauder_dir, "rev-parse", "--abbrev-ref", "HEAD"),
         "claudeR_commit": _git_value(clauder_dir, "rev-parse", "HEAD"),
+        "claudeR_dirty": _git_dirty(clauder_dir),
+        "claudeR_version": _description_version(clauder_dir / "DESCRIPTION"),
         "claudeR_git_origin": _git_value(clauder_dir, "config", "--get", "remote.origin.url"),
+        "clauder_mcp_version": _pyproject_version(clauder_dir / "clauder-mcp" / "pyproject.toml"),
         "clauder_mcp_source": str(clauder_dir / "clauder-mcp"),
         "clauder_mcp_command": str(mcp_command),
         "clauder_mcp_install_mode": "uv_tool_from_local_fork",
@@ -226,6 +304,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-r-package", action="store_true")
     parser.add_argument("--skip-mcp", action="store_true")
     parser.add_argument("--skip-harness", action="store_true")
+    parser.add_argument(
+        "--backup-retention",
+        type=_non_negative_int,
+        default=0,
+        help="number of per-skill backups to keep; 0 keeps all backups (default: 0)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -264,11 +348,21 @@ def main(argv: list[str] | None = None) -> int:
 
     destinations: list[Path] = []
     for source in _skill_sources(repo_root):
-        destination = _install_skill(source, codex_home / "skills", dry_run=args.dry_run)
+        destination = _install_skill(
+            source,
+            codex_home / "skills",
+            backup_retention=args.backup_retention,
+            dry_run=args.dry_run,
+        )
         if source.name == "clauder-rstudio-workbench":
             destinations.append(destination)
         if args.sync_agents_skill:
-            destination = _install_skill(source, agents_home / "skills", dry_run=args.dry_run)
+            destination = _install_skill(
+                source,
+                agents_home / "skills",
+                backup_retention=args.backup_retention,
+                dry_run=args.dry_run,
+            )
             if source.name == "clauder-rstudio-workbench":
                 destinations.append(destination)
 
@@ -293,6 +387,7 @@ def main(argv: list[str] | None = None) -> int:
             mcp_command=mcp_command,
             uv_cache_dir=uv_cache_dir,
             configured_clients=configured_clients,
+            backup_retention=args.backup_retention,
             dry_run=args.dry_run,
         )
 
