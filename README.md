@@ -2,10 +2,10 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.1` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
+The `v0.4.2` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
 on upstream ClaudeR `0.8.1` / `clauder-mcp 0.10.0`.
 
-**Platform status:** the local `v0.4.1` candidate uses `install.sh` on
+**Platform status:** the local `v0.4.2` candidate uses `install.sh` on
 macOS/Linux. `install.ps1` remains available for the published Windows flow.
 
 ## Skills in This Collection
@@ -24,6 +24,11 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
 
 Neither installer modifies MCP client configuration unless an explicit configure switch is passed.
 
+Formal completion keeps resource-gate admission evidence fresh for 120 minutes
+by default. Long-soak contracts can override this with
+`resource_gate_max_age_min`; an explicit contract value takes precedence over
+the CLI default.
+
 ## Quick Start
 
 On macOS/Linux:
@@ -35,7 +40,7 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 ```
 
 These commands intentionally use the recovered local candidate branch. There
-is no `v0.4.1` remote tag or release until this branch is reviewed and
+is no `v0.4.2` remote tag or release until this branch is reviewed and
 explicitly published.
 
 On Windows PowerShell:
@@ -179,6 +184,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.4.2` | local fork based on upstream `0.8.1` | Extends resource-gate freshness to 120 minutes for long soaks and records the selected gate age while retaining the recoverable monitor introduced in v0.4.1. |
 | `v0.4.1` | local fork based on upstream `0.8.1` | Adds recoverable long-soak monitoring, exact scheduled heartbeat accounting, supervised checkpoint recovery, macOS-safe process enumeration, and a monitor-aware formal completion gate. |
 | `v0.4.0` | local fork based on upstream `0.8.1` | Adds macOS/Linux installers and harness entrypoints, platform-aware doctor/provenance checks, POSIX resource sampling, and retains async progress, parallel metadata, Copilot support, and safe Windows PID discovery. |
 | `v0.3.4` | `v0.2.0-lzhs.1` | Closes the downstream gate: fan-out, merge, and completion checks now reject stale `native-smoke` PASS evidence unless it carries four unique record `parent_evidence_ids`. Adds installer `-BackupRetention 5` and documents strict single-agent/raw-proof behavior as by design. |

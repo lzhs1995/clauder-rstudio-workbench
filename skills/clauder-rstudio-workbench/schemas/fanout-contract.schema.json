@@ -28,6 +28,15 @@
         }
       }
     },
+    "require_resource_gate": {
+      "type": "boolean",
+      "description": "Require matching resource_gate increase_by_1 parent evidence during strict completion-check."
+    },
+    "resource_gate_max_age_min": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Maximum age of accepted resource-gate parent evidence. Defaults to 120 minutes."
+    },
     "artifacts": {
       "type": "object",
       "properties": {

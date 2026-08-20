@@ -60,6 +60,8 @@ from .transport import (
     run_python_smoke,
 )
 
+DEFAULT_RESOURCE_GATE_MAX_AGE_MIN = 120.0
+
 
 def emit(doc: dict[str, Any], *, write: bool = True) -> int:
     if write:
@@ -1165,20 +1167,57 @@ def _fresh_enough(doc: dict[str, Any], max_age_min: float | None) -> bool:
     return age_min <= max_age_min
 
 
+def _evidence_age_min(doc: dict[str, Any]) -> float | None:
+    ts = _parse_utc(str(doc.get("timestamp_utc") or ""))
+    if ts is None:
+        return None
+    return (datetime.now(timezone.utc) - ts).total_seconds() / 60
+
+
 def _matching_task(doc: dict[str, Any], task_key: str | None) -> bool:
     if not task_key:
         return True
     return doc.get("task_key") == task_key
 
 
-def _resource_gate_ok(parent_docs: list[dict[str, Any]], task_key: str | None, max_age_min: float | None) -> bool:
-    return any(
-        doc.get("harness_name") == "resource_gate"
-        and doc.get("decision") == "increase_by_1"
-        and _matching_task(doc, task_key)
-        and _fresh_enough(doc, max_age_min)
+def _resource_gate_status(
+    parent_docs: list[dict[str, Any]],
+    task_key: str | None,
+    max_age_min: float | None,
+) -> dict[str, Any]:
+    candidates = [
+        doc
         for doc in parent_docs
+        if (
+            doc.get("harness_name") == "resource_gate"
+            and doc.get("decision") == "increase_by_1"
+            and _matching_task(doc, task_key)
+        )
+    ]
+    ranked = [(doc, _evidence_age_min(doc)) for doc in candidates]
+    valid = [(doc, age) for doc, age in ranked if age is not None]
+    if valid:
+        selected, age_min = min(valid, key=lambda item: item[1])
+    elif ranked:
+        selected, age_min = ranked[0]
+    else:
+        selected, age_min = None, None
+    accepted = bool(
+        selected is not None
+        and (max_age_min is None or (age_min is not None and age_min <= max_age_min))
     )
+    return {
+        "accepted": accepted,
+        "candidate_count": len(candidates),
+        "selected_evidence_id": selected.get("evidence_id") if selected else None,
+        "selected_timestamp_utc": selected.get("timestamp_utc") if selected else None,
+        "selected_age_min": age_min,
+        "max_age_min": max_age_min,
+    }
+
+
+def _resource_gate_ok(parent_docs: list[dict[str, Any]], task_key: str | None, max_age_min: float | None) -> bool:
+    return bool(_resource_gate_status(parent_docs, task_key, max_age_min)["accepted"])
 
 
 def _job_complete_ok(parent_docs: list[dict[str, Any]], task_key: str | None) -> bool:
@@ -1279,15 +1318,23 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
     if args.task_key and load_inflight(args.task_key):
         policy_violations.append("P4 RESUBMIT-AFTER-TRANSIENT")
         reasons.append("task still has an active in-flight record")
+    resource_gate_check: dict[str, Any] | None = None
     require_resource_gate = args.require_resource_gate or bool(contract.get("require_resource_gate"))
     if require_resource_gate:
         max_age_min = args.resource_gate_max_age_min
         if contract.get("resource_gate_max_age_min") is not None:
             max_age_min = float(contract["resource_gate_max_age_min"])
-        gate_ok = _resource_gate_ok(parent_docs, args.task_key, max_age_min)
-        if not gate_ok:
+        resource_gate_check = _resource_gate_status(parent_docs, args.task_key, max_age_min)
+        if not resource_gate_check["accepted"]:
             policy_violations.append("P5 CONCURRENCY-WITHOUT-GATE")
-            reasons.append("fresh matching resource_gate increase_by_1 evidence is missing")
+            if resource_gate_check["candidate_count"] and resource_gate_check["selected_age_min"] is not None:
+                reasons.append(
+                    "matching resource_gate increase_by_1 evidence is stale: "
+                    f"age={resource_gate_check['selected_age_min']:.3f} min > "
+                    f"max_age={max_age_min:.3f} min"
+                )
+            else:
+                reasons.append("matching resource_gate increase_by_1 evidence is missing or has no valid timestamp")
     require_soak_monitor = args.require_soak_monitor or bool(contract.get("require_soak_monitor"))
     if require_soak_monitor:
         max_age_min = args.soak_monitor_max_age_min
@@ -1330,7 +1377,13 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
         artifact_paths=[req["path"] for req in requirements],
         policy_violations=policy_violations,
         exit_code=exit_code,
-        extra={"artifact_checks": artifacts["checks"], "mode": args.mode, "policy": policy, "contract": str(args.contract or "")},
+        extra={
+            "artifact_checks": artifacts["checks"],
+            "mode": args.mode,
+            "policy": policy,
+            "contract": str(args.contract or ""),
+            "resource_gate_check": resource_gate_check,
+        },
     )
     return emit(doc)
 
@@ -1746,7 +1799,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--outputs", nargs="*", default=[])
     p.add_argument("--state-file")
     p.add_argument("--require-resource-gate", action="store_true")
-    p.add_argument("--resource-gate-max-age-min", type=float, default=60.0)
+    p.add_argument(
+        "--resource-gate-max-age-min",
+        type=float,
+        default=DEFAULT_RESOURCE_GATE_MAX_AGE_MIN,
+    )
     p.add_argument("--require-soak-monitor", action="store_true")
     p.add_argument("--soak-monitor-max-age-min", type=float, default=120.0)
     p.add_argument("--require-job-complete", action="store_true")

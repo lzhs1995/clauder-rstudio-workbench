@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.2 - local candidate, 2026-08-20
+
+- Raise formal completion's default resource-gate freshness window from 60 to
+  120 minutes so a valid final admission decision remains usable after a
+  70-minute soak.
+- Record the selected resource-gate evidence id, age, effective threshold, and
+  acceptance decision in completion evidence; distinguish stale evidence from
+  missing evidence.
+- Document detached tmux plus run-scoped caffeinate as the macOS hosting model
+  for formal Native soak monitoring.
+
 ## v0.4.1 - local candidate, 2026-08-20
 
 - Add macOS/Linux `--backup-retention`; it defaults to `0` so upgrades preserve

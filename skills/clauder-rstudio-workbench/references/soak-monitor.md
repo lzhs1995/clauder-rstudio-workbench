@@ -26,6 +26,24 @@ The first invocation owns the logical monitor run. If that command is stopped
 outside its internal supervisor, restart it only with `--resume`; an existing
 checkpoint is never overwritten implicitly.
 
+## macOS formal hosting
+
+For a formal Codex soak, do not leave the outer monitor process attached to the
+agent's foreground command session. Run it in a named detached tmux session and
+wrap it in a run-scoped `caffeinate` process:
+
+```bash
+tmux new-session -d -s clauder-soak-<run_id> \
+  "/usr/bin/caffeinate -dimsu /Users/<USER>/.local/bin/clauder-workbench soak-monitor run <arguments> >monitor.stdout.log 2>monitor.stderr.log"
+```
+
+Before worker submission, verify the tmux session, checkpoint logical run id,
+two resource rows, and one successful heartbeat from a separate shell. During a
+full-green qualification, disappearance of the outer tmux/monitor process
+before the stop file is a BLOCK; do not use external `--resume` to make that
+run appear continuous. The monitor's own supervised sampling-child recovery
+remains valid when it stays within policy and does not break the SLA.
+
 ## Recovery and accounting
 
 - Process attributes are read one at a time. macOS `psutil` failures from
