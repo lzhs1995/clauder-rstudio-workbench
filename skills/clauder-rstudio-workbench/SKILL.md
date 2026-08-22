@@ -128,8 +128,8 @@ On macOS, `install.sh --configure-codex` installs that executable with
 `uv tool install --force --from <USER_HOME>/projects/ClaudeR/clauder-mcp
 clauder-mcp`. Windows uses `install.ps1 -ConfigureCodex`,
 `clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The local Mac
-candidate is the user-maintained fork branch based on upstream ClaudeR `0.8.1`
-and MCP bridge `0.10.0`. Never use bare `uvx clauder-mcp` or bare
+candidate is the user-maintained fork branch based on upstream ClaudeR `0.12.2`
+and MCP bridge `0.14.2`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
@@ -175,14 +175,14 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This local skill collection release `v0.4.2` candidate is paired with the
-`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.8.1` and MCP
-bridge `0.10.0`. The collection includes this workbench skill and the companion
+This local skill collection release `v0.4.3` candidate is paired with the
+`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.12.2` and MCP
+bridge `0.14.2`. The collection includes this workbench skill and the companion
 `cmaverse-paired-mval` skill.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4`, `v0.4.1`, and the local `v0.4.2` candidate, inherit that
+`v0.3.4`, `v0.4.1`, `v0.4.2`, and the local `v0.4.3` candidate, inherit that
 config-writer fix.

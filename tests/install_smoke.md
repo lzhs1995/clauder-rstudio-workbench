@@ -2,6 +2,28 @@
 
 This file records sanitized smoke evidence for the public sharing package. Private user paths are replaced with `<USER_HOME>`, `<TEMP>`, or `<REPO>`.
 
+## v0.4.3 macOS Candidate Source Smoke
+
+Observed: 2026-08-22 Asia/Kolkata
+
+Commands:
+
+```bash
+python -m unittest discover -s tests -v
+uv --no-config build --wheel
+clauder-workbench tool-surface
+```
+
+Local result:
+
+- 175 Workbench tests passed, including the exact 40-tool ClaudeR 0.12.2
+  compatibility surface and the existing soak-monitor fault-injection suite.
+- The 0.4.3 wheel built locally and the installer dry-run selected the pinned
+  ClaudeR 0.12.2 / bridge 0.14.2 worktree.
+- The candidate bridge returned all 40 expected tools over MCP stdio. Installed
+  doctor and native-wrapper validation are recorded outside this distributable
+  transcript in the run-specific evidence directory.
+
 ## v0.4.0 macOS Candidate Smoke
 
 Observed: 2026-08-19 Asia/Kolkata

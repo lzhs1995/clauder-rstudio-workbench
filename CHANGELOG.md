@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.3 - local candidate, 2026-08-22
+
+- Pair the local workbench with the fork rebased on upstream ClaudeR 0.12.2
+  and MCP bridge 0.14.2 while retaining the fork's read-only PID checks,
+  async progress sidecars, multi-session metadata, and Copilot installer path.
+- Require the complete 40-tool ClaudeR MCP surface, including Coordination v2,
+  screening, cross-reference reconciliation, citations, notebooks, and
+  codebooks, instead of accepting only the five legacy connection primitives.
+- Refresh provenance, compatibility, installer smoke, and skill documentation
+  for the new pinned local candidate without changing evidence schema 0.2.4.
+
 ## v0.4.2 - local candidate, 2026-08-20
 
 - Raise formal completion's default resource-gate freshness window from 60 to
