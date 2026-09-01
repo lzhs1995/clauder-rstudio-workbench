@@ -40,6 +40,10 @@ def discovery_sessions() -> list[dict[str, Any]]:
         except Exception as exc:
             sessions.append({"path": str(path), "error": str(exc)})
             continue
+        # Discovery files carry the bearer token used by the local HTTP
+        # bridge. Doctor evidence is durable and may be shared for support, so
+        # it must report only whether a token exists, never the secret itself.
+        doc["token_present"] = bool(doc.pop("token", None))
         doc["path"] = str(path)
         port = doc.get("port")
         if isinstance(port, int):
