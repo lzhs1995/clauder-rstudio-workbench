@@ -3,7 +3,7 @@
 
 This is a Python gate over the per-mediator ``validation_<mediator>.csv`` files
 the R workers emit. It does NOT re-run R; it checks that every mediator x group
-row exists and passes the structural checks: full cmest, 17 effects, 159 data
+row exists and passes the structural checks: full cmest, 17 effects, 203 data
 columns, ref mval 0/1, no duplicate / wrong-mediator rows, that M=0 and M=1 used
 the SAME bootstrap indices (``m0_boot_hash == m1_boot_hash``), and that the
 controlled-direct-effect delta deliverable is present with full inference
@@ -43,8 +43,8 @@ def parse_args(argv=None):
     p.add_argument("--groups", required=True, help="Comma-separated group ids.")
     p.add_argument("--expected-effects", type=int, default=17,
                    help="Expected effect count per cmest (case study: 17).")
-    p.add_argument("--expected-ncol", type=int, default=159,
-                   help="Expected $data column count (case study: 159).")
+    p.add_argument("--expected-ncol", type=int, default=203,
+                   help="Expected $data column count (migrated Mac snapshot: 203; historical trimmed Windows objects: 159).")
     p.add_argument("--no-count-check", action="store_true",
                    help="Skip the effect-count and data-ncol checks (dataset-specific). Sets weak_validation=true; not for formal success claims.")
     p.add_argument("--no-pairing-check", action="store_true",

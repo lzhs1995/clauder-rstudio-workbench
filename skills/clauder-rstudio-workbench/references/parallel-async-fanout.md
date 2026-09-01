@@ -139,15 +139,22 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 
 `fanout-run` treats `--max-parallel` as the starting concurrency ceiling. Without
 `--auto-scale`, that ceiling stays fixed for the whole run. With `--auto-scale`,
-the harness samples system memory each poll cycle and raises concurrency by one
-while memory stays below `--memory-threshold` (default `85`) and workers remain
-pending, up to the worker count or `--max-parallel-cap`.
+the harness samples memory, CPU, free disk, and (when configured) the durable
+upload queue each poll cycle. A contract may require several consecutive healthy
+samples before concurrency rises by exactly one. Omitted v0.4.4 fields retain
+the pre-v0.4.4 memory-only behavior and one-sample scale-up.
 
-When memory is at or above the threshold, `fanout-run` stops launching new
+When any configured hold threshold is reached, `fanout-run` stops launching new
 workers and lets existing workers drain; it never kills an already-running job
-just to reduce concurrency. Each decision is written to `scale_log` in the run
-result/evidence so a reviewer can see whether a run used fixed or dynamic
-parallelism.
+just to reduce concurrency. Each decision and the observed memory/CPU/disk/
+backlog values are written to `scale_log` in the run result/evidence.
+
+For the Mac CMAverse chain, the frozen policy is: start at 1, cap at 3, sample
+every 30 seconds, and require five consecutive samples with memory below 70%,
+CPU below 75%, disk above 200 GB, and upload backlog below 2 before adding one
+slot. Memory at/above 80%, CPU at/above 90%, disk below 150 GB, or backlog at/
+above 2 holds new admissions. These are admission rules; hard safety cancellation
+remains the monitor's separate responsibility.
 
 This auto-scaling path belongs to `fanout-run`'s Python MCP stdio mode. The
 agent-native wrapper path is still explicit: plan the workers, submit through

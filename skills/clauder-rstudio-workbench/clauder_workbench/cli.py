@@ -48,7 +48,7 @@ from .fanout import (
 from .worker_lint import lint_worker_file
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
 from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
-from .resource import decide_resource_gate
+from .resource import decide_resource_gate, upload_backlog_count
 from .soak_monitor import build_monitor_config, monitor_status, run_soak_monitor
 from .transport import (
     classify_transport,
@@ -1053,6 +1053,9 @@ def cmd_async_guard(args: argparse.Namespace) -> int:
 
 
 def cmd_resource_gate(args: argparse.Namespace) -> int:
+    upload_backlog = args.upload_backlog
+    if args.upload_backlog_dir:
+        upload_backlog = upload_backlog_count(args.upload_backlog_dir)
     decision = decide_resource_gate(
         current_parallel=args.current_parallel,
         memory_threshold=args.memory_threshold,
@@ -1062,6 +1065,14 @@ def cmd_resource_gate(args: argparse.Namespace) -> int:
         rterm_responsive=not args.rterm_unresponsive,
         mcp_responsive=not args.mcp_unresponsive,
         memory_override=args.memory_override,
+        cpu_scale_up_percent=args.cpu_scale_up_percent,
+        cpu_hold_percent=args.cpu_hold_percent,
+        cpu_override=args.cpu_override,
+        min_disk_free_gb_scale_up=args.min_disk_free_gb_scale_up,
+        min_disk_free_gb_hold=args.min_disk_free_gb_hold,
+        disk_free_gb_override=args.disk_free_gb_override,
+        upload_backlog=upload_backlog,
+        upload_backlog_hold=args.upload_backlog_hold,
     )
     exit_code = PASS
     if args.mode == "enforce" and decision["decision"] != "increase_by_1":
@@ -1553,6 +1564,14 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         auto_scale=args.auto_scale,
         memory_threshold=args.memory_threshold,
         max_parallel_cap=args.max_parallel_cap,
+        memory_scale_up_percent=args.memory_scale_up_percent,
+        memory_hold_percent=args.memory_hold_percent,
+        cpu_scale_up_percent=args.cpu_scale_up_percent,
+        cpu_hold_percent=args.cpu_hold_percent,
+        min_disk_free_gb_scale_up=args.min_disk_free_gb_scale_up,
+        min_disk_free_gb_hold=args.min_disk_free_gb_hold,
+        upload_backlog_hold=args.upload_backlog_hold,
+        healthy_samples_for_scale_up=args.healthy_samples_for_scale_up,
     )
     for wid in result.get("done", []):
         archive_inflight(f"{task_key}:{wid}", "worker complete")
@@ -1767,6 +1786,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--current-parallel", type=int, default=1)
     p.add_argument("--memory-threshold", type=float, default=85.0)
     p.add_argument("--memory-override", type=float)
+    p.add_argument("--cpu-scale-up-percent", type=float)
+    p.add_argument("--cpu-hold-percent", type=float)
+    p.add_argument("--cpu-override", type=float)
+    p.add_argument("--min-disk-free-gb-scale-up", type=float)
+    p.add_argument("--min-disk-free-gb-hold", type=float)
+    p.add_argument("--disk-free-gb-override", type=float)
+    p.add_argument("--upload-backlog", type=int, default=0)
+    p.add_argument("--upload-backlog-dir")
+    p.add_argument("--upload-backlog-hold", type=int)
     p.add_argument("--output-root")
     p.add_argument("--previous-newest-mtime", type=float)
     p.add_argument("--io-blocked", action="store_true")
@@ -1841,6 +1869,22 @@ def build_parser() -> argparse.ArgumentParser:
                         "Running jobs are never killed.")
     p.add_argument("--memory-threshold", type=float, default=85.0,
                    help="Memory %% ceiling for --auto-scale (default 85). At/above it, no new workers are submitted.")
+    p.add_argument("--memory-scale-up-percent", type=float,
+                   help="Memory threshold below which a healthy sample may contribute to scale-up.")
+    p.add_argument("--memory-hold-percent", type=float,
+                   help="Memory threshold at/above which new submissions are throttled.")
+    p.add_argument("--cpu-scale-up-percent", type=float,
+                   help="CPU threshold below which a healthy sample may contribute to scale-up.")
+    p.add_argument("--cpu-hold-percent", type=float,
+                   help="CPU threshold at/above which new submissions are throttled.")
+    p.add_argument("--min-disk-free-gb-scale-up", type=float,
+                   help="Minimum free disk required for a healthy scale-up sample.")
+    p.add_argument("--min-disk-free-gb-hold", type=float,
+                   help="Free disk below which new submissions are throttled.")
+    p.add_argument("--upload-backlog-hold", type=int,
+                   help="Validated-but-unarchived item count at/above which submissions are throttled.")
+    p.add_argument("--healthy-samples-for-scale-up", type=int, default=1,
+                   help="Consecutive healthy samples required before raising concurrency by one.")
     p.add_argument("--max-parallel-cap", type=int,
                    help="Hard upper bound for --auto-scale concurrency (default: worker count).")
     p.add_argument("--dry-run", action="store_true",

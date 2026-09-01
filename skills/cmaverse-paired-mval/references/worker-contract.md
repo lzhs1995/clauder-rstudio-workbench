@@ -20,6 +20,11 @@ project but keep the shape):
 | `NEW47_OUTPUT_ROOT`   | base output dir                          | a project path                  |
 | `NEW47_UPLOAD_ENABLED`| optional durable-archive toggle          | `false`                         |
 
+The Mac streaming worker additionally uses `NEW47_ORIGINAL_SCRIPT`,
+`NEW47_TARGET_SCRIPT`, `NEW47_DATA_PATH`, `NEW47_UPLOAD_REQUIRED`,
+`NEW47_FORMAL_RUN`, and `NEW47_ARM_FULL_RUN`. A formal worker refuses to start
+unless the last flag is explicitly true.
+
 Output layout (must match what the fan-out contract expects):
 
 ```text
@@ -91,3 +96,15 @@ An async Rterm worker does **not** put its objects back into the foreground
 RStudio `.GlobalEnv`. The durable RData + manifest + validation CSV are the only
 evidence of completion. If a foreground check is needed, read the saved RData
 back into the session explicitly.
+
+## Mac group-shard layout and recovery
+
+The current Mac implementation writes `models/<mediator>/<group>__paired_...rds`
+rather than one mediator-sized RData containing all groups. It records a worker
+RNG checkpoint only after the group has passed validation and any required
+archive gate. On restart, the same mediator resumes at the next incomplete
+group; it never reseeds per group.
+
+Use `open_mval_grid_run()` and `load_cmest_pair(mediator, group)` to recover the
+old nested lookup semantics lazily. If a local shard was archived and deleted,
+the loader refuses and points to the archive receipt; restore that shard first.

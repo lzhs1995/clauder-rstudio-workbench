@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from .resource import memory_used_percent
+from .resource import cpu_used_percent, disk_free_gb, memory_used_percent, upload_backlog_count
 from .worker_lint import lint_worker_file
 
 WORKER_FILE_KEYS = ("expected_state", "expected_manifest", "expected_validation")
@@ -472,6 +472,17 @@ def run_fanout(
     memory_threshold: float = 85.0,
     max_parallel_cap: int | None = None,
     mem_probe_fn: Callable[[], float | None] | None = None,
+    cpu_probe_fn: Callable[[], float | None] | None = None,
+    disk_probe_fn: Callable[[], float | None] | None = None,
+    upload_backlog_probe_fn: Callable[[], int] | None = None,
+    memory_scale_up_percent: float | None = None,
+    memory_hold_percent: float | None = None,
+    cpu_scale_up_percent: float | None = None,
+    cpu_hold_percent: float | None = None,
+    min_disk_free_gb_scale_up: float | None = None,
+    min_disk_free_gb_hold: float | None = None,
+    upload_backlog_hold: int | None = None,
+    healthy_samples_for_scale_up: int = 1,
 ) -> dict[str, Any]:
     """mcp-stdio 模式：提交 N 个 worker 并 file-poll 至完成。
 
@@ -510,14 +521,43 @@ def run_fanout(
     cap = max(1, min(cap, len(workers))) if workers else 1
     if level > cap:
         level = cap
-    probe = mem_probe_fn or memory_used_percent
+    mem_probe = mem_probe_fn or memory_used_percent
+    cpu_probe = cpu_probe_fn or cpu_used_percent
+    disk_probe = disk_probe_fn or (lambda: disk_free_gb(output_root_of(contract)))
     rg = contract.get("resource_gate") or {}
     if isinstance(rg, dict) and rg.get("memory_threshold") is not None:
         try:
             memory_threshold = float(rg.get("memory_threshold"))
         except (TypeError, ValueError):
             pass
+    if isinstance(rg, dict):
+        def _number(name: str, current: float | None) -> float | None:
+            value = rg.get(name)
+            if value is None:
+                return current
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return current
+
+        memory_scale_up_percent = _number("memory_scale_up_percent", memory_scale_up_percent)
+        memory_hold_percent = _number("memory_hold_percent", memory_hold_percent)
+        cpu_scale_up_percent = _number("cpu_scale_up_percent", cpu_scale_up_percent)
+        cpu_hold_percent = _number("cpu_hold_percent", cpu_hold_percent)
+        min_disk_free_gb_scale_up = _number("min_disk_free_gb_scale_up", min_disk_free_gb_scale_up)
+        min_disk_free_gb_hold = _number("min_disk_free_gb_hold", min_disk_free_gb_hold)
+        if rg.get("upload_backlog_hold") is not None:
+            upload_backlog_hold = int(rg["upload_backlog_hold"])
+        if rg.get("healthy_samples_for_scale_up") is not None:
+            healthy_samples_for_scale_up = int(rg["healthy_samples_for_scale_up"])
+        if upload_backlog_probe_fn is None and rg.get("upload_backlog_dir"):
+            upload_backlog_probe_fn = lambda: upload_backlog_count(str(rg["upload_backlog_dir"]))
+    memory_scale_up_percent = memory_threshold if memory_scale_up_percent is None else memory_scale_up_percent
+    memory_hold_percent = memory_threshold if memory_hold_percent is None else memory_hold_percent
+    healthy_samples_for_scale_up = max(1, int(healthy_samples_for_scale_up))
+    upload_probe = upload_backlog_probe_fn or (lambda: 0)
     scale_log: list[dict[str, Any]] = []
+    healthy_streak = 0
 
     # 续跑：仅当显式 reuse_existing 时，已完成的旧产出才计入 done（否则一律重新提交本轮）
     pending: list[str] = []
@@ -537,24 +577,54 @@ def run_fanout(
 
     while (pending or running) and not failed:
         if auto_scale:
-            mem = probe()
+            mem = mem_probe()
+            cpu = cpu_probe()
+            free_gb = disk_probe()
+            upload_backlog = upload_probe()
             old_level = level
             action = "hold"
+            hard_hold = (
+                (mem is not None and mem >= memory_hold_percent)
+                or (cpu_hold_percent is not None and cpu is not None and cpu >= cpu_hold_percent)
+                or (min_disk_free_gb_hold is not None and free_gb is not None and free_gb < min_disk_free_gb_hold)
+                or (upload_backlog_hold is not None and upload_backlog >= upload_backlog_hold)
+            )
+            healthy = (
+                mem is not None and mem < memory_scale_up_percent
+                and (cpu_scale_up_percent is None or (cpu is not None and cpu < cpu_scale_up_percent))
+                and (min_disk_free_gb_scale_up is None or (free_gb is not None and free_gb >= min_disk_free_gb_scale_up))
+                and (upload_backlog_hold is None or upload_backlog < upload_backlog_hold)
+            )
+            healthy_streak = healthy_streak + 1 if healthy else 0
             if mem is None:
                 action = "hold_mem_unknown"
-            elif mem >= memory_threshold:
+            elif hard_hold:
                 # 回压：不再提交新 worker，等在跑的排空（不杀在跑 job）
                 if level > max(1, len(running)):
                     level = max(1, len(running))
-                    action = "throttle"
-            elif pending and level < cap:
+                action = "throttle"
+            elif pending and level < cap and healthy_streak >= healthy_samples_for_scale_up:
                 level += 1
                 action = "scale_up"
+                healthy_streak = 0
+            elif pending and healthy and healthy_streak < healthy_samples_for_scale_up:
+                action = "hold_health_warmup"
             if action != "hold":
                 scale_log.append({
                     "iteration": iterations,
                     "memory_used_percent": mem,
-                    "memory_threshold": memory_threshold,
+                    "memory_scale_up_percent": memory_scale_up_percent,
+                    "memory_hold_percent": memory_hold_percent,
+                    "cpu_used_percent": cpu,
+                    "cpu_scale_up_percent": cpu_scale_up_percent,
+                    "cpu_hold_percent": cpu_hold_percent,
+                    "disk_free_gb": free_gb,
+                    "min_disk_free_gb_scale_up": min_disk_free_gb_scale_up,
+                    "min_disk_free_gb_hold": min_disk_free_gb_hold,
+                    "upload_backlog": upload_backlog,
+                    "upload_backlog_hold": upload_backlog_hold,
+                    "healthy_streak": healthy_streak,
+                    "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
                     "from_level": old_level,
                     "to_level": level,
                     "action": action,
@@ -658,5 +728,13 @@ def run_fanout(
         "start_max_parallel": int(max_parallel or contract.get("max_parallel") or 1),
         "max_parallel_cap": cap,
         "memory_threshold": memory_threshold,
+        "memory_scale_up_percent": memory_scale_up_percent,
+        "memory_hold_percent": memory_hold_percent,
+        "cpu_scale_up_percent": cpu_scale_up_percent,
+        "cpu_hold_percent": cpu_hold_percent,
+        "min_disk_free_gb_scale_up": min_disk_free_gb_scale_up,
+        "min_disk_free_gb_hold": min_disk_free_gb_hold,
+        "upload_backlog_hold": upload_backlog_hold,
+        "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
         "scale_log": scale_log,
     }

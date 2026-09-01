@@ -56,7 +56,16 @@
         "memory_threshold": {
           "type": "number",
           "description": "Memory percent ceiling for the advise/enforce concurrency decision."
-        }
+        },
+        "memory_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "memory_hold_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "cpu_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "cpu_hold_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "min_disk_free_gb_scale_up": {"type": "number", "minimum": 0},
+        "min_disk_free_gb_hold": {"type": "number", "minimum": 0},
+        "upload_backlog_dir": {"type": "string"},
+        "upload_backlog_hold": {"type": "integer", "minimum": 1},
+        "healthy_samples_for_scale_up": {"type": "integer", "minimum": 1}
       }
     },
     "require_soak_monitor": {

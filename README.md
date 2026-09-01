@@ -2,10 +2,10 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.3` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
+The `v0.4.4` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
 on upstream ClaudeR `0.12.2` / `clauder-mcp 0.14.2`.
 
-**Platform status:** the local `v0.4.3` candidate uses `install.sh` on
+**Platform status:** the local `v0.4.4` candidate uses `install.sh` on
 macOS/Linux. `install.ps1` remains available for the published Windows flow.
 
 ## Skills in This Collection
@@ -40,7 +40,7 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 ```
 
 These commands intentionally use the recovered local candidate branch. There
-is no `v0.4.3` remote tag or release until this branch is reviewed and
+is no `v0.4.4` remote tag or release until this branch is reviewed and
 explicitly published.
 
 On Windows PowerShell:
@@ -185,6 +185,7 @@ Installer prerequisites:
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
 | `v0.4.3` | local fork based on upstream `0.12.2` | Updates the strict MCP tool surface to all 40 ClaudeR tools, including Coordination v2, screening, cross-reference reconciliation, citation, notebook, and codebook workflows, while retaining the fork's safe PID and async-progress compatibility. |
+| `v0.4.4` | local CMAverse Mac candidate | Adds CPU/disk/upload-backlog aware fan-out admission while preserving the `MCP_STDIO_OK` transport boundary and the v0.4.3 ClaudeR 0.12.2 compatibility surface. |
 | `v0.4.2` | local fork based on upstream `0.8.1` | Extends resource-gate freshness to 120 minutes for long soaks and records the selected gate age while retaining the recoverable monitor introduced in v0.4.1. |
 | `v0.4.1` | local fork based on upstream `0.8.1` | Adds recoverable long-soak monitoring, exact scheduled heartbeat accounting, supervised checkpoint recovery, macOS-safe process enumeration, and a monitor-aware formal completion gate. |
 | `v0.4.0` | local fork based on upstream `0.8.1` | Adds macOS/Linux installers and harness entrypoints, platform-aware doctor/provenance checks, POSIX resource sampling, and retains async progress, parallel metadata, Copilot support, and safe Windows PID discovery. |

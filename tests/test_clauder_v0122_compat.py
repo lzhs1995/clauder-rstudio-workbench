@@ -51,7 +51,7 @@ EXPECTED_V0122_TOOLS = {
 
 class ClaudeRV0122CompatibilityTests(unittest.TestCase):
     def test_workbench_candidate_version(self) -> None:
-        self.assertEqual(__version__, "0.4.3")
+        self.assertEqual(__version__, "0.4.4")
 
     def test_exact_40_tool_surface(self) -> None:
         self.assertEqual(len(EXPECTED_R_STUDIO_TOOLS), 40)
