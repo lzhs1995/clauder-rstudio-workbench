@@ -483,6 +483,7 @@ def run_fanout(
     min_disk_free_gb_hold: float | None = None,
     upload_backlog_hold: int | None = None,
     healthy_samples_for_scale_up: int = 1,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """mcp-stdio 模式：提交 N 个 worker 并 file-poll 至完成。
 
@@ -680,6 +681,40 @@ def run_fanout(
             if elapsed_min > job_timeout_min:
                 running.pop(wid, None)
                 failed.append(wid)
+
+        if progress_callback:
+            latest_by_worker: dict[str, dict[str, Any]] = {}
+            for entry in progress_log:
+                worker_id = str(entry.get("id") or "")
+                if worker_id:
+                    latest_by_worker[worker_id] = entry
+            snapshot = {
+                "iteration": iterations,
+                "done": list(done),
+                "failed": list(failed),
+                "pending": list(pending),
+                "running": [
+                    {
+                        "id": worker_id,
+                        "job_id": details.get("job_id"),
+                        "submitted_at": details.get("submitted_at"),
+                        "latest_poll": latest_by_worker.get(worker_id),
+                    }
+                    for worker_id, details in running.items()
+                ],
+                "max_parallel": level,
+                "scale_event": scale_log[-1] if scale_log else None,
+            }
+            try:
+                progress_callback(snapshot)
+            except Exception as exc:
+                progress_log.append({
+                    "iteration": iterations,
+                    "id": "__progress_callback__",
+                    "job_id": None,
+                    "ok": False,
+                    "text": f"{type(exc).__name__}: {exc}",
+                })
 
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:

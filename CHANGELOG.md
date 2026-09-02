@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.4.5 - cross-platform candidate, 2026-09-02
+
+- Add an explicit `--defer-native-smoke` compute-first mode to `fanout-plan`,
+  `fanout-run`, `fanout-poll`, and `merge-gate`. It is OS-independent, keeps
+  the real worker transport labelled `MCP_STDIO_OK`, records
+  `NATIVE-SMOKE-DEFERRED`, and deliberately leaves formal `completion-check`
+  blocked until a fresh native-wrapper smoke is supplied.
+- Write `<output_root>/fanout_runtime_status.json` atomically on every fan-out
+  polling iteration and emit flushed `FANOUT_PROGRESS` lines containing the
+  unchanged job IDs, done/running/pending counts, and failures.
+- Document that an already-running agent task cannot reliably hot-add a newly
+  configured MCP wrapper on Windows or macOS. Persistent bridge diagnosis and
+  MCP stdio computation can continue without falsely claiming
+  `NATIVE_MCP_OK`.
+- Refresh the compatibility target to upstream ClaudeR 0.14.1 and bridge
+  0.14.5, including unified home resolution, preserved MCP environment,
+  Windows-safe liveness checks, and console-output logging fixes.
+
+## v0.4.4 - local candidate, 2026-09-02
+
+- Add CPU, disk-free, and upload-backlog admission signals to memory-aware
+  fan-out scaling for the CMAverse archival workflow.
+- Redact ClaudeR discovery tokens from doctor evidence while retaining session
+  health and provenance fields needed for diagnosis.
+
 ## v0.4.3 - local candidate, 2026-08-22
 
 - Pair the local workbench with the fork rebased on upstream ClaudeR 0.12.2

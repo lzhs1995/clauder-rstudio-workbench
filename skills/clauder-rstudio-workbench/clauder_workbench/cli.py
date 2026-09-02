@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -565,10 +566,16 @@ def _contract_requires_native_smoke(contract: dict[str, Any]) -> bool:
     return transport in {"native-wrapper", "native_wrapper", "native"}
 
 
-def _native_smoke_gate(contract: dict[str, Any], parent_evidence: list[str] | None, task_key: str | None = None) -> tuple[bool, list[str], list[dict[str, Any]]]:
+def _native_smoke_gate(
+    contract: dict[str, Any],
+    parent_evidence: list[str] | None,
+    task_key: str | None = None,
+    *,
+    allow_deferred: bool = False,
+) -> tuple[bool, bool, list[str], list[dict[str, Any]]]:
     parent_docs, reasons = _load_parent_docs(parent_evidence)
     if not _contract_requires_native_smoke(contract):
-        return True, reasons, parent_docs
+        return True, False, reasons, parent_docs
     max_age = 60.0
     native_cfg = contract.get("native_smoke") or {}
     if isinstance(native_cfg, dict) and native_cfg.get("max_age_min") is not None:
@@ -578,13 +585,20 @@ def _native_smoke_gate(contract: dict[str, Any], parent_evidence: list[str] | No
             pass
     key = task_key or contract.get("task_key")
     if not _native_smoke_parent_ok(parent_docs, str(key) if key else None, max_age):
+        if allow_deferred:
+            reasons.append(
+                "native smoke explicitly deferred for MCP stdio computation only; "
+                "transport remains MCP_STDIO_OK and formal completion must still supply "
+                "fresh NATIVE_MCP_OK evidence"
+            )
+            return True, True, reasons, parent_docs
         reasons.append(
             "contract requires fresh native_smoke parent evidence with transport_class=NATIVE_MCP_OK and four chained record parent ids; "
             "run native-smoke start -> native list_sessions/execute_r/execute_r_async/get_async_result -> "
             "native-smoke record/complete first"
         )
-        return False, reasons, parent_docs
-    return True, reasons, parent_docs
+        return False, False, reasons, parent_docs
+    return True, False, reasons, parent_docs
 
 
 def _agent_from_tool_layer(steps: dict[str, Any]) -> str | None:
@@ -1435,7 +1449,15 @@ def cmd_worker_lint(args: argparse.Namespace) -> int:
 def cmd_fanout_plan(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     task_key = contract.get("task_key") or "fanout"
-    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    native_ok, native_deferred, native_reasons, parent_docs = _native_smoke_gate(
+        contract,
+        args.parent_evidence,
+        task_key,
+        allow_deferred=(
+            args.defer_native_smoke
+            and str(contract.get("transport") or "mcp-stdio").lower() == "mcp-stdio"
+        ),
+    )
     if not native_ok:
         doc = build_evidence(
             "fanout_plan",
@@ -1457,19 +1479,24 @@ def cmd_fanout_plan(args: argparse.Namespace) -> int:
                 submit_codes[worker["id"]] = build_submit_code(worker)
             except Exception as exc:
                 submit_codes[worker["id"]] = f"<error: {exc}>"
-    exit_code = PASS if plan["ok"] else CONTRACT_FAILED
-    decision = "PASS" if plan["ok"] else "CONTRACT_FAILED"
-    reasons = plan["problems"] or [
+    exit_code = WARN if plan["ok"] and native_deferred else PASS if plan["ok"] else CONTRACT_FAILED
+    decision = "WARN_NATIVE_DEFERRED" if plan["ok"] and native_deferred else "PASS" if plan["ok"] else "CONTRACT_FAILED"
+    reasons = native_reasons + (plan["problems"] or [
         f"{plan['worker_count']} workers planned; recommended start parallel={plan['recommended_max_parallel']} ({plan['advice_reason']})"
-    ]
+    ])
     doc = build_evidence(
         "fanout_plan",
         decision,
         reasons=reasons,
         parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
         task_key=plan["task_key"],
+        policy_violations=["NATIVE-SMOKE-DEFERRED"] if native_deferred else [],
         exit_code=exit_code,
-        extra=plan | {"submit_codes": submit_codes, "contract": str(args.contract)},
+        extra=plan | {
+            "submit_codes": submit_codes,
+            "contract": str(args.contract),
+            "native_smoke_deferred": native_deferred,
+        },
     )
     return emit(doc)
 
@@ -1478,7 +1505,12 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     transport = (args.transport or contract.get("transport") or "mcp-stdio").lower()
     task_key = contract.get("task_key") or "fanout"
-    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    native_ok, native_deferred, native_reasons, parent_docs = _native_smoke_gate(
+        contract,
+        args.parent_evidence,
+        task_key,
+        allow_deferred=args.defer_native_smoke and transport == "mcp-stdio",
+    )
     if not native_ok:
         doc = build_evidence(
             "fanout_run",
@@ -1513,15 +1545,21 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
     job_timeout = float(args.job_timeout_min or contract.get("job_timeout_min") or 180.0)
     if args.dry_run:
         plan = plan_fanout(contract, advise_parallel=True)
+        dry_ok = bool(plan["ok"])
         doc = build_evidence(
             "fanout_run",
-            "PASS" if plan["ok"] else "CONTRACT_FAILED",
-            reasons=["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
+            "WARN_NATIVE_DEFERRED" if dry_ok and native_deferred else "PASS" if dry_ok else "CONTRACT_FAILED",
+            reasons=native_reasons + ["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
             parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
             task_key=task_key,
             transport_class="N/A",
-            exit_code=PASS if plan["ok"] else CONTRACT_FAILED,
-            extra=plan | {"dry_run": True, "contract": str(args.contract)},
+            policy_violations=["NATIVE-SMOKE-DEFERRED"] if native_deferred else [],
+            exit_code=WARN if dry_ok and native_deferred else PASS if dry_ok else CONTRACT_FAILED,
+            extra=plan | {
+                "dry_run": True,
+                "contract": str(args.contract),
+                "native_smoke_deferred": native_deferred,
+            },
         )
         return emit(doc)
 
@@ -1550,6 +1588,56 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
             retries=0,
         )
 
+    artifacts = contract.get("artifacts") or {}
+    output_root = Path(str(artifacts.get("output_root") or Path(args.contract).resolve().parent)).expanduser()
+    if not output_root.is_absolute():
+        output_root = Path(str(contract.get("_contract_path") or args.contract)).resolve().parent / output_root
+    output_root = output_root.resolve()
+    if args.progress_file:
+        progress_path = Path(args.progress_file).expanduser()
+        if not progress_path.is_absolute():
+            progress_path = output_root / progress_path
+        progress_path = progress_path.resolve()
+    else:
+        progress_path = output_root / "fanout_runtime_status.json"
+    worker_total = len([w for w in (contract.get("workers") or []) if isinstance(w, dict)])
+
+    def progress_callback(snapshot: dict[str, Any]) -> None:
+        payload = {
+            "schema_version": "1.0",
+            "task_key": task_key,
+            "transport_class": "MCP_STDIO_OK",
+            "native_smoke_deferred": native_deferred,
+            "updated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "worker_total": worker_total,
+            **snapshot,
+        }
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = progress_path.with_name(progress_path.name + f".tmp-{os.getpid()}")
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, progress_path)
+        if os.name != "nt":
+            directory_fd = os.open(progress_path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        running = ",".join(
+            f"{item.get('id')}:{item.get('job_id')}" for item in snapshot.get("running", [])
+        ) or "none"
+        print(
+            f"FANOUT_PROGRESS task={task_key} iteration={snapshot.get('iteration')} "
+            f"done={len(snapshot.get('done', []))}/{worker_total} "
+            f"running={running} pending={len(snapshot.get('pending', []))} "
+            f"failed={snapshot.get('failed', [])}",
+            file=sys.stderr,
+            flush=True,
+        )
+
     result = run_fanout(
         contract,
         submit_fn=submit_fn,
@@ -1572,13 +1660,13 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         min_disk_free_gb_hold=args.min_disk_free_gb_hold,
         upload_backlog_hold=args.upload_backlog_hold,
         healthy_samples_for_scale_up=args.healthy_samples_for_scale_up,
+        progress_callback=progress_callback,
     )
     for wid in result.get("done", []):
         archive_inflight(f"{task_key}:{wid}", "worker complete")
-    exit_code = PASS if result["ok"] else BLOCK
-    decision = "PASS" if result["ok"] else "BLOCK"
-    worker_total = len([w for w in (contract.get("workers") or []) if isinstance(w, dict)])
-    reasons = [
+    exit_code = WARN if result["ok"] and native_deferred else PASS if result["ok"] else BLOCK
+    decision = "PASS_WITH_NATIVE_DEFERRED" if result["ok"] and native_deferred else "PASS" if result["ok"] else "BLOCK"
+    reasons = native_reasons + [
         f"done={len(result.get('done', []))}/{worker_total} workers; "
         f"failed={result.get('failed')}; pending={result.get('pending')}; "
         f"still_running={result.get('still_running')}; max_parallel={result.get('max_parallel')}"
@@ -1594,8 +1682,14 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         task_key=task_key,
         transport_class=result.get("transport_class", "MCP_STDIO_OK"),
         session_name=session_name,
+        artifact_paths=[str(progress_path)],
+        policy_violations=["NATIVE-SMOKE-DEFERRED"] if native_deferred else [],
         exit_code=exit_code,
-        extra=result | {"contract": str(args.contract)},
+        extra=result | {
+            "contract": str(args.contract),
+            "native_smoke_deferred": native_deferred,
+            "progress_file": str(progress_path),
+        },
     )
     return emit(doc)
 
@@ -1603,7 +1697,15 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
 def cmd_fanout_poll(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     task_key = contract.get("task_key") or "fanout"
-    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    native_ok, native_deferred, native_reasons, parent_docs = _native_smoke_gate(
+        contract,
+        args.parent_evidence,
+        task_key,
+        allow_deferred=(
+            args.defer_native_smoke
+            and str(contract.get("transport") or "mcp-stdio").lower() == "mcp-stdio"
+        ),
+    )
     if not native_ok:
         doc = build_evidence(
             "fanout_poll",
@@ -1618,9 +1720,9 @@ def cmd_fanout_poll(args: argparse.Namespace) -> int:
         )
         return emit(doc)
     poll = poll_once(contract)
-    exit_code = PASS if poll["all_complete"] else WARN
-    decision = "PASS" if poll["all_complete"] else "WARN"
-    reasons = [
+    exit_code = WARN if native_deferred or not poll["all_complete"] else PASS
+    decision = "PASS_WITH_NATIVE_DEFERRED" if poll["all_complete"] and native_deferred else "PASS" if poll["all_complete"] else "WARN"
+    reasons = native_reasons + [
         f"done={len(poll['done'])}/{poll['worker_count']}; pending={poll['pending']}"
     ]
     doc = build_evidence(
@@ -1629,8 +1731,9 @@ def cmd_fanout_poll(args: argparse.Namespace) -> int:
         reasons=reasons,
         parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
         task_key=task_key,
+        policy_violations=["NATIVE-SMOKE-DEFERRED"] if native_deferred else [],
         exit_code=exit_code,
-        extra=poll | {"contract": str(args.contract)},
+        extra=poll | {"contract": str(args.contract), "native_smoke_deferred": native_deferred},
     )
     return emit(doc)
 
@@ -1638,7 +1741,15 @@ def cmd_fanout_poll(args: argparse.Namespace) -> int:
 def cmd_merge_gate(args: argparse.Namespace) -> int:
     contract = load_fanout_contract(args.contract)
     task_key = contract.get("task_key") or "fanout"
-    native_ok, native_reasons, parent_docs = _native_smoke_gate(contract, args.parent_evidence, task_key)
+    native_ok, native_deferred, native_reasons, parent_docs = _native_smoke_gate(
+        contract,
+        args.parent_evidence,
+        task_key,
+        allow_deferred=(
+            args.defer_native_smoke
+            and str(contract.get("transport") or "mcp-stdio").lower() == "mcp-stdio"
+        ),
+    )
     if not native_ok:
         doc = build_evidence(
             "merge_gate",
@@ -1659,15 +1770,17 @@ def cmd_merge_gate(args: argparse.Namespace) -> int:
             p = s["files"].get(key, {}).get("path")
             if p:
                 artifact_paths.append(p)
-    if gate["ok"]:
+    if gate["ok"] and native_deferred:
+        exit_code, decision = WARN, "PASS_WITH_NATIVE_DEFERRED"
+    elif gate["ok"]:
         exit_code, decision = PASS, "PASS"
     elif gate["all_complete"]:
         exit_code, decision = BLOCK, "BLOCK"
     else:
         exit_code, decision = CONTRACT_FAILED, "CONTRACT_FAILED"
-    reasons = gate["violations"] or [
+    reasons = native_reasons + (gate["violations"] or [
         f"all {gate['worker_count']} workers complete with manifest+validation present"
-    ]
+    ])
     doc = build_evidence(
         "merge_gate",
         decision,
@@ -1675,9 +1788,9 @@ def cmd_merge_gate(args: argparse.Namespace) -> int:
         parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
         task_key=task_key,
         artifact_paths=artifact_paths,
-        policy_violations=gate["violations"],
+        policy_violations=gate["violations"] + (["NATIVE-SMOKE-DEFERRED"] if native_deferred else []),
         exit_code=exit_code,
-        extra=gate | {"contract": str(args.contract)},
+        extra=gate | {"contract": str(args.contract), "native_smoke_deferred": native_deferred},
     )
     return emit(doc)
 
@@ -1844,12 +1957,24 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("fanout-plan")
     p.add_argument("--contract", required=True)
     p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
+    p.add_argument(
+        "--defer-native-smoke",
+        action="store_true",
+        help="Allow MCP stdio computation planning before native-wrapper smoke. "
+             "Evidence is marked NATIVE-SMOKE-DEFERRED and formal completion remains blocked.",
+    )
     p.add_argument("--no-advise", action="store_true",
                    help="Skip memory-based parallelism advice; only validate the contract.")
 
     p = sub.add_parser("fanout-run")
     p.add_argument("--contract", required=True)
     p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
+    p.add_argument(
+        "--defer-native-smoke",
+        action="store_true",
+        help="Explicit compute-first mode for an unavailable current native tool registry. "
+             "Uses real MCP stdio, never claims NATIVE_MCP_OK, and cannot satisfy completion-check.",
+    )
     p.add_argument("--transport", choices=["mcp-stdio", "native-wrapper"], default=None)
     p.add_argument("--session-name", default="")
     p.add_argument("--max-parallel", type=int)
@@ -1887,16 +2012,24 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Consecutive healthy samples required before raising concurrency by one.")
     p.add_argument("--max-parallel-cap", type=int,
                    help="Hard upper bound for --auto-scale concurrency (default: worker count).")
+    p.add_argument(
+        "--progress-file",
+        help="Atomic live fan-out status JSON. Defaults to <output_root>/fanout_runtime_status.json.",
+    )
     p.add_argument("--dry-run", action="store_true",
                    help="Validate contract and report plan without submitting any jobs.")
 
     p = sub.add_parser("fanout-poll")
     p.add_argument("--contract", required=True)
     p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
+    p.add_argument("--defer-native-smoke", action="store_true",
+                   help="Read durable progress before native smoke; final completion remains blocked.")
 
     p = sub.add_parser("merge-gate")
     p.add_argument("--contract", required=True)
     p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
+    p.add_argument("--defer-native-smoke", action="store_true",
+                   help="Run scientific merge checks before native smoke without claiming NATIVE_MCP_OK.")
 
     return parser
 

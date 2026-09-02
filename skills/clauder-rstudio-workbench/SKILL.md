@@ -99,6 +99,16 @@ Run many independent R workers from one RStudio session and gate the autonomous 
 
 `fanout-run` submits via an independent Python MCP stdio client and labels evidence `MCP_STDIO_OK`; it BLOCKs `--transport native-wrapper`. For native-wrapper fan-out, use `fanout-plan` to emit each worker's submit code, submit it via your own wrapper, record real job ids with `async-guard register-job`, then poll with `fanout-poll`/`merge-gate`. Stale prior-run outputs do not count unless you pass `--reuse-existing` (resume) or the worker output is within `artifacts.max_age_h`.
 
+Every `fanout-run` polling cycle atomically refreshes
+`<output_root>/fanout_runtime_status.json` and prints a flushed
+`FANOUT_PROGRESS` line containing the original job ids and the
+done/running/pending/failed counts. An agent task whose native wrapper was not
+registered when the task started may explicitly use `--defer-native-smoke`
+after a real MCP stdio probe. This compute-first escape hatch is identical on
+Windows and macOS: evidence is marked `NATIVE-SMOKE-DEFERRED`, never
+`NATIVE_MCP_OK`, and strict completion still requires a fresh four-step native
+smoke. Do not use this flag to hide a failed wrapper or to claim final success.
+
 ### Transport Evidence Boundary
 
 - Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
@@ -128,8 +138,8 @@ On macOS, `install.sh --configure-codex` installs that executable with
 `uv tool install --force --from <USER_HOME>/projects/ClaudeR/clauder-mcp
 clauder-mcp`. Windows uses `install.ps1 -ConfigureCodex`,
 `clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The local Mac
-candidate is the user-maintained fork branch based on upstream ClaudeR `0.12.2`
-and MCP bridge `0.14.2`. Never use bare `uvx clauder-mcp` or bare
+candidate is the user-maintained fork branch based on upstream ClaudeR `0.14.1`
+and MCP bridge `0.14.5`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
@@ -175,14 +185,15 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This local skill collection release `v0.4.4` candidate is paired with the
-`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.12.2` and MCP
-bridge `0.14.2`. The collection includes this workbench skill and the companion
+This local skill collection release `v0.4.5` candidate is paired with the
+`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.14.1` and MCP
+bridge `0.14.5`. The collection includes this workbench skill and the companion
 `cmaverse-paired-mval` skill.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, and the local `v0.4.4` candidate, inherit that
+`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, `v0.4.4`, and the local `v0.4.5`
+candidate inherit that
 config-writer fix.

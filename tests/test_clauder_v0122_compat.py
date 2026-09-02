@@ -49,9 +49,9 @@ EXPECTED_V0122_TOOLS = {
 }
 
 
-class ClaudeRV0122CompatibilityTests(unittest.TestCase):
+class ClaudeRV0141CompatibilityTests(unittest.TestCase):
     def test_workbench_candidate_version(self) -> None:
-        self.assertEqual(__version__, "0.4.4")
+        self.assertEqual(__version__, "0.4.5")
 
     def test_exact_40_tool_surface(self) -> None:
         self.assertEqual(len(EXPECTED_R_STUDIO_TOOLS), 40)
@@ -61,8 +61,8 @@ class ClaudeRV0122CompatibilityTests(unittest.TestCase):
         readme = Path("README.md").read_text(encoding="utf-8")
         skill = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
         for text in (readme, skill):
-            self.assertIn("ClaudeR `0.12.2`", text)
-            self.assertIn("0.14.2", text)
+            self.assertIn("ClaudeR `0.14.1`", text)
+            self.assertIn("0.14.5", text)
 
 
 if __name__ == "__main__":

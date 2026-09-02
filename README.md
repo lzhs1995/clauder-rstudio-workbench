@@ -2,11 +2,13 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.4` candidate pairs with the local `lzhs1995/ClaudeR` fork branch based
-on upstream ClaudeR `0.12.2` / `clauder-mcp 0.14.2`.
+The `v0.4.5` candidate is cross-platform and targets upstream ClaudeR `0.14.1`
+/ `clauder-mcp 0.14.5` while retaining strict native provenance and durable
+async progress.
 
-**Platform status:** the local `v0.4.4` candidate uses `install.sh` on
-macOS/Linux. `install.ps1` remains available for the published Windows flow.
+**Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
+supports Windows. Both configure a persistent platform-native `clauder-mcp`
+entry and share the same fan-out, progress, resource, and completion gates.
 
 ## Skills in This Collection
 
@@ -39,14 +41,14 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-These commands intentionally use the recovered local candidate branch. There
-is no `v0.4.4` remote tag or release until this branch is reviewed and
+These commands intentionally use the local `v0.4.5` candidate branch. There
+is no `v0.4.5` remote tag or release until this branch is reviewed and
 explicitly published.
 
 On Windows PowerShell:
 
 ```powershell
-git clone --branch v0.3.4 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -127,6 +129,20 @@ in the skill: `fanout-plan` → native submit → `async-guard register-job` →
 `fanout-poll` → `merge-gate`. See `skills/cmaverse-paired-mval/SKILL.md` for the full
 workflow and the worker contract.
 
+Every `fanout-run` polling cycle atomically refreshes
+`<output_root>/fanout_runtime_status.json` and emits a flushed
+`FANOUT_PROGRESS` line with the original job IDs and
+done/running/pending/failed counts. Use `--progress-file <absolute.json>` to
+override the status path.
+
+If the current agent task was created before its native MCP wrapper was
+registered, its tool registry cannot reliably hot-add that wrapper on either
+Windows or macOS. After an independent `MCP_STDIO_OK` probe, an explicitly
+authorized compute-first run may use `--defer-native-smoke`. This does not
+weaken provenance: evidence is marked `NATIVE-SMOKE-DEFERRED`, never
+`NATIVE_MCP_OK`, and formal `completion-check` remains blocked until a fresh
+four-step native smoke is attached.
+
 For a formal long soak, start the recoverable monitor before submitting native
 workers and require its evidence at completion:
 
@@ -184,6 +200,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Adds OS-independent compute-first native deferral with an unchanged strict completion gate, plus atomic live fan-out status containing the original async job IDs. |
 | `v0.4.3` | local fork based on upstream `0.12.2` | Updates the strict MCP tool surface to all 40 ClaudeR tools, including Coordination v2, screening, cross-reference reconciliation, citation, notebook, and codebook workflows, while retaining the fork's safe PID and async-progress compatibility. |
 | `v0.4.4` | local CMAverse Mac candidate | Adds CPU/disk/upload-backlog aware fan-out admission while preserving the `MCP_STDIO_OK` transport boundary and the v0.4.3 ClaudeR 0.12.2 compatibility surface. |
 | `v0.4.2` | local fork based on upstream `0.8.1` | Extends resource-gate freshness to 120 minutes for long soaks and records the selected gate age while retaining the recoverable monitor introduced in v0.4.1. |
@@ -240,7 +257,8 @@ stable colleague install path.
 
 After installation:
 
-1. Restart Codex.
+1. Restart Codex only when MCP configuration or bridge source changed; an
+   existing task cannot reliably hot-add a new native tool registry.
 2. Start the ClaudeR Addin in RStudio.
 3. Ask Codex to connect with `$clauder 连接Rstudio`.
 4. Verify `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test.
@@ -264,8 +282,10 @@ Current validation status:
   suite, MCP stdio handshake, real RStudio workflows, multi-session cleanup,
   and a three-worker async fan-out with strict completion evidence.
 - A git-subdirectory MCP runtime smoke has passed when a live RStudio ClaudeR Addin session is available.
-- Native Codex wrapper evidence still requires a Codex task restart after MCP
-  configuration changes; MCP stdio evidence must not be relabeled `NATIVE_MCP_OK`.
+- Native Codex wrapper evidence still requires a fresh task/process registry
+  after MCP configuration changes; MCP stdio evidence must not be relabeled
+  `NATIVE_MCP_OK`. Explicit `--defer-native-smoke` can keep computation moving,
+  but cannot make formal completion pass.
 - A clean-VM or colleague-machine validation remains the final gate before broad rollout.
 
 ## Troubleshooting
@@ -328,7 +348,7 @@ Do not start long fan-out work after a single `Transport closed`.
 
 Do not use an unpatched ClaudeR build whose stale discovery cleanup uses
 `tools::pskill(pid, signal = 0)`. Install the maintained fork branch based on
-ClaudeR 0.12.2 (or the older Windows `v0.2.0-lzhs.1` release), restart RStudio,
+ClaudeR 0.14.1 (or the older Windows `v0.2.0-lzhs.1` release), restart RStudio,
 then rerun a multi-session safety check before trusting concurrent sessions.
 
 ### `Latest progress:` does not appear

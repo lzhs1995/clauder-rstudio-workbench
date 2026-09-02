@@ -135,6 +135,18 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 - `merge-gate`: `0 PASS` / `5 CONTRACT_FAILED` (not all complete) / `3 BLOCK`
   (all complete but with violations such as stale outputs).
 
+Every `fanout-run` poll atomically writes
+`<output_root>/fanout_runtime_status.json` and emits a flushed
+`FANOUT_PROGRESS` line containing the original job ids. Use
+`--progress-file <absolute.json>` to select another durable status path.
+
+When a task-local native wrapper is unavailable because its tool registry was
+frozen at task creation, `--defer-native-smoke` permits an explicitly authorized
+MCP stdio computation on both Windows and macOS. The command returns WARN even
+when the scientific workers pass, records `NATIVE-SMOKE-DEFERRED`, and leaves
+strict completion blocked until fresh four-step `NATIVE_MCP_OK` evidence is
+attached. The default remains strict and blocks before submission.
+
 ## Dynamic concurrency
 
 `fanout-run` treats `--max-parallel` as the starting concurrency ceiling. Without

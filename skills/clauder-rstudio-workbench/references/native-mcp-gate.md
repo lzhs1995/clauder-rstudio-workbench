@@ -10,6 +10,15 @@ native `mcp__r_studio__` wrapper path. The Python harness cannot call the native
 wrapper directly. It can only record and validate evidence produced by the
 agent tool layer.
 
+If a task was created before the wrapper was registered, the task-local tool
+registry may remain frozen on either Windows or macOS even while the configured
+`clauder-mcp` server is healthy. After a real `MCP_STDIO_OK` probe, an explicitly
+authorized compute-first fan-out may use `--defer-native-smoke`. That option
+only permits MCP stdio computation and durable polling: it records
+`NATIVE-SMOKE-DEFERRED`, never satisfies this gate, and cannot make strict
+completion pass. A fresh task with the wrapper must still run the four native
+steps below before final success is claimed.
+
 ## Required sequence
 
 ```powershell
