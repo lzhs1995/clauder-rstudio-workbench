@@ -200,7 +200,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
-| `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Adds OS-independent compute-first native deferral with an unchanged strict completion gate, plus atomic live fan-out status containing the original async job IDs. |
+| `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Requires the complete 41-tool surface (including `suggest_edit`), adds OS-independent compute-first native deferral with an unchanged strict completion gate, and writes atomic live fan-out status containing the original async job IDs. |
 | `v0.4.3` | local fork based on upstream `0.12.2` | Updates the strict MCP tool surface to all 40 ClaudeR tools, including Coordination v2, screening, cross-reference reconciliation, citation, notebook, and codebook workflows, while retaining the fork's safe PID and async-progress compatibility. |
 | `v0.4.4` | local CMAverse Mac candidate | Adds CPU/disk/upload-backlog aware fan-out admission while preserving the `MCP_STDIO_OK` transport boundary and the v0.4.3 ClaudeR 0.12.2 compatibility surface. |
 | `v0.4.2` | local fork based on upstream `0.8.1` | Extends resource-gate freshness to 120 minutes for long soaks and records the selected gate age while retaining the recoverable monitor introduced in v0.4.1. |

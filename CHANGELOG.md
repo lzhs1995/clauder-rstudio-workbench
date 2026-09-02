@@ -17,6 +17,8 @@
 - Refresh the compatibility target to upstream ClaudeR 0.14.1 and bridge
   0.14.5, including unified home resolution, preserved MCP environment,
   Windows-safe liveness checks, and console-output logging fixes.
+- Require the complete 41-tool ClaudeR 0.14.1 surface, including the new
+  `suggest_edit` tool, so a current bridge is not rejected as incompatible.
 
 ## v0.4.4 - local candidate, 2026-09-02
 
