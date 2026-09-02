@@ -2,9 +2,9 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.5` candidate is cross-platform and targets upstream ClaudeR `0.14.1`
-/ `clauder-mcp 0.14.5` while retaining strict native provenance and durable
-async progress.
+The `v0.4.6` candidate is cross-platform and targets the local ClaudeR
+`0.14.1.9001` fork based on upstream ClaudeR `0.14.1` / `clauder-mcp 0.14.5`, while
+retaining strict native provenance and durable async progress.
 
 **Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
 supports Windows. Both configure a persistent platform-native `clauder-mcp`
@@ -41,8 +41,8 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-These commands intentionally use the local `v0.4.5` candidate branch. There
-is no `v0.4.5` remote tag or release until this branch is reviewed and
+These commands intentionally use the local `v0.4.6` candidate branch. There
+is no `v0.4.6` remote tag or release until this branch is reviewed and
 explicitly published.
 
 On Windows PowerShell:
@@ -135,6 +135,11 @@ Every `fanout-run` polling cycle atomically refreshes
 done/running/pending/failed counts. Use `--progress-file <absolute.json>` to
 override the status path.
 
+An explicit bridge response such as `Async job error`, cancelled, or not-found
+is a terminal worker failure and is recorded with the original job ID. A
+connection reset or other transport-only polling error remains retryable and
+never causes the worker to be resubmitted.
+
 If the current agent task was created before its native MCP wrapper was
 registered, its tool registry cannot reliably hot-add that wrapper on either
 Windows or macOS. After an independent `MCP_STDIO_OK` probe, an explicitly
@@ -200,6 +205,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
 | `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Requires the complete 41-tool surface (including `suggest_edit`), adds OS-independent compute-first native deferral with an unchanged strict completion gate, and writes atomic live fan-out status containing the original async job IDs. |
 | `v0.4.3` | local fork based on upstream `0.12.2` | Updates the strict MCP tool surface to all 40 ClaudeR tools, including Coordination v2, screening, cross-reference reconciliation, citation, notebook, and codebook workflows, while retaining the fork's safe PID and async-progress compatibility. |
 | `v0.4.4` | local CMAverse Mac candidate | Adds CPU/disk/upload-backlog aware fan-out admission while preserving the `MCP_STDIO_OK` transport boundary and the v0.4.3 ClaudeR 0.12.2 compatibility surface. |

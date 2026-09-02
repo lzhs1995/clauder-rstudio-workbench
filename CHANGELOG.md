@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.6 - local candidate, 2026-09-03
+
+- Prevent verbose ClaudeR async jobs from stalling on full process stdout or
+  stderr pipes by pairing with ClaudeR `0.14.1.9001` file-backed output.
+- Add `async-io-rescue run/status` for jobs that were already started by an
+  older ClaudeR package. It drains only original job IDs from durable fan-out
+  status and cannot submit, cancel, or restart workers.
+- Make soak-monitor checkpoint and JSONL evidence serialization cycle-safe so
+  a malformed or self-referential MCP result cannot terminate monitoring.
+- Treat explicit `Async job error`/cancelled/not-found responses as terminal
+  fan-out failures while leaving transient MCP transport errors retryable.
+
 ## v0.4.5 - cross-platform candidate, 2026-09-02
 
 - Add an explicit `--defer-native-smoke` compute-first mode to `fanout-plan`,

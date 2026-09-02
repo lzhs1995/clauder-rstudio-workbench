@@ -26,6 +26,7 @@ clauder-workbench doctor
 - `async-guard`: pre-submit/register-job/list/complete/cancel guard with in-flight registry.
 - `resource-gate`: advise/enforce dynamic concurrency.
 - `soak-monitor`: recoverable scheduled resource/progress/heartbeat monitoring for formal long runs.
+- `async-io-rescue`: drains legacy async stdout/stderr pipes using only existing fan-out job IDs.
 - `completion-check`: validates artifacts, evidence, and policy rules.
 
 By default, `transport-classify` and `tool-surface` use independent MCP stdio

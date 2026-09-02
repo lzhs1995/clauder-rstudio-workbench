@@ -242,6 +242,27 @@ def state_is_complete(state: Any) -> bool:
     return str(state).strip().lower() in done
 
 
+def async_poll_terminal_error(result: Any) -> str | None:
+    """Return a durable async terminal error without treating transport loss as job failure."""
+    if not isinstance(result, dict):
+        return None
+    text = str(result.get("text") or result.get("reason") or "").strip()
+    lower = text.lower()
+    if not text or "still running" in lower:
+        return None
+    terminal_prefixes = (
+        "async job error:",
+        "async job failed:",
+        "async job cancelled",
+        "async job canceled",
+    )
+    if lower.startswith(terminal_prefixes):
+        return text
+    if lower.startswith("job ") and (" not found" in lower or " was cancelled" in lower or " was canceled" in lower):
+        return text
+    return None
+
+
 def worker_status(
     contract: dict[str, Any],
     worker: dict[str, Any],
@@ -574,6 +595,7 @@ def run_fanout(
     submit_log: list[dict[str, Any]] = []
     progress_log: list[dict[str, Any]] = []
     final_collect_log: list[dict[str, Any]] = []
+    terminal_failures: list[dict[str, Any]] = []
     iterations = 0
 
     while (pending or running) and not failed:
@@ -652,6 +674,7 @@ def run_fanout(
         for wid in list(running.keys()):
             worker = by_id[wid]
             job_id = running[wid]["job_id"]
+            terminal_error = None
             if poll_fn:
                 try:
                     poll_result = poll_fn(job_id)
@@ -664,6 +687,7 @@ def run_fanout(
                     "ok": bool(poll_result.get("ok")),
                     "text": str(poll_result.get("text") or poll_result.get("reason") or "")[:4000],
                 })
+                terminal_error = async_poll_terminal_error(poll_result)
             # 只有本轮 run 开始后写入的产出才算完成（reuse_existing 时放宽）
             status = worker_status(
                 contract, worker, fresh_after=None if reuse_existing else fresh_boundary
@@ -671,6 +695,16 @@ def run_fanout(
             if status["complete"]:
                 running.pop(wid, None)
                 done.append(wid)
+                continue
+            if terminal_error:
+                running.pop(wid, None)
+                failed.append(wid)
+                terminal_failures.append({
+                    "id": wid,
+                    "job_id": job_id,
+                    "error": terminal_error[:4000],
+                    "iteration": iterations,
+                })
                 continue
             elapsed_min = (time.time() - running[wid]["submitted_at"]) / 60
             no_artifact = not any(f["exists"] for f in status["files"].values())
@@ -757,6 +791,7 @@ def run_fanout(
         "submit_log": submit_log,
         "progress_log": progress_log,
         "final_collect_log": final_collect_log,
+        "terminal_failures": terminal_failures,
         "iterations": iterations,
         "max_parallel": level,
         "auto_scale": auto_scale,
