@@ -24,6 +24,7 @@ from clauder_workbench.cli import (
 )
 from clauder_workbench.evidence import build_evidence, stable_task_key, write_evidence
 from clauder_workbench.inflight import archive_inflight, load_inflight, write_inflight
+from clauder_workbench.installer import update_codex_config
 from clauder_workbench.mcp_client import _retry_if_cold_timeout, _server_args, extract_job_id
 from clauder_workbench.resource import decide_resource_gate
 from clauder_workbench.transport import classify_transport
@@ -68,6 +69,14 @@ class HarnessUnitTests(unittest.TestCase):
     def test_resource_gate_allows_low_memory_ok_io(self) -> None:
         result = decide_resource_gate(memory_override=82.0, io_blocked=False)
         self.assertEqual(result["decision"], "increase_by_1")
+
+    def test_macos_resource_fallback_is_implemented(self) -> None:
+        text = Path(
+            "skills/clauder-rstudio-workbench/clauder_workbench/resource.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('sys.platform == "darwin"', text)
+        self.assertIn('["vm_stat"]', text)
+        self.assertIn('["sysctl", "-n", "hw.memsize"]', text)
 
     def test_resource_gate_holds_high_memory(self) -> None:
         result = decide_resource_gate(memory_override=90.0, io_blocked=False)
@@ -193,7 +202,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.3.4")
+        self.assertEqual(doc["producer_version"], "0.4.5")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -642,11 +651,12 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("WorkbenchBinDir", text)
         self.assertIn("clauder-workbench.cmd", text)
 
-    def test_readme_quickstart_uses_release_tag_and_wrapper(self) -> None:
+    def test_readme_quickstart_uses_local_candidate_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("--branch v0.3.4", text)
-        self.assertIn("releases/download/v0.3.4/clauder-rstudio-workbench-v0.3.4.zip", text)
+        self.assertIn("local `v0.4.5` candidate", text)
+        self.assertIn("no `v0.4.5` remote tag or release", text)
         self.assertIn("clauder-workbench.cmd", text)
+        self.assertIn("./install.sh --clauder-dir", text)
         self.assertIn("-AddHarnessToPath", text)
         # The install/clone/zip/upgrade commands must not point at the old tag.
         self.assertNotIn("--branch v0.2.4", text)
@@ -657,7 +667,7 @@ class HarnessUnitTests(unittest.TestCase):
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.3.4`", text)
+        self.assertIn("skill collection release `v0.4.5`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
@@ -720,17 +730,19 @@ class HarnessUnitTests(unittest.TestCase):
         from clauder_workbench import cli as cli_mod
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            exe = root / "clauder-mcp.exe"
+            bridge = root / "projects" / "ClaudeR" / "clauder-mcp"
+            bridge.mkdir(parents=True)
+            exe = root / ("clauder-mcp.exe" if os.name == "nt" else "clauder-mcp")
             exe.write_text("", encoding="utf-8")
             cfg = root / "config.toml"
             cfg.write_text(
-                f"""[mcp_servers.r-studio]\ncommand = \"{exe.as_posix()}\"\nstartup_timeout_sec = 180.0\n\n[mcp_servers.r-studio.env]\nUSERPROFILE = \"C:/Users/LZHS\"\nPYTHONIOENCODING = \"utf-8\"\nNO_PROXY = \"127.0.0.1,localhost\"\nUV_CACHE_DIR = \"C:/tmp/uv-cache\"\n""",
+                f"""[mcp_servers.r-studio]\ncommand = \"{exe.as_posix()}\"\nstartup_timeout_sec = 180.0\n\n[mcp_servers.r-studio.env]\nHOME = \"{root.as_posix()}\"\nPYTHONIOENCODING = \"utf-8\"\nNO_PROXY = \"127.0.0.1,localhost\"\nUV_CACHE_DIR = \"{(root / 'uv-cache').as_posix()}\"\n""",
                 encoding="utf-8",
             )
             with mock.patch.object(cli_mod, "CODEX_CONFIG", cfg):
                 result = cli_mod._check_codex_rstudio_mcp_config({
                     "clauder_mcp_install_mode": "uv_tool_from_local_lzhs_fork",
-                    "clauder_mcp_source": "C:/Users/LZHS/projects/ClaudeR/clauder-mcp",
+                    "clauder_mcp_source": str(bridge),
                 })
         self.assertTrue(result["ok"], result)
         self.assertTrue(result["persistent_entry"])
@@ -765,13 +777,13 @@ class HarnessUnitTests(unittest.TestCase):
                 result = cli_mod._check_codex_rstudio_mcp_config({})
         self.assertTrue(result["ok"], result)
         self.assertTrue(result["uvx_from_local_bridge"])
-        self.assertTrue(any("dev/diagnostic" in w for w in result["warnings"]))
+        self.assertTrue(any("development" in w for w in result["warnings"]))
 
     def test_mcp_client_prefers_codex_persistent_entry(self) -> None:
         from clauder_workbench import mcp_client as mcp_mod
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            exe = root / "clauder-mcp.exe"
+            exe = root / ("clauder-mcp.exe" if os.name == "nt" else "clauder-mcp")
             exe.write_text("", encoding="utf-8")
             cfg = root / "config.toml"
             cfg.write_text(
@@ -782,6 +794,133 @@ class HarnessUnitTests(unittest.TestCase):
                 command, args = _server_args()
         self.assertEqual(command.replace("\\", "/"), exe.as_posix())
         self.assertEqual(args, [])
+
+    def test_posix_installer_updates_codex_config_without_losing_other_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = root / "config.toml"
+            config.write_text(
+                "[projects.sample]\ntrust_level = \"trusted\"\n\n"
+                "[mcp_servers.r-studio]\ncommand = \"uvx\"\nargs = [\"clauder-mcp\"]\n\n"
+                "[mcp_servers.r-studio.env]\nHOME = \"/old\"\n",
+                encoding="utf-8",
+            )
+            mcp = root / "bin" / "clauder-mcp"
+            mcp.parent.mkdir()
+            mcp.write_text("", encoding="utf-8")
+            update_codex_config(config, mcp, root, root / "uv-cache")
+            text = config.read_text(encoding="utf-8")
+            try:
+                import tomllib
+            except ImportError:  # pragma: no cover - Python 3.10 fallback
+                import tomli as tomllib
+
+            parsed = tomllib.loads(text)
+            self.assertEqual(parsed["projects"]["sample"]["trust_level"], "trusted")
+            self.assertEqual(parsed["mcp_servers"]["r-studio"]["command"], str(mcp))
+            self.assertEqual(parsed["mcp_servers"]["r-studio"]["startup_timeout_sec"], 180.0)
+            self.assertEqual(parsed["mcp_servers"]["r-studio"]["env"]["HOME"], str(root))
+            self.assertEqual(text.count("[mcp_servers.r-studio]"), 1)
+            self.assertTrue(list(root.glob("config.toml.bak_*")))
+
+    def test_posix_entrypoints_are_executable(self) -> None:
+        self.assertTrue(os.access("install.sh", os.X_OK))
+        self.assertTrue(os.access("skills/clauder-rstudio-workbench/harness/run.sh", os.X_OK))
+
+    def test_cli_exposes_candidate_version(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit) as caught, mock.patch("sys.stdout"):
+            parser.parse_args(["--version"])
+        self.assertEqual(caught.exception.code, 0)
+
+    def test_parent_evidence_accepts_repeated_and_grouped_values(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args([
+            "completion-check",
+            "--parent-evidence", "preflight.json", "resource.json",
+            "--parent-evidence", "fanout.json",
+            "--parent-evidence", "merge.json",
+        ])
+        self.assertEqual(
+            args.parent_evidence,
+            ["preflight.json", "resource.json", "fanout.json", "merge.json"],
+        )
+
+    def test_posix_installer_preserves_existing_skill_symlink(self) -> None:
+        from clauder_workbench.installer import _install_skill
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source" / "demo"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("new", encoding="utf-8")
+            target = root / "codex" / "demo"
+            target.mkdir(parents=True)
+            (target / "SKILL.md").write_text("installed", encoding="utf-8")
+            agents = root / "agents"
+            agents.mkdir()
+            link = agents / "demo"
+            link.symlink_to(target, target_is_directory=True)
+
+            installed = _install_skill(source, agents)
+
+            self.assertEqual(installed, link)
+            self.assertTrue(link.is_symlink())
+            self.assertEqual((link / "SKILL.md").read_text(encoding="utf-8"), "installed")
+
+    def test_posix_installer_backup_retention_defaults_to_keep_all(self) -> None:
+        from clauder_workbench.installer import build_parser as build_installer_parser
+
+        args = build_installer_parser().parse_args([])
+        self.assertEqual(args.backup_retention, 0)
+
+    def test_posix_installer_prunes_only_backups_older_than_retention(self) -> None:
+        from clauder_workbench.installer import _prune_skill_backups
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            backups = [root / f"demo_bak_20260819_00000{i}" for i in range(4)]
+            for backup in backups:
+                backup.mkdir()
+
+            removed = _prune_skill_backups(root, "demo", 2)
+
+            self.assertEqual(set(removed), set(backups[:2]))
+            self.assertEqual(
+                sorted(path.name for path in root.glob("demo_bak_*")),
+                sorted(path.name for path in backups[2:]),
+            )
+
+    def test_posix_installer_retention_zero_preserves_backups(self) -> None:
+        from clauder_workbench.installer import _prune_skill_backups
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            backup = root / "demo_bak_20260819_000001"
+            backup.mkdir()
+
+            self.assertEqual(_prune_skill_backups(root, "demo", 0), [])
+            self.assertTrue(backup.exists())
+
+    def test_posix_installer_reads_component_versions(self) -> None:
+        from clauder_workbench.installer import _description_version, _pyproject_version
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            description = root / "DESCRIPTION"
+            description.write_text("Package: ClaudeR\nVersion: 0.8.1\n", encoding="utf-8")
+            pyproject = root / "pyproject.toml"
+            pyproject.write_text('[project]\nname = "clauder-mcp"\nversion = "0.10.0"\n', encoding="utf-8")
+
+            self.assertEqual(_description_version(description), "0.8.1")
+            self.assertEqual(_pyproject_version(pyproject), "0.10.0")
+
+    def test_posix_installer_records_dirty_git_state(self) -> None:
+        from clauder_workbench.installer import _git_dirty
+
+        result = mock.Mock(stdout=" M README.md\n")
+        with mock.patch("clauder_workbench.installer.subprocess.run", return_value=result):
+            self.assertTrue(_git_dirty(Path("/tmp/demo")))
 
     # v0.2.4: install.ps1 UTF-8 + TOML 自检测试
     def test_installer_has_utf8_no_bom_helpers(self) -> None:

@@ -19,7 +19,7 @@ The worker also **records these into `validation_<mediator>.csv`**, and
 
 - `m0_is_full_cmest`, `m1_is_full_cmest` (both TRUE);
 - `m0_effect_n`, `m1_effect_n` == 17;
-- `m0_data_ncol`, `m1_data_ncol` == 159;
+- `m0_data_ncol`, `m1_data_ncol` equal the frozen dataset-specific count;
 - `m0_ref_mval` == 0, `m1_ref_mval` == 1;
 - **boot-hash equality** — the core invariant: `m0_boot_hash` and `m1_boot_hash`
   must both be present, non-empty, and **equal** for every row. This proves M=0
@@ -35,9 +35,14 @@ The worker also **records these into `validation_<mediator>.csv`**, and
   fails the gate. `--no-delta-cde-check` relaxes this but marks the run
   `weak_validation` (not for formal success claims).
 
-The 17-effect and 159-column figures are case-study specific (new4.7 data). When
-porting to another dataset/version, recompute the expected effect count and
-column count from one known-good native `cmest` object and pass them via
+The 17-effect figure is fixed for this case study. The historical Windows
+postprocessed objects had 159 columns only after applying a separate
+`group_object_meta.csv` trimming map. That map is absent from the migrated Mac
+evidence. The hash-frozen Mac input therefore deliberately retains all 203
+columns after adding its two logged variables; it must be validated with
+`--expected-ncol 203`. Never guess a 159-column subset. When porting to another
+dataset/version, recompute the expected effect count and column count from one
+known-good native `cmest` object and pass them via
 `--expected-effects` / `--expected-ncol`. Prefer that over `--no-count-check`,
 which relaxes the gate and marks the result `weak_validation` (not for formal
 success claims). `--no-pairing-check` and `--no-delta-cde-check` likewise
@@ -67,8 +72,14 @@ row fails the gate.
 - every validation row passed;
 - no Rterm abnormal exit;
 - no RData write failure;
-- C-drive free space covered the concurrent write peak;
+- output-drive free space covered the concurrent write peak;
 - if upload is on, upload kept pace and local RData did not pile up.
 
 Absence of a runtime error is **not** sufficient. No durable validation row, no
 completion claim.
+
+For a shard eligible for local deletion, also require a matching Delta CDE,
+Section 3/4 derived files, local SHA-256 and MD5, upload receipt, independent
+remote `file-meta` path/size/MD5/fs_id verification, an fsynced receipt, a
+quarantine move, a second remote metadata check, and an fsynced deletion
+manifest. Upload-response success alone never authorizes deletion.

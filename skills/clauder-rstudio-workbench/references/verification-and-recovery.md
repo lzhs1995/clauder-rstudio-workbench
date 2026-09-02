@@ -8,6 +8,7 @@
 - For long jobs, confirm the same `job_id` reached a terminal state.
 - For formal deliverables, keep durable evidence: logs, CSV, RDS, figures, tables, or manifests.
 - For formal deliverables, run `completion-check --mode formal`; do not report completion when it returns `BLOCK`, `TRANSPORT_UNSTABLE`, or `CONTRACT_FAILED`.
+- For formal soak tests, require a fresh matching `soak_monitor` parent with `--require-soak-monitor`; merge success alone does not satisfy monitoring continuity.
 - Use `--require-file` constraints such as `min_rows`, `min_bytes`, `max_age_h`, and `output_root` so stale or tiny files cannot pass as durable evidence.
 - Use `--require-transport-class` and `--require-preflight` when the task requires native MCP evidence.
 

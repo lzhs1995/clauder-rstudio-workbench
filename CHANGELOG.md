@@ -1,5 +1,85 @@
 # Changelog
 
+## v0.4.5 - cross-platform candidate, 2026-09-02
+
+- Add an explicit `--defer-native-smoke` compute-first mode to `fanout-plan`,
+  `fanout-run`, `fanout-poll`, and `merge-gate`. It is OS-independent, keeps
+  the real worker transport labelled `MCP_STDIO_OK`, records
+  `NATIVE-SMOKE-DEFERRED`, and deliberately leaves formal `completion-check`
+  blocked until a fresh native-wrapper smoke is supplied.
+- Write `<output_root>/fanout_runtime_status.json` atomically on every fan-out
+  polling iteration and emit flushed `FANOUT_PROGRESS` lines containing the
+  unchanged job IDs, done/running/pending counts, and failures.
+- Document that an already-running agent task cannot reliably hot-add a newly
+  configured MCP wrapper on Windows or macOS. Persistent bridge diagnosis and
+  MCP stdio computation can continue without falsely claiming
+  `NATIVE_MCP_OK`.
+- Refresh the compatibility target to upstream ClaudeR 0.14.1 and bridge
+  0.14.5, including unified home resolution, preserved MCP environment,
+  Windows-safe liveness checks, and console-output logging fixes.
+
+## v0.4.4 - local candidate, 2026-09-02
+
+- Add CPU, disk-free, and upload-backlog admission signals to memory-aware
+  fan-out scaling for the CMAverse archival workflow.
+- Redact ClaudeR discovery tokens from doctor evidence while retaining session
+  health and provenance fields needed for diagnosis.
+
+## v0.4.3 - local candidate, 2026-08-22
+
+- Pair the local workbench with the fork rebased on upstream ClaudeR 0.12.2
+  and MCP bridge 0.14.2 while retaining the fork's read-only PID checks,
+  async progress sidecars, multi-session metadata, and Copilot installer path.
+- Require the complete 40-tool ClaudeR MCP surface, including Coordination v2,
+  screening, cross-reference reconciliation, citations, notebooks, and
+  codebooks, instead of accepting only the five legacy connection primitives.
+- Refresh provenance, compatibility, installer smoke, and skill documentation
+  for the new pinned local candidate without changing evidence schema 0.2.4.
+
+## v0.4.2 - local candidate, 2026-08-20
+
+- Raise formal completion's default resource-gate freshness window from 60 to
+  120 minutes so a valid final admission decision remains usable after a
+  70-minute soak.
+- Record the selected resource-gate evidence id, age, effective threshold, and
+  acceptance decision in completion evidence; distinguish stale evidence from
+  missing evidence.
+- Document detached tmux plus run-scoped caffeinate as the macOS hosting model
+  for formal Native soak monitoring.
+
+## v0.4.1 - local candidate, 2026-08-20
+
+- Add macOS/Linux `--backup-retention`; it defaults to `0` so upgrades preserve
+  every runtime skill backup unless the operator explicitly opts into pruning.
+- Record workbench/ClaudeR dirty-tree state and explicit ClaudeR/MCP component
+  versions in macOS/Linux `INSTALL_INFO.json` for auditable local upgrades.
+- Add the recoverable `soak-monitor` harness with exact scheduled heartbeat
+  accounting, atomic checkpoints, supervised recovery, and durable resource,
+  progress, event, and raw heartbeat evidence.
+- Make macOS process enumeration defensive: `psutil` `cmdline()` permission and
+  `SystemError` failures are recorded as non-critical metric errors instead of
+  terminating a formal long run.
+- Add contract monitor policy, `completion-check --require-soak-monitor`, and
+  fault-injection coverage for recovery, missed slots, safety cancellation, and
+  matching monitor provenance.
+
+## v0.4.0 - local candidate, 2026-08-19
+
+- Rebase the paired ClaudeR fork on upstream R package 0.8.1 and MCP bridge
+  0.10.0 while retaining safe Windows PID checks, async progress, multi-session
+  metadata, parallel job guidance, and GitHub Copilot setup.
+- Add `install.sh` and `harness/run.sh`, platform-aware doctor/provenance checks,
+  POSIX paths, macOS uv cache discovery, and native macOS memory sampling.
+- Install the MCP bridge from the local ClaudeR worktree into the persistent
+  `~/.local/bin/clauder-mcp` entry and atomically update Codex configuration and
+  runtime skills with backups and TOML rollback validation.
+- Preserve original job ids through fan-out polling and final collection, and
+  surface intermediate async progress from worker sidecars.
+- Validate the candidate locally on macOS with R CMD check, Python tests, a
+  real RStudio/MCP workflow suite, multi-session cleanup, and a three-worker
+  150,000-fit IV bootstrap fan-out. This entry does not represent a tag or
+  published release.
+
 ## v0.3.4 - 2026-05-31
 
 - Harden downstream native-smoke consumption: fan-out and completion gates now require a `native_smoke` parent evidence to carry four unique record `parent_evidence_ids`, so v0.3.2-era empty-chain PASS evidence no longer satisfies formal gates.

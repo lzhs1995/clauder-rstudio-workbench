@@ -6,15 +6,50 @@ import re
 import time
 from typing import Any
 
-from .config import CODEX_CONFIG, LOCAL_CLAUDER_BRIDGE
+from .config import CODEX_CONFIG, HOME, IS_WINDOWS, LOCAL_CLAUDER_BRIDGE, UV_CACHE_DIR
 
 
 EXPECTED_R_STUDIO_TOOLS = {
-    "list_sessions",
+    "annotate",
+    "cancel_annotation_job",
+    "cancel_async_job",
+    "check_cross_references",
+    "check_messages",
+    "checkpoint_session",
+    "clean_error_log",
     "connect_session",
+    "coordination_roster",
+    "create_task_list",
     "execute_r",
     "execute_r_async",
+    "execute_r_with_plot",
+    "generate_codebook",
+    "generate_notebook",
+    "get_active_document",
+    "get_annotation_job_status",
     "get_async_result",
+    "get_bibtex",
+    "get_r_info",
+    "get_session_history",
+    "get_viewer_content",
+    "insert_text",
+    "list_checkpoints",
+    "list_sessions",
+    "load_annotation_data",
+    "modify_code_section",
+    "probe_scripts",
+    "read_file",
+    "reconcile_values",
+    "restore_session",
+    "run_annotation_job",
+    "screening_report",
+    "search_citations",
+    "search_project_code",
+    "send_message",
+    "set_agent_name",
+    "update_task_status",
+    "verify_references",
+    "wait_for_message",
 }
 
 
@@ -57,9 +92,13 @@ def _server_spec() -> tuple[str, list[str], dict[str, str]]:
 
 def _server_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ)
-    env.setdefault("USERPROFILE", str(os.environ.get("USERPROFILE") or os.path.expanduser("~")))
+    env.setdefault("HOME", str(HOME))
+    if IS_WINDOWS:
+        env.setdefault("USERPROFILE", str(os.environ.get("USERPROFILE") or HOME))
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("NO_PROXY", "127.0.0.1,localhost")
+    if UV_CACHE_DIR:
+        env.setdefault("UV_CACHE_DIR", str(UV_CACHE_DIR))
     if extra:
         env.update(extra)
     return env

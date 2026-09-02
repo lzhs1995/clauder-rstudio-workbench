@@ -93,7 +93,7 @@ class CmaverseValidateTests(unittest.TestCase):
                      "m0_effect_n,m1_effect_n,m0_data_ncol,m1_data_ncol,"
                      "m0_ref_mval,m1_ref_mval")
 
-    def _row(self, m, group, *, ncol="159,159", mval="0,1",
+    def _row(self, m, group, *, ncol="203,203", mval="0,1",
              hashes="h1,h1", paired="TRUE", delta=None):
         """Build a full validation row (with paired + delta tail)."""
         delta = self.DELTA if delta is None else delta
@@ -130,7 +130,7 @@ class CmaverseValidateTests(unittest.TestCase):
     def test_fail_on_ncol(self):
         with tempfile.TemporaryDirectory() as tmp:
             self._write(tmp, "msat_c12_2", [
-                self._row("msat_c12_2", "sy_female", ncol="158,159"),
+                self._row("msat_c12_2", "sy_female", ncol="202,203"),
                 self._row("msat_c12_2", "sy_male", hashes="h2,h2"),
             ])
             self._write(tmp, "msat_c12_3", [
@@ -230,8 +230,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1",
+                    f"{m},sy_female,TRUE,TRUE,17,17,203,203,0,1",
+                    f"{m},sy_male,TRUE,TRUE,17,17,203,203,0,1",
                 ], header=self.LEGACY_HEADER)
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -242,8 +242,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1",
+                    f"{m},sy_female,TRUE,TRUE,17,17,203,203,0,1",
+                    f"{m},sy_male,TRUE,TRUE,17,17,203,203,0,1",
                 ], header=self.LEGACY_HEADER)
             # legacy CSVs lack both the pairing proof and the delta columns
             r = self._run(tmp, **{"no-pairing-check": True, "no-delta-cde-check": True})
@@ -255,8 +255,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    f"{m},sy_female,TRUE,TRUE,17,17,203,203,0,1,h1,h1,TRUE",
+                    f"{m},sy_male,TRUE,TRUE,17,17,203,203,0,1,h2,h2,TRUE",
                 ], header=self.NO_DELTA_HEADER)
             r = self._run(tmp)
             self.assertEqual(r["exit_code"], cma_validate.EXIT_FAILED)
@@ -278,8 +278,8 @@ class CmaverseValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for m in ("msat_c12_2", "msat_c12_3"):
                 self._write(tmp, m, [
-                    f"{m},sy_female,TRUE,TRUE,17,17,159,159,0,1,h1,h1,TRUE",
-                    f"{m},sy_male,TRUE,TRUE,17,17,159,159,0,1,h2,h2,TRUE",
+                    f"{m},sy_female,TRUE,TRUE,17,17,203,203,0,1,h1,h1,TRUE",
+                    f"{m},sy_male,TRUE,TRUE,17,17,203,203,0,1,h2,h2,TRUE",
                 ], header=self.NO_DELTA_HEADER)
             r = self._run(tmp, **{"no-delta-cde-check": True})
             self.assertEqual(r["decision"], "WEAK_PASS")

@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from .resource import memory_used_percent
+from .resource import cpu_used_percent, disk_free_gb, memory_used_percent, upload_backlog_count
 from .worker_lint import lint_worker_file
 
 WORKER_FILE_KEYS = ("expected_state", "expected_manifest", "expected_validation")
@@ -383,7 +383,10 @@ def build_submit_code(worker: dict[str, Any]) -> str:
     if isinstance(env, dict):
         for key, value in env.items():
             lines.append(f"Sys.setenv({json.dumps(str(key))} = {json.dumps(str(value), ensure_ascii=False)})")
-    lines.append(f'source({json.dumps(code_file, ensure_ascii=False)}, encoding = "UTF-8", local = FALSE)')
+    # The async bridge injects clauder_progress() into the evaluation
+    # environment. local=TRUE keeps sourced workers in that environment so
+    # progress sidecars and output marshaling remain available.
+    lines.append(f'source({json.dumps(code_file, ensure_ascii=False)}, encoding = "UTF-8", local = TRUE)')
     return "\n".join(lines)
 
 
@@ -463,11 +466,24 @@ def run_fanout(
     reuse_existing: bool = False,
     sleep_fn: Callable[[float], None] = time.sleep,
     register_fn: Callable[[str, str], None] | None = None,
+    poll_fn: Callable[[str], dict[str, Any]] | None = None,
     max_iterations: int | None = None,
     auto_scale: bool = False,
     memory_threshold: float = 85.0,
     max_parallel_cap: int | None = None,
     mem_probe_fn: Callable[[], float | None] | None = None,
+    cpu_probe_fn: Callable[[], float | None] | None = None,
+    disk_probe_fn: Callable[[], float | None] | None = None,
+    upload_backlog_probe_fn: Callable[[], int] | None = None,
+    memory_scale_up_percent: float | None = None,
+    memory_hold_percent: float | None = None,
+    cpu_scale_up_percent: float | None = None,
+    cpu_hold_percent: float | None = None,
+    min_disk_free_gb_scale_up: float | None = None,
+    min_disk_free_gb_hold: float | None = None,
+    upload_backlog_hold: int | None = None,
+    healthy_samples_for_scale_up: int = 1,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """mcp-stdio 模式：提交 N 个 worker 并 file-poll 至完成。
 
@@ -506,14 +522,43 @@ def run_fanout(
     cap = max(1, min(cap, len(workers))) if workers else 1
     if level > cap:
         level = cap
-    probe = mem_probe_fn or memory_used_percent
+    mem_probe = mem_probe_fn or memory_used_percent
+    cpu_probe = cpu_probe_fn or cpu_used_percent
+    disk_probe = disk_probe_fn or (lambda: disk_free_gb(output_root_of(contract)))
     rg = contract.get("resource_gate") or {}
     if isinstance(rg, dict) and rg.get("memory_threshold") is not None:
         try:
             memory_threshold = float(rg.get("memory_threshold"))
         except (TypeError, ValueError):
             pass
+    if isinstance(rg, dict):
+        def _number(name: str, current: float | None) -> float | None:
+            value = rg.get(name)
+            if value is None:
+                return current
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return current
+
+        memory_scale_up_percent = _number("memory_scale_up_percent", memory_scale_up_percent)
+        memory_hold_percent = _number("memory_hold_percent", memory_hold_percent)
+        cpu_scale_up_percent = _number("cpu_scale_up_percent", cpu_scale_up_percent)
+        cpu_hold_percent = _number("cpu_hold_percent", cpu_hold_percent)
+        min_disk_free_gb_scale_up = _number("min_disk_free_gb_scale_up", min_disk_free_gb_scale_up)
+        min_disk_free_gb_hold = _number("min_disk_free_gb_hold", min_disk_free_gb_hold)
+        if rg.get("upload_backlog_hold") is not None:
+            upload_backlog_hold = int(rg["upload_backlog_hold"])
+        if rg.get("healthy_samples_for_scale_up") is not None:
+            healthy_samples_for_scale_up = int(rg["healthy_samples_for_scale_up"])
+        if upload_backlog_probe_fn is None and rg.get("upload_backlog_dir"):
+            upload_backlog_probe_fn = lambda: upload_backlog_count(str(rg["upload_backlog_dir"]))
+    memory_scale_up_percent = memory_threshold if memory_scale_up_percent is None else memory_scale_up_percent
+    memory_hold_percent = memory_threshold if memory_hold_percent is None else memory_hold_percent
+    healthy_samples_for_scale_up = max(1, int(healthy_samples_for_scale_up))
+    upload_probe = upload_backlog_probe_fn or (lambda: 0)
     scale_log: list[dict[str, Any]] = []
+    healthy_streak = 0
 
     # 续跑：仅当显式 reuse_existing 时，已完成的旧产出才计入 done（否则一律重新提交本轮）
     pending: list[str] = []
@@ -527,28 +572,60 @@ def run_fanout(
     running: dict[str, dict[str, Any]] = {}
     failed: list[str] = []
     submit_log: list[dict[str, Any]] = []
+    progress_log: list[dict[str, Any]] = []
+    final_collect_log: list[dict[str, Any]] = []
     iterations = 0
 
     while (pending or running) and not failed:
         if auto_scale:
-            mem = probe()
+            mem = mem_probe()
+            cpu = cpu_probe()
+            free_gb = disk_probe()
+            upload_backlog = upload_probe()
             old_level = level
             action = "hold"
+            hard_hold = (
+                (mem is not None and mem >= memory_hold_percent)
+                or (cpu_hold_percent is not None and cpu is not None and cpu >= cpu_hold_percent)
+                or (min_disk_free_gb_hold is not None and free_gb is not None and free_gb < min_disk_free_gb_hold)
+                or (upload_backlog_hold is not None and upload_backlog >= upload_backlog_hold)
+            )
+            healthy = (
+                mem is not None and mem < memory_scale_up_percent
+                and (cpu_scale_up_percent is None or (cpu is not None and cpu < cpu_scale_up_percent))
+                and (min_disk_free_gb_scale_up is None or (free_gb is not None and free_gb >= min_disk_free_gb_scale_up))
+                and (upload_backlog_hold is None or upload_backlog < upload_backlog_hold)
+            )
+            healthy_streak = healthy_streak + 1 if healthy else 0
             if mem is None:
                 action = "hold_mem_unknown"
-            elif mem >= memory_threshold:
+            elif hard_hold:
                 # 回压：不再提交新 worker，等在跑的排空（不杀在跑 job）
                 if level > max(1, len(running)):
                     level = max(1, len(running))
-                    action = "throttle"
-            elif pending and level < cap:
+                action = "throttle"
+            elif pending and level < cap and healthy_streak >= healthy_samples_for_scale_up:
                 level += 1
                 action = "scale_up"
+                healthy_streak = 0
+            elif pending and healthy and healthy_streak < healthy_samples_for_scale_up:
+                action = "hold_health_warmup"
             if action != "hold":
                 scale_log.append({
                     "iteration": iterations,
                     "memory_used_percent": mem,
-                    "memory_threshold": memory_threshold,
+                    "memory_scale_up_percent": memory_scale_up_percent,
+                    "memory_hold_percent": memory_hold_percent,
+                    "cpu_used_percent": cpu,
+                    "cpu_scale_up_percent": cpu_scale_up_percent,
+                    "cpu_hold_percent": cpu_hold_percent,
+                    "disk_free_gb": free_gb,
+                    "min_disk_free_gb_scale_up": min_disk_free_gb_scale_up,
+                    "min_disk_free_gb_hold": min_disk_free_gb_hold,
+                    "upload_backlog": upload_backlog,
+                    "upload_backlog_hold": upload_backlog_hold,
+                    "healthy_streak": healthy_streak,
+                    "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
                     "from_level": old_level,
                     "to_level": level,
                     "action": action,
@@ -574,6 +651,19 @@ def run_fanout(
 
         for wid in list(running.keys()):
             worker = by_id[wid]
+            job_id = running[wid]["job_id"]
+            if poll_fn:
+                try:
+                    poll_result = poll_fn(job_id)
+                except Exception as exc:
+                    poll_result = {"ok": False, "text": f"{type(exc).__name__}: {exc}"}
+                progress_log.append({
+                    "iteration": iterations,
+                    "id": wid,
+                    "job_id": job_id,
+                    "ok": bool(poll_result.get("ok")),
+                    "text": str(poll_result.get("text") or poll_result.get("reason") or "")[:4000],
+                })
             # 只有本轮 run 开始后写入的产出才算完成（reuse_existing 时放宽）
             status = worker_status(
                 contract, worker, fresh_after=None if reuse_existing else fresh_boundary
@@ -592,11 +682,70 @@ def run_fanout(
                 running.pop(wid, None)
                 failed.append(wid)
 
+        if progress_callback:
+            latest_by_worker: dict[str, dict[str, Any]] = {}
+            for entry in progress_log:
+                worker_id = str(entry.get("id") or "")
+                if worker_id:
+                    latest_by_worker[worker_id] = entry
+            snapshot = {
+                "iteration": iterations,
+                "done": list(done),
+                "failed": list(failed),
+                "pending": list(pending),
+                "running": [
+                    {
+                        "id": worker_id,
+                        "job_id": details.get("job_id"),
+                        "submitted_at": details.get("submitted_at"),
+                        "latest_poll": latest_by_worker.get(worker_id),
+                    }
+                    for worker_id, details in running.items()
+                ],
+                "max_parallel": level,
+                "scale_event": scale_log[-1] if scale_log else None,
+            }
+            try:
+                progress_callback(snapshot)
+            except Exception as exc:
+                progress_log.append({
+                    "iteration": iterations,
+                    "id": "__progress_callback__",
+                    "job_id": None,
+                    "ok": False,
+                    "text": f"{type(exc).__name__}: {exc}",
+                })
+
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:
             break
         if (pending or running) and not failed:
             sleep_fn(poll_interval_sec)
+
+    # Collect each submitted async result using the original job_id. This
+    # releases callr/progress tempfiles and proves that polling never resubmits.
+    if poll_fn:
+        for entry in submit_log:
+            job_id = entry.get("job_id")
+            if not entry.get("ok") or not job_id:
+                continue
+            collected: dict[str, Any] = {}
+            for attempt in range(1, 4):
+                try:
+                    collected = poll_fn(str(job_id))
+                except Exception as exc:
+                    collected = {"ok": False, "text": f"{type(exc).__name__}: {exc}"}
+                text = str(collected.get("text") or collected.get("reason") or "")
+                final_collect_log.append({
+                    "id": entry.get("id"),
+                    "job_id": job_id,
+                    "attempt": attempt,
+                    "ok": bool(collected.get("ok")),
+                    "text": text[:4000],
+                })
+                if "still running" not in text.lower():
+                    break
+                sleep_fn(min(poll_interval_sec, 1.0))
 
     return {
         "ok": not failed and not pending and not running,
@@ -606,11 +755,21 @@ def run_fanout(
         "pending": pending,
         "still_running": list(running.keys()),
         "submit_log": submit_log,
+        "progress_log": progress_log,
+        "final_collect_log": final_collect_log,
         "iterations": iterations,
         "max_parallel": level,
         "auto_scale": auto_scale,
         "start_max_parallel": int(max_parallel or contract.get("max_parallel") or 1),
         "max_parallel_cap": cap,
         "memory_threshold": memory_threshold,
+        "memory_scale_up_percent": memory_scale_up_percent,
+        "memory_hold_percent": memory_hold_percent,
+        "cpu_scale_up_percent": cpu_scale_up_percent,
+        "cpu_hold_percent": cpu_hold_percent,
+        "min_disk_free_gb_scale_up": min_disk_free_gb_scale_up,
+        "min_disk_free_gb_hold": min_disk_free_gb_hold,
+        "upload_backlog_hold": upload_backlog_hold,
+        "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
         "scale_log": scale_log,
     }

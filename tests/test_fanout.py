@@ -4,6 +4,7 @@ import json
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from clauder_workbench.evidence import build_evidence, write_evidence
@@ -80,6 +81,7 @@ class FanoutTests(unittest.TestCase):
         code = build_submit_code(worker)
         self.assertIn('Sys.setenv("K" = "v")', code)
         self.assertIn('source("C:/tmp/w1.R"', code)
+        self.assertIn("local = TRUE", code)
 
     def test_plan_validates_and_advises(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -142,6 +144,7 @@ class FanoutTests(unittest.TestCase):
                 return {"ok": True, "job_id": f"job_{wid}", "text": f"Job job_{wid} started"}
 
             registered: list[tuple[str, str]] = []
+            progress: list[dict] = []
             result = run_fanout(
                 contract,
                 submit_fn=submit_fn,
@@ -149,6 +152,7 @@ class FanoutTests(unittest.TestCase):
                 poll_interval_sec=0,
                 sleep_fn=lambda s: None,
                 register_fn=lambda wid, jid: registered.append((wid, jid)),
+                progress_callback=progress.append,
                 max_iterations=5,
             )
             self.assertTrue(result["ok"])
@@ -156,6 +160,38 @@ class FanoutTests(unittest.TestCase):
             self.assertEqual(set(result["done"]), {"w1", "w2"})
             self.assertEqual(set(submitted), {"w1", "w2"})
             self.assertEqual(len(registered), 2)
+            self.assertTrue(progress)
+            self.assertEqual(set(progress[-1]["done"]), {"w1", "w2"})
+            self.assertEqual(progress[-1]["running"], [])
+
+    def test_run_fanout_polls_and_collects_original_job_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            contract = load_fanout_contract(_write_contract(root))
+            polled: list[str] = []
+
+            def submit_fn(code: str) -> dict:
+                wid = "w1" if "w1" in code else "w2"
+                _complete_worker(root, wid)
+                return {"ok": True, "job_id": f"job_{wid}", "text": "started"}
+
+            def poll_fn(job_id: str) -> dict:
+                polled.append(job_id)
+                return {"ok": True, "text": f"complete {job_id}"}
+
+            result = run_fanout(
+                contract,
+                submit_fn=submit_fn,
+                poll_fn=poll_fn,
+                max_parallel=2,
+                poll_interval_sec=0,
+                sleep_fn=lambda s: None,
+                max_iterations=5,
+            )
+            self.assertTrue(result["ok"])
+            self.assertEqual(set(polled), {"job_w1", "job_w2"})
+            self.assertTrue(result["progress_log"])
+            self.assertTrue(result["final_collect_log"])
 
     def test_run_fanout_reports_submit_failure(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -290,6 +326,109 @@ class FanoutTests(unittest.TestCase):
             self.assertEqual(rc, cli.BLOCK)
             doc = json.loads(buf.getvalue())
             self.assertEqual(doc["policy_violations"], ["MISSING-NATIVE-SMOKE-EVIDENCE"])
+
+    def test_fanout_plan_can_explicitly_defer_native_smoke_cross_platform(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            text = CONTRACT_TEMPLATE.format(root=str(root).replace("\\", "/"))
+            text = text.replace("transport: mcp-stdio\n", "transport: mcp-stdio\nrequires_native_smoke: true\n")
+            contract = root / "task.yaml"
+            contract.write_text(text, encoding="utf-8")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = cli.main([
+                    "fanout-plan", "--contract", str(contract),
+                    "--defer-native-smoke", "--no-advise",
+                ])
+            self.assertEqual(rc, cli.WARN)
+            doc = json.loads(buf.getvalue())
+            self.assertEqual(doc["decision"], "WARN_NATIVE_DEFERRED")
+            self.assertEqual(doc["transport_class"], None)
+            self.assertEqual(doc["policy_violations"], ["NATIVE-SMOKE-DEFERRED"])
+            self.assertTrue(doc["extra"]["native_smoke_deferred"])
+
+    def test_native_wrapper_contract_cannot_use_stdio_defer(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            text = CONTRACT_TEMPLATE.format(root=str(root).replace("\\", "/"))
+            text = text.replace(
+                "transport: mcp-stdio\n",
+                "transport: native-wrapper\nrequires_native_smoke: true\n",
+            )
+            contract = root / "task.yaml"
+            contract.write_text(text, encoding="utf-8")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = cli.main([
+                    "fanout-plan", "--contract", str(contract),
+                    "--defer-native-smoke", "--no-advise",
+                ])
+            self.assertEqual(rc, cli.BLOCK)
+            doc = json.loads(buf.getvalue())
+            self.assertEqual(doc["policy_violations"], ["MISSING-NATIVE-SMOKE-EVIDENCE"])
+
+    def test_fanout_run_writes_atomic_live_status_with_original_job_id(self) -> None:
+        from clauder_workbench import cli
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            contract = _write_contract(root)
+            status_path = root / "live" / "status.json"
+            captured: list[dict] = []
+
+            def fake_run_fanout(contract_doc: dict, **kwargs: object) -> dict:
+                callback = kwargs["progress_callback"]
+                callback({
+                    "iteration": 3,
+                    "done": [],
+                    "failed": [],
+                    "pending": ["w2"],
+                    "running": [{
+                        "id": "w1",
+                        "job_id": "original-job-w1",
+                        "submitted_at": 1.0,
+                        "latest_poll": {"ok": True, "text": "running"},
+                    }],
+                    "max_parallel": 1,
+                    "scale_event": None,
+                })
+                return {
+                    "ok": True,
+                    "done": ["w1", "w2"],
+                    "failed": [],
+                    "pending": [],
+                    "still_running": [],
+                    "max_parallel": 1,
+                    "auto_scale": False,
+                    "transport_class": "MCP_STDIO_OK",
+                }
+
+            args = cli.build_parser().parse_args([
+                "fanout-run", "--contract", str(contract),
+                "--progress-file", str(status_path),
+            ])
+            with mock.patch("clauder_workbench.cli.run_fanout", side_effect=fake_run_fanout), mock.patch(
+                "clauder_workbench.cli.archive_inflight"
+            ), mock.patch(
+                "clauder_workbench.cli.emit",
+                side_effect=lambda doc, write=True: captured.append(doc) or int(doc["exit_code"]),
+            ):
+                rc = cli.cmd_fanout_run(args)
+
+            self.assertEqual(rc, cli.PASS)
+            self.assertTrue(status_path.exists())
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["running"][0]["job_id"], "original-job-w1")
+            self.assertEqual(status["pending"], ["w2"])
+            self.assertEqual(captured[0]["extra"]["progress_file"], str(status_path.resolve()))
 
     def test_fanout_plan_accepts_native_smoke_parent(self) -> None:
         import io

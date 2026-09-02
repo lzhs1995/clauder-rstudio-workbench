@@ -57,6 +57,11 @@ the contract so `merge-gate` rejects old outputs.
 > Write artifacts atomically (temp file + rename) so the poller never reads a
 > half-written manifest/validation.
 
+During `fanout-run`, the harness also polls `get_async_result` with each
+worker's original `job_id` and records the replies in `progress_log`. After the
+file gate completes it collects each result with the same id into
+`final_collect_log`; it never resubmits merely because a job is still running.
+
 ## Contract (`task.yaml`)
 
 ```yaml
@@ -130,19 +135,38 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 - `merge-gate`: `0 PASS` / `5 CONTRACT_FAILED` (not all complete) / `3 BLOCK`
   (all complete but with violations such as stale outputs).
 
+Every `fanout-run` poll atomically writes
+`<output_root>/fanout_runtime_status.json` and emits a flushed
+`FANOUT_PROGRESS` line containing the original job ids. Use
+`--progress-file <absolute.json>` to select another durable status path.
+
+When a task-local native wrapper is unavailable because its tool registry was
+frozen at task creation, `--defer-native-smoke` permits an explicitly authorized
+MCP stdio computation on both Windows and macOS. The command returns WARN even
+when the scientific workers pass, records `NATIVE-SMOKE-DEFERRED`, and leaves
+strict completion blocked until fresh four-step `NATIVE_MCP_OK` evidence is
+attached. The default remains strict and blocks before submission.
+
 ## Dynamic concurrency
 
 `fanout-run` treats `--max-parallel` as the starting concurrency ceiling. Without
 `--auto-scale`, that ceiling stays fixed for the whole run. With `--auto-scale`,
-the harness samples system memory each poll cycle and raises concurrency by one
-while memory stays below `--memory-threshold` (default `85`) and workers remain
-pending, up to the worker count or `--max-parallel-cap`.
+the harness samples memory, CPU, free disk, and (when configured) the durable
+upload queue each poll cycle. A contract may require several consecutive healthy
+samples before concurrency rises by exactly one. Omitted v0.4.4 fields retain
+the pre-v0.4.4 memory-only behavior and one-sample scale-up.
 
-When memory is at or above the threshold, `fanout-run` stops launching new
+When any configured hold threshold is reached, `fanout-run` stops launching new
 workers and lets existing workers drain; it never kills an already-running job
-just to reduce concurrency. Each decision is written to `scale_log` in the run
-result/evidence so a reviewer can see whether a run used fixed or dynamic
-parallelism.
+just to reduce concurrency. Each decision and the observed memory/CPU/disk/
+backlog values are written to `scale_log` in the run result/evidence.
+
+For the Mac CMAverse chain, the frozen policy is: start at 1, cap at 3, sample
+every 30 seconds, and require five consecutive samples with memory below 70%,
+CPU below 75%, disk above 200 GB, and upload backlog below 2 before adding one
+slot. Memory at/above 80%, CPU at/above 90%, disk below 150 GB, or backlog at/
+above 2 holds new admissions. These are admission rules; hard safety cancellation
+remains the monitor's separate responsibility.
 
 This auto-scaling path belongs to `fanout-run`'s Python MCP stdio mode. The
 agent-native wrapper path is still explicit: plan the workers, submit through
