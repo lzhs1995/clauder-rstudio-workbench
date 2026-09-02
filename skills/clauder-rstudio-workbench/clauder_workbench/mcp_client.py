@@ -47,6 +47,7 @@ EXPECTED_R_STUDIO_TOOLS = {
     "search_project_code",
     "send_message",
     "set_agent_name",
+    "suggest_edit",
     "update_task_status",
     "verify_references",
     "wait_for_message",

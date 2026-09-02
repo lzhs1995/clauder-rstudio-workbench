@@ -16,11 +16,11 @@ clauder-workbench tool-surface
 
 Local result:
 
-- 175 Workbench tests passed, including the exact 40-tool ClaudeR 0.14.1
+- 175 Workbench tests passed, including the exact 41-tool ClaudeR 0.14.1
   compatibility surface and the existing soak-monitor fault-injection suite.
 - The 0.4.3 wheel built locally and the installer dry-run selected the pinned
   ClaudeR 0.14.1 / bridge 0.14.5 worktree.
-- The candidate bridge returned all 40 expected tools over MCP stdio. Installed
+- The candidate bridge returned all 41 expected tools over MCP stdio. Installed
   doctor and native-wrapper validation are recorded outside this distributable
   transcript in the run-specific evidence directory.
 

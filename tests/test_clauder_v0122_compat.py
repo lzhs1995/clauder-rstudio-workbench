@@ -5,7 +5,7 @@ from clauder_workbench import __version__
 from clauder_workbench.mcp_client import EXPECTED_R_STUDIO_TOOLS
 
 
-EXPECTED_V0122_TOOLS = {
+EXPECTED_V0141_TOOLS = {
     "annotate",
     "cancel_annotation_job",
     "cancel_async_job",
@@ -43,6 +43,7 @@ EXPECTED_V0122_TOOLS = {
     "search_project_code",
     "send_message",
     "set_agent_name",
+    "suggest_edit",
     "update_task_status",
     "verify_references",
     "wait_for_message",
@@ -53,9 +54,9 @@ class ClaudeRV0141CompatibilityTests(unittest.TestCase):
     def test_workbench_candidate_version(self) -> None:
         self.assertEqual(__version__, "0.4.5")
 
-    def test_exact_40_tool_surface(self) -> None:
-        self.assertEqual(len(EXPECTED_R_STUDIO_TOOLS), 40)
-        self.assertEqual(EXPECTED_R_STUDIO_TOOLS, EXPECTED_V0122_TOOLS)
+    def test_exact_41_tool_surface(self) -> None:
+        self.assertEqual(len(EXPECTED_R_STUDIO_TOOLS), 41)
+        self.assertEqual(EXPECTED_R_STUDIO_TOOLS, EXPECTED_V0141_TOOLS)
 
     def test_candidate_provenance_is_documented(self) -> None:
         readme = Path("README.md").read_text(encoding="utf-8")
