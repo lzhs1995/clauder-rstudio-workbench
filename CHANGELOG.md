@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.6 - local candidate, 2026-09-03
+## v0.4.6 - 2026-09-05
 
 - Prevent verbose ClaudeR async jobs from stalling on full process stdout or
   stderr pipes by pairing with ClaudeR `0.14.1.9001` file-backed output.
@@ -11,6 +11,11 @@
   a malformed or self-referential MCP result cannot terminate monitoring.
 - Treat explicit `Async job error`/cancelled/not-found responses as terminal
   fan-out failures while leaving transient MCP transport errors retryable.
+- Publish the maintained cross-platform Chinese architecture and operations
+  guide, including the four progress layers, Native/stdio evidence boundary,
+  tmux hosting boundary, release history, and an evidence-honest CMAverse case
+  study. Preserve the Windows-first development record as a sanitized history
+  summary rather than exposing local research paths and logs.
 
 ## v0.4.5 - cross-platform candidate, 2026-09-02
 

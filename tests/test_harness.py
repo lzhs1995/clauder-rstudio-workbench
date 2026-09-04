@@ -651,10 +651,10 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("WorkbenchBinDir", text)
         self.assertIn("clauder-workbench.cmd", text)
 
-    def test_readme_quickstart_uses_local_candidate_and_wrapper(self) -> None:
+    def test_readme_quickstart_uses_release_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("local `v0.4.6` candidate", text)
-        self.assertIn("no `v0.4.6` remote tag or release", text)
+        self.assertIn("`v0.4.6` release", text)
+        self.assertIn("releases/download/v0.4.6/", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("./install.sh --clauder-dir", text)
         self.assertIn("-AddHarnessToPath", text)
@@ -664,6 +664,8 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertNotIn("releases/download/v0.2.4/", text)
         self.assertNotIn("--branch v0.3.1", text)
         self.assertNotIn("releases/download/v0.3.1/", text)
+        self.assertNotIn("git checkout v0.3.4", text)
+        self.assertNotIn("releases/download/v0.3.4/", text)
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
