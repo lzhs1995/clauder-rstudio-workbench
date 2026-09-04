@@ -1,0 +1,8 @@
+args_all <- commandArgs(trailingOnly = FALSE)
+script_arg <- grep("^--file=", args_all, value = TRUE)
+script_dir <- dirname(normalizePath(sub("^--file=", "", script_arg[[1L]]), mustWork = TRUE))
+source(file.path(script_dir, "comparegroups_common.R"))
+args <- cg_parse_args()
+if (is.null(args$spec) || is.null(args[["output-root"]])) cg_stop("Usage: run_comparegroups.R --spec <table-spec.json> --output-root <new-directory>")
+result <- cg_run(args$spec, args[["output-root"]])
+cat("COMPAREGROUPS_RUN_OK decision=", result$decision, " output_root=", result$output_root, "\n", sep = "")

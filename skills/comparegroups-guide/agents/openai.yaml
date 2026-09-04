@@ -1,0 +1,4 @@
+interface:
+  display_name: "compareGroups Guide"
+  short_description: "Build validated descriptive tables with compareGroups and ClaudeR."
+  default_prompt: "Use $comparegroups-guide to audit my data and create a validated publication-ready descriptive table without overwriting source files."

@@ -16,6 +16,9 @@ the fan-out harness there. This skill supplies the CMAverse-specific contract:
 what a worker must do, what counts as a valid result, and how to map a
 monolithic `g_formula` script into independent per-mediator workers.
 
+For ordinary descriptive statistics and publication-ready three-line Table 1
+outputs, route to the sibling `$comparegroups-guide` skill instead.
+
 > First case study: `g_formula_new4.7` (original script region `552:3561`). The
 > skill is written to generalize to `new4.8.*`; always re-do the region
 > inventory for a new script version before trusting the old region map.

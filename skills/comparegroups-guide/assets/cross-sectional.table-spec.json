@@ -1,0 +1,17 @@
+{
+  "spec_version": "1.0",
+  "analysis_id": "cross-sectional-table-1",
+  "input": {"path": "/absolute/path/cross_section.dta", "format": "auto", "id": "person_id", "time": null},
+  "analysis": {"group": "exposure_group", "panel_mode": "cross_section", "subset": null},
+  "blocks": [
+    {"id": "dv", "label": "被解释变量", "variables": [
+      {"name": "outcome", "type": "continuous", "method": "normal", "digits": 3, "label": null, "include_missing": false, "reference": null, "levels": null}
+    ]},
+    {"id": "individual", "label": "个体特征", "variables": [
+      {"name": "age", "type": "continuous", "method": "nonnormal", "digits": 3, "label": null, "include_missing": false, "reference": null, "levels": null},
+      {"name": "sex", "type": "categorical", "method": "categorical", "digits": 2, "label": null, "include_missing": true, "reference": "Male", "levels": null}
+    ]}
+  ],
+  "display": {"show_all": true, "show_n": true, "show_p_overall": true, "show_p_multiple": false, "show_p_trend": false, "p_digits": 3, "compatibility_export2word": false},
+  "outputs": {"stem": "Table_1", "formats": ["docx", "csv", "rds"]}
+}

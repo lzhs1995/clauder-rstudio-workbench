@@ -1,0 +1,76 @@
+name: comparegroups-guide
+
+on:
+  push:
+    branches: [main, "feature/comparegroups-guide-v0.5.0"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-platform:
+    name: ${{ matrix.os }} / R ${{ matrix.r }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        r: [release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::compareGroups
+            any::haven
+            any::labelled
+            any::officer
+            any::flextable
+            any::jsonlite
+            any::digest
+          needs: check
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install jsonschema
+
+      - name: Synthetic Python integration tests
+        run: python -m unittest tests.test_comparegroups_guide -v
+
+      - name: Synthetic and compareGroups::regicor R tests
+        run: Rscript tests/test_comparegroups_guide.R
+
+  repository-gates:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: skills/clauder-rstudio-workbench
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pyyaml
+      - name: Validate all three skills
+        run: |
+          python .github/scripts/quick_validate.py skills/clauder-rstudio-workbench
+          python .github/scripts/quick_validate.py skills/cmaverse-paired-mval
+          python .github/scripts/quick_validate.py skills/comparegroups-guide
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+
+      - name: Public-tree privacy scan
+        run: python -m unittest tests.test_discovery_redaction_v044 -v
