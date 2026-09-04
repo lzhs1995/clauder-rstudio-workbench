@@ -31,7 +31,11 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: |
+          # This repository is a skill collection, not an R package.  The
+          # action defaults to `deps::.` and would therefore scan unrelated
+          # CMAverse templates for packages that are intentionally not on
+          # CRAN.  Install only this skill's explicit test dependencies.
+          packages: |
             any::compareGroups
             any::haven
             any::labelled
@@ -39,7 +43,7 @@ jobs:
             any::flextable
             any::jsonlite
             any::digest
-          needs: check
+            any::rmarkdown
 
       - uses: actions/setup-python@v5
         with:
