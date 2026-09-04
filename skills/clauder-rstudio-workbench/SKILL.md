@@ -11,6 +11,9 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 
 ## First Reads
 
+- For the complete cross-platform architecture, installation, operations, and
+  evidence guide, read the maintained
+  [Chinese usage manual](https://github.com/lzhs1995/clauder-rstudio-workbench/blob/main/docs/ClaudeR_%E6%9E%B6%E6%9E%84%E8%AF%B4%E6%98%8E%E4%B8%8Eclauder-rstudio-workbench%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md).
 - Before formal long-running RStudio work, run the executable harness layer below. Markdown is advisory; harness evidence is the completion gate.
 - For connection setup and MCP routing, read [rstudio-connection.md](references/rstudio-connection.md).
 - For long jobs, read [async-long-jobs.md](references/async-long-jobs.md).
@@ -32,6 +35,7 @@ Use the matching entrypoint from this skill directory, or use the installed
 ./harness/run.sh tool-surface
 ./harness/run.sh resource-gate advise --current-parallel 1 --memory-threshold 85
 ./harness/run.sh soak-monitor status --contract /path/task.json --evidence-dir /path/evidence --expected-pid 1234 --stop-file /path/stop.monitor
+./harness/run.sh async-io-rescue status --runtime-status /path/output/fanout_runtime_status.json --session-name default --evidence-dir /path/evidence
 ./harness/run.sh completion-check --mode formal --require-file validation::/path/validation.csv,min_rows=1,max_age_h=24
 ```
 
@@ -109,6 +113,20 @@ Windows and macOS: evidence is marked `NATIVE-SMOKE-DEFERRED`, never
 `NATIVE_MCP_OK`, and strict completion still requires a fresh four-step native
 smoke. Do not use this flag to hide a failed wrapper or to claim final success.
 
+ClaudeR `0.14.1.9001` and later route async stdout/stderr to temporary files,
+so verbose jobs cannot block on undrained process pipes. For jobs already
+started by an older package, `async-io-rescue run` drains only the original job
+IDs present in `fanout_runtime_status.json`. It keeps one MCP stdio connection
+open, follows newly admitted original IDs, and records append-only logs plus a
+durable checkpoint. It never submits, cancels, or resumes a job:
+
+```bash
+clauder-workbench async-io-rescue run \
+  --runtime-status /path/output/fanout_runtime_status.json \
+  --session-name default \
+  --evidence-dir /path/evidence
+```
+
 ### Transport Evidence Boundary
 
 - Native `mcp__r_studio__` wrapper: current agent tool-layer evidence only. A Python harness cannot directly call this wrapper; require parent evidence from a real wrapper smoke before claiming native-wrapper success.
@@ -185,8 +203,8 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This local skill collection release `v0.4.5` candidate is paired with the
-`lzhs1995/ClaudeR` local fork branch based on upstream ClaudeR `0.14.1` and MCP
+This skill collection release `v0.4.6` is paired with the
+`lzhs1995/ClaudeR` local fork branch `0.14.1.9001`, based on upstream ClaudeR `0.14.1`, and MCP
 bridge `0.14.5`. The collection includes this workbench skill and the companion
 `cmaverse-paired-mval` skill.
 
@@ -194,6 +212,6 @@ Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, `v0.4.4`, and the local `v0.4.5`
-candidate inherit that
+`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, `v0.4.4`, `v0.4.5`, and `v0.4.6`
+inherit that
 config-writer fix.

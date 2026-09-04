@@ -30,6 +30,24 @@ saveRDS(fit, output_path)
 
 Report stage, message, elapsed time, and unchanged `job_id`. Do not rely on percent values as the main user-facing progress signal.
 
+## Legacy Output-Pipe Recovery
+
+ClaudeR `0.14.1.9001` and later use file-backed stdout/stderr for async jobs.
+If a verbose job was already started by an older release and durable progress
+stops while the process is alive, drain its existing process pipes without
+changing job identity:
+
+```bash
+clauder-workbench async-io-rescue run \
+  --runtime-status /path/output/fanout_runtime_status.json \
+  --session-name default \
+  --evidence-dir /path/evidence
+```
+
+The rescue loop reads job IDs only from the fan-out runtime file. It performs
+no submission, cancellation, or process restart. Stop using it after all old
+jobs reach terminal state; new file-backed jobs do not require it.
+
 ## Main Session Parallelism
 
 The main RStudio session can respond while the async job runs, but shared resources still need discipline:

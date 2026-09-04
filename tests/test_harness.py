@@ -202,7 +202,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.4.5")
+        self.assertEqual(doc["producer_version"], "0.4.6")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -651,10 +651,10 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("WorkbenchBinDir", text)
         self.assertIn("clauder-workbench.cmd", text)
 
-    def test_readme_quickstart_uses_local_candidate_and_wrapper(self) -> None:
+    def test_readme_quickstart_uses_release_and_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("local `v0.4.5` candidate", text)
-        self.assertIn("no `v0.4.5` remote tag or release", text)
+        self.assertIn("`v0.4.6` release", text)
+        self.assertIn("releases/download/v0.4.6/", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("./install.sh --clauder-dir", text)
         self.assertIn("-AddHarnessToPath", text)
@@ -664,10 +664,12 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertNotIn("releases/download/v0.2.4/", text)
         self.assertNotIn("--branch v0.3.1", text)
         self.assertNotIn("releases/download/v0.3.1/", text)
+        self.assertNotIn("git checkout v0.3.4", text)
+        self.assertNotIn("releases/download/v0.3.4/", text)
 
     def test_workbench_skill_documents_collection_release(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.4.5`", text)
+        self.assertIn("skill collection release `v0.4.6`", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)

@@ -12,6 +12,7 @@ from typing import Any
 
 from . import __version__
 from .artifacts import check_artifacts, parse_requirement
+from .async_io_rescue import build_rescue_config, rescue_status, run_async_io_rescue
 from .config import (
     AGENTS_INSTALL_INFO,
     BLOCK,
@@ -1117,6 +1118,22 @@ def cmd_soak_monitor(args: argparse.Namespace) -> int:
     return emit(run_soak_monitor(config, resume=args.resume))
 
 
+def cmd_async_io_rescue(args: argparse.Namespace) -> int:
+    config = build_rescue_config(
+        runtime_status=args.runtime_status,
+        session_name=args.session_name,
+        evidence_dir=args.evidence_dir,
+        interval_sec=args.interval_sec,
+        reconnect_sec=args.reconnect_sec,
+        call_timeout_sec=args.call_timeout_sec,
+        max_connection_failures=args.max_connection_failures,
+    )
+    if args.action == "status":
+        print_json(rescue_status(config))
+        return PASS
+    return emit(run_async_io_rescue(config, once=args.once))
+
+
 def parse_requirements(values: list[str] | None) -> list[dict[str, Any]]:
     reqs: list[dict[str, Any]] = []
     for value in values or []:
@@ -1924,6 +1941,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--monitored-transport", choices=["NATIVE_MCP_OK", "MCP_STDIO_OK"], default="NATIVE_MCP_OK")
     p.add_argument("--resume", action="store_true")
 
+    p = sub.add_parser("async-io-rescue")
+    p.add_argument("action", choices=["run", "status"])
+    p.add_argument("--runtime-status", required=True)
+    p.add_argument("--session-name", required=True)
+    p.add_argument("--evidence-dir", required=True)
+    p.add_argument("--interval-sec", type=float, default=1.0)
+    p.add_argument("--reconnect-sec", type=float, default=2.0)
+    p.add_argument("--call-timeout-sec", type=float, default=20.0)
+    p.add_argument("--max-connection-failures", type=int, default=0)
+    p.add_argument("--once", action="store_true")
+
     p = sub.add_parser("completion-check")
     p.add_argument("--mode", choices=["formal", "diagnostic"], default="formal")
     p.add_argument("--policy", choices=["auto", "strict", "warn", "skip"], default="auto")
@@ -2056,6 +2084,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_resource_gate(args)
         if args.cmd == "soak-monitor":
             return cmd_soak_monitor(args)
+        if args.cmd == "async-io-rescue":
+            return cmd_async_io_rescue(args)
         if args.cmd == "completion-check":
             return cmd_completion_check(args)
         if args.cmd == "worker-lint":

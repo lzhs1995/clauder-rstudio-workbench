@@ -2,13 +2,18 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.4.5` candidate is cross-platform and targets upstream ClaudeR `0.14.1`
-/ `clauder-mcp 0.14.5` while retaining strict native provenance and durable
-async progress.
+The `v0.4.6` release is cross-platform and targets the local ClaudeR
+`0.14.1.9001` fork based on upstream ClaudeR `0.14.1` / `clauder-mcp 0.14.5`, while
+retaining strict native provenance and durable async progress.
 
 **Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
 supports Windows. Both configure a persistent platform-native `clauder-mcp`
 entry and share the same fan-out, progress, resource, and completion gates.
+
+The maintained Chinese architecture and operations manual is
+[ClaudeR 架构说明与 clauder-rstudio-workbench 使用指南](docs/ClaudeR_架构说明与clauder-rstudio-workbench使用指南.md).
+It supersedes the Windows-first development diary while preserving a
+[sanitized origin summary](docs/history/2026-05-windows-origin.md).
 
 ## Skills in This Collection
 
@@ -41,9 +46,7 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-These commands intentionally use the local `v0.4.5` candidate branch. There
-is no `v0.4.5` remote tag or release until this branch is reviewed and
-explicitly published.
+These commands use the reviewed `v0.4.6` release line.
 
 On Windows PowerShell:
 
@@ -76,13 +79,13 @@ python -m clauder_workbench doctor
 To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 If the Windows `git clone` is blocked by a proxy or reset connection, use the
-published `v0.3.4` tag-zip bootstrap instead:
+published `v0.4.6` tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.3.4.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.3.4"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.4.6.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.4.6"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.3.4/clauder-rstudio-workbench-v0.3.4.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.4.6/clauder-rstudio-workbench-v0.4.6.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -134,6 +137,11 @@ Every `fanout-run` polling cycle atomically refreshes
 `FANOUT_PROGRESS` line with the original job IDs and
 done/running/pending/failed counts. Use `--progress-file <absolute.json>` to
 override the status path.
+
+An explicit bridge response such as `Async job error`, cancelled, or not-found
+is a terminal worker failure and is recorded with the original job ID. A
+connection reset or other transport-only polling error remains retryable and
+never causes the worker to be resubmitted.
 
 If the current agent task was created before its native MCP wrapper was
 registered, its tool registry cannot reliably hot-add that wrapper on either
@@ -200,6 +208,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
 | `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Requires the complete 41-tool surface (including `suggest_edit`), adds OS-independent compute-first native deferral with an unchanged strict completion gate, and writes atomic live fan-out status containing the original async job IDs. |
 | `v0.4.3` | local fork based on upstream `0.12.2` | Updates the strict MCP tool surface to all 40 ClaudeR tools, including Coordination v2, screening, cross-reference reconciliation, citation, notebook, and codebook workflows, while retaining the fork's safe PID and async-progress compatibility. |
 | `v0.4.4` | local CMAverse Mac candidate | Adds CPU/disk/upload-backlog aware fan-out admission while preserving the `MCP_STDIO_OK` transport boundary and the v0.4.3 ClaudeR 0.12.2 compatibility surface. |
@@ -275,17 +284,19 @@ written to `<USER_HOME>/.clauder_workbench/evidence`.
 
 For the installer smoke transcript format, see `tests/install_smoke.md`.
 
-Current validation status:
+Current validation status for the v0.4.6 release line:
 
 - Local Windows install, reinstall idempotence, and privacy scan have passed.
-- The local macOS `v0.4.0` candidate passed R package checks, the Python harness
-  suite, MCP stdio handshake, real RStudio workflows, multi-session cleanup,
-  and a three-worker async fan-out with strict completion evidence.
+- The macOS release candidate passed the 192-test Python harness suite, skill
+  validation, MCP stdio/tool-surface checks, real RStudio workflows,
+  multi-session cleanup, and asynchronous fan-out regression tests.
+- An earlier full-green qualification ran eight workers for 4,200 seconds each
+  and matched all canonical RDS hashes between Native and MCP stdio transports.
 - A git-subdirectory MCP runtime smoke has passed when a live RStudio ClaudeR Addin session is available.
-- Native Codex wrapper evidence still requires a fresh task/process registry
-  after MCP configuration changes; MCP stdio evidence must not be relabeled
-  `NATIVE_MCP_OK`. Explicit `--defer-native-smoke` can keep computation moving,
-  but cannot make formal completion pass.
+- Native Codex wrapper evidence always requires a fresh current-task four-step
+  smoke after MCP configuration changes; MCP stdio evidence must not be
+  relabeled `NATIVE_MCP_OK`. Explicit `--defer-native-smoke` can keep
+  computation moving, but cannot make formal completion pass.
 - A clean-VM or colleague-machine validation remains the final gate before broad rollout.
 
 ## Troubleshooting
@@ -361,7 +372,7 @@ Confirm all three layers:
 
 ## Upgrade
 
-To upgrade the local macOS/Linux candidate and reinstall the paired ClaudeR worktree:
+To upgrade macOS/Linux and reinstall the paired ClaudeR worktree:
 
 ```bash
 cd "$HOME/projects/clauder-rstudio-workbench"
@@ -374,7 +385,7 @@ For the published Windows release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.3.4
+git checkout v0.4.6
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

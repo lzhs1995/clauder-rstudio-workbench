@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
 import json
 import math
@@ -114,10 +115,53 @@ def _parse_utc(value: str) -> float | None:
         return None
 
 
+def _json_safe(value: Any, seen: set[int] | None = None) -> Any:
+    """Return a JSON-serializable snapshot without following reference cycles."""
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, BaseException):
+        return {"type": type(value).__name__, "message": str(value)}
+
+    seen = seen if seen is not None else set()
+    identity = id(value)
+    if identity in seen:
+        return f"<circular-reference:{type(value).__name__}>"
+    seen.add(identity)
+    try:
+        if dataclasses.is_dataclass(value) and not isinstance(value, type):
+            # dataclasses.asdict() recursively expands before this function can
+            # inspect identities, so a self-referential tool payload can still
+            # raise RecursionError. Walk fields through the shared seen set.
+            result: dict[str, Any] = {}
+            for field in dataclasses.fields(value):
+                try:
+                    result[field.name] = _json_safe(getattr(value, field.name), seen)
+                except Exception as exc:
+                    result[field.name] = f"<field-read-error:{type(exc).__name__}:{exc}>"
+            return result
+        if hasattr(value, "model_dump"):
+            try:
+                return _json_safe(value.model_dump(), seen)
+            except Exception:
+                pass
+        if isinstance(value, dict):
+            return {str(key): _json_safe(item, seen) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return [_json_safe(item, seen) for item in value]
+        return repr(value)
+    finally:
+        seen.discard(identity)
+
+
 def _atomic_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}.{uuid.uuid4().hex}")
-    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.write_text(json.dumps(_json_safe(value), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -136,7 +180,7 @@ def _append_csv(path: Path, fieldnames: list[str], row: dict[str, Any]) -> None:
 def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        handle.write(json.dumps(_json_safe(row), ensure_ascii=False) + "\n")
         handle.flush()
         os.fsync(handle.fileno())
 
