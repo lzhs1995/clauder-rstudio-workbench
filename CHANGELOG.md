@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.5.0 - 2026-09-05
+
+- Add the third sibling skill, **`comparegroups-guide`**, for contract-driven
+  descriptive statistics and publication-ready Table 1 workflows using the
+  official R `compareGroups` package.
+- Add table specification schema `1.0`, sanitized cross-sectional, panel,
+  repeated-cross-section, and attrition templates, plus deterministic R
+  dependency, input-audit, execution, and independent-validation entrypoints.
+- Preserve Stata variable/value labels through `haven`; block unknown or
+  unlabelled numeric categorical codes unless the contract provides explicit
+  levels and reference semantics.
+- Add panel `dual` output: wave-specific or p-suppressed primary evidence plus
+  a clearly labelled pooled compatibility table whose independence limitation
+  is retained in metadata and DOCX notes.
+- Produce a true three-line `officer`/`flextable` DOCX, display CSV,
+  unformatted numeric-long CSV, retained per-block `compareGroups` and
+  `createTable` RDS objects, metadata, validation, manifest, and SHA-256 hashes.
+- Route ClaudeR sync/async execution through the existing workbench discipline,
+  including seven named progress stages and same-job-ID polling, without
+  introducing artificial fan-out for a single table.
+- Add synthetic cross-platform tests and document the private five-case Mac
+  regression gate. Public fixtures contain no user paths, private variables,
+  datasets, or results.
+
 ## v0.4.6 - 2026-09-05
 
 - Prevent verbose ClaudeR async jobs from stalling on full process stdout or

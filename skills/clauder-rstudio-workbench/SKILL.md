@@ -23,6 +23,16 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
 
+## Domain skill routing
+
+- Use `$comparegroups-guide` for descriptive statistics, Table 1, labelled
+  Stata inputs, panel/repeated-cross-section presentation, attrition tables,
+  and validated three-line DOCX exports.
+- Use `$cmaverse-paired-mval` for paired M=0/M=1 CMAverse bootstrap and Delta
+  CDE validation.
+- This core skill supplies the RStudio/MCP execution, async identity, resource,
+  fan-out, monitoring, and completion discipline used by both domain skills.
+
 ## Executable Harness Layer
 
 Use the matching entrypoint from this skill directory, or use the installed
@@ -203,15 +213,15 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 
 ## Compatible Release
 
-This skill collection release `v0.4.6` is paired with the
+This skill collection release `v0.5.0` is paired with the
 `lzhs1995/ClaudeR` local fork branch `0.14.1.9001`, based on upstream ClaudeR `0.14.1`, and MCP
 bridge `0.14.5`. The collection includes this workbench skill and the companion
-`cmaverse-paired-mval` skill.
+`cmaverse-paired-mval` and `comparegroups-guide` skills.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain
 non-ASCII paths. `v0.2.4` is the minimum safe release because it writes UTF-8
 without BOM and validates TOML after writing. Releases after `v0.2.4`, including
-`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, `v0.4.4`, `v0.4.5`, and `v0.4.6`
+`v0.3.4`, `v0.4.1`, `v0.4.2`, `v0.4.3`, `v0.4.4`, `v0.4.5`, `v0.4.6`, and `v0.5.0`
 inherit that
 config-writer fix.

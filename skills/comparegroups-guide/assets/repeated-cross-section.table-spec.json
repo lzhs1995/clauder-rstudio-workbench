@@ -1,0 +1,13 @@
+{
+  "spec_version": "1.0",
+  "analysis_id": "repeated-cross-section-table",
+  "input": {"path": "/absolute/path/repeated_cross_section.dta", "format": "auto", "id": null, "time": "year"},
+  "analysis": {"group": "year", "panel_mode": "cross_section", "subset": null},
+  "blocks": [
+    {"id": "outcomes", "label": "被解释变量", "variables": [
+      {"name": "score", "type": "continuous", "method": "normal", "digits": 3, "label": null, "include_missing": false, "reference": null, "levels": null}
+    ]}
+  ],
+  "display": {"show_all": true, "show_n": true, "show_p_overall": true, "show_p_multiple": false, "show_p_trend": true, "p_digits": 3, "compatibility_export2word": false},
+  "outputs": {"stem": "Table_year", "formats": ["docx", "csv", "rds"]}
+}

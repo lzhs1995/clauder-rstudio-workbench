@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lzhs1995/clauder-rstudio-workbench/schemas/table-spec-1.0.json",
+  "title": "compareGroups Guide table specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_version", "analysis_id", "input", "analysis", "blocks", "display", "outputs"],
+  "properties": {
+    "spec_version": {"const": "1.0"},
+    "analysis_id": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "format"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "format": {"enum": ["auto", "dta", "sav", "csv", "tsv", "rds"]},
+        "id": {"type": ["string", "null"]},
+        "time": {"type": ["string", "null"]}
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "panel_mode", "subset"],
+      "properties": {
+        "group": {"type": ["string", "null"]},
+        "panel_mode": {"enum": ["cross_section", "dual", "pooled_compatibility"]},
+        "subset": {"type": ["string", "null"]},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "variables"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "variables": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type", "method", "digits", "label", "include_missing"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "type": {"enum": ["continuous", "categorical"]},
+                "method": {"enum": ["normal", "nonnormal", "categorical"]},
+                "digits": {"type": "integer", "minimum": 0, "maximum": 8},
+                "label": {"type": ["string", "null"]},
+                "include_missing": {"type": "boolean"},
+                "reference": {"type": ["string", "null"]},
+                "levels": {
+                  "type": ["array", "null"],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["value", "label"],
+                    "properties": {
+                      "value": {"type": ["string", "number", "integer", "boolean"]},
+                      "label": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["show_all", "show_n", "show_p_overall", "show_p_multiple", "show_p_trend", "p_digits"],
+      "properties": {
+        "show_all": {"type": "boolean"},
+        "show_n": {"type": "boolean"},
+        "show_p_overall": {"type": "boolean"},
+        "show_p_multiple": {"type": "boolean"},
+        "show_p_trend": {"type": "boolean"},
+        "p_digits": {"type": "integer", "minimum": 0, "maximum": 8},
+        "compatibility_export2word": {"type": "boolean", "default": false}
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stem", "formats"],
+      "properties": {
+        "stem": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$"},
+        "formats": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": {"enum": ["docx", "csv", "rds"]}
+        }
+      }
+    }
+  }
+}

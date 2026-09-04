@@ -1,0 +1,14 @@
+{
+  "spec_version": "1.0",
+  "analysis_id": "baseline-attrition-table",
+  "input": {"path": "/absolute/path/baseline_with_retention.dta", "format": "auto", "id": "person_id", "time": null},
+  "analysis": {"group": "retention_status", "panel_mode": "cross_section", "subset": null, "note": "retention_status must be constructed before follow-up cases are filtered."},
+  "blocks": [
+    {"id": "baseline", "label": "基期特征", "variables": [
+      {"name": "baseline_age", "type": "continuous", "method": "normal", "digits": 3, "label": null, "include_missing": false, "reference": null, "levels": null},
+      {"name": "baseline_health", "type": "categorical", "method": "categorical", "digits": 2, "label": null, "include_missing": true, "reference": null, "levels": null}
+    ]}
+  ],
+  "display": {"show_all": true, "show_n": true, "show_p_overall": true, "show_p_multiple": false, "show_p_trend": false, "p_digits": 3, "compatibility_export2word": false},
+  "outputs": {"stem": "Table_attrition", "formats": ["docx", "csv", "rds"]}
+}

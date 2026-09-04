@@ -1,6 +1,6 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.4.6`、ClaudeR `0.14.1.9001`
+> 适用版本：`clauder-rstudio-workbench v0.5.0`、ClaudeR `0.14.1.9001`
 >（基于 upstream `0.14.1`）、`clauder-mcp 0.14.5`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
@@ -43,6 +43,7 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 | workbench skill | 告诉 agent 如何安全选择和组合工具 | Markdown 本身不是完成证据 |
 | workbench harness | doctor、async guard、fan-out、资源门禁、monitor、completion | 不判断具体统计模型是否科学正确 |
 | `cmaverse-paired-mval` | paired bootstrap、Delta CDE、CMAverse 科学验收 | 不负责通用 MCP 连接或百度客户端 |
+| `comparegroups-guide` | 描述统计、标签审计、面板双轨表、三线 DOCX 和数值核验 | 不替代纵向模型或 ClaudeR 执行层 |
 | tmux/caffeinate | macOS/POSIX 长任务的可选后台托管壳 | 不是 ClaudeR、RStudio 或 MCP 的组成部分 |
 
 百度网盘、S3 或其他归档器属于工作流消费者。只有接口、失败语义和验证逻辑经过
@@ -50,9 +51,9 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.4.6 推荐值 | 验证方式 |
+| 层 | v0.5.0 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.4.6` | `clauder-workbench --version` |
+| workbench | `0.5.0` | `clauder-workbench --version` |
 | ClaudeR | `0.14.1.9001` 本地 fork | `packageVersion("ClaudeR")` |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
 | MCP bridge | `0.14.5` | 安装元数据/`pyproject.toml` |
@@ -460,6 +461,46 @@ Reviewers、DOCX 注释、引用和 notebook 等高级工作流。使用前应�
 这次事件同时证明了 compute-first 解耦是必要的：归档消费者失败不应停止仍在运行的
 bootstrap；但上传未通过独立回下载哈希验证时，也绝不能删除本地 RDS。
 
+### 14.1 compareGroups Guide：描述统计三线表
+
+`comparegroups-guide` 是第三个并列 skill。它把自然语言制表需求沉淀为
+`table-spec.json`，由官方 `compareGroups` 负责统计计算，由 ClaudeR 负责读取旧脚本、
+检查标签、生成合同、执行/异步轮询、读取 DOCX 和复核论文数值。
+
+固定流程：
+
+```bash
+Rscript skills/comparegroups-guide/scripts/check_dependencies.R
+Rscript skills/comparegroups-guide/scripts/audit_input.R \
+  --spec /absolute/path/table-spec.json \
+  --output /absolute/path/input-audit.json
+Rscript skills/comparegroups-guide/scripts/run_comparegroups.R \
+  --spec /absolute/path/table-spec.json \
+  --output-root /absolute/path/new-results
+Rscript skills/comparegroups-guide/scripts/validate_comparegroups.R \
+  --output-root /absolute/path/new-results --stem Table_1
+```
+
+输出同时包含三线 DOCX、展示 CSV、未格式化数值长表、原始
+`compareGroups/createTable` RDS、输入/标签/方法/版本元数据、validation 和
+manifest。论文叙述必须以数值长表为准，DOCX 只负责展示。
+
+个人做表规范已经固化：连续正态变量为“均值（标准差）”并保留 3 位小数，偏态变量
+为“中位数 [Q1, Q3]”并保留 3 位小数，分类变量为“n（%）”且比例保留 2 位；
+`[ALL]` 显示为“全样本”，`p.overall` 显示为“p-value”；变量按被解释变量、解释
+变量、中介/调节变量、个体、父母、家庭、混杂因素等区块排列。
+
+对于 Stata 数据，优先保留变量标签和值标签；数值型无标签分类变量必须在合同中显式
+给出编码、显示标签和参照水平。遇到重复 person-wave 行时，`panel_mode: dual`
+会生成安全主表和兼容 pooled 表：正式主表按波次输出，或隐藏不成立的 pooled p 值；
+兼容表保留旧结果，但必须携带“普通 t/卡方检验假设独立行”的限制说明。删除/保留样本
+比较必须在删除记录前构造状态，并以基期一人一行为正式分析单位。
+
+单张小表用 ClaudeR `execute_r`；大型 `.dta` 或多表 DOCX 批处理只提交一次
+`execute_r_async`，再使用同一个 job ID 轮询
+`preflight → import → labels → compute → render → validate → complete`。只有多个真正
+独立的表格合同时才使用 workbench fan-out。
+
 ## 15. 已完成的关键验收
 
 ### v0.4.2 Native 70 分钟全绿浸泡
@@ -478,6 +519,13 @@ bootstrap；但上传未通过独立回下载哈希验证时，也绝不能删�
   completion 均 PASS，结论为 `CORE_PASS`。
 - Citation 外部网络服务仍为 `BLOCKED_EXTERNAL`，因此未写成 `ALL_PASS`。
 - 后续 v0.4.5/v0.4.6 已把兼容目标升级到 ClaudeR 0.14.1/bridge 0.14.5。
+
+### v0.5.0 compareGroups skill collection 扩展
+
+- 新增第三个并列 skill `comparegroups-guide`，不把统计计算误写成 ClaudeR 内建能力。
+- 引入独立 `spec_version=1.0` 的表格合同；workbench evidence schema 仍为 `0.2.4`。
+- 用真实三线 DOCX、数值长表、RDS、元数据、validation、manifest 和哈希组成可核验交付。
+- 公共仓库只包含合成数据和去标识模板；私人 `.dta`、变量清单和实证结果只在本机验收。
 
 ## 16. 一页式速查表
 
@@ -498,6 +546,9 @@ bootstrap；但上传未通过独立回下载哈希验证时，也绝不能删�
 | 旧 async pipe 救援 | `async-io-rescue run/status` |
 | 合并前门禁 | `merge-gate` |
 | 正式完成 | `completion-check --mode formal` |
+| 描述统计输入审计 | `$comparegroups-guide` + `audit_input.R` |
+| 三线表生成 | `run_comparegroups.R --spec ... --output-root ...` |
+| 三线表独立复验 | `validate_comparegroups.R --output-root ... --stem ...` |
 
 ## 17. 版本管理与贡献
 

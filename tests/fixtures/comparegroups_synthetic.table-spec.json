@@ -1,0 +1,17 @@
+{
+  "spec_version": "1.0",
+  "analysis_id": "synthetic-panel",
+  "input": {"path": "tests/fixtures/comparegroups_synthetic.csv", "format": "csv", "id": "person_id", "time": "wave"},
+  "analysis": {"group": "group", "panel_mode": "dual", "subset": null},
+  "blocks": [
+    {"id": "outcomes", "label": "被解释变量", "variables": [
+      {"name": "outcome", "type": "continuous", "method": "normal", "digits": 3, "label": "Outcome", "include_missing": false, "reference": null, "levels": null},
+      {"name": "skewed", "type": "continuous", "method": "nonnormal", "digits": 3, "label": "Skewed", "include_missing": false, "reference": null, "levels": null}
+    ]},
+    {"id": "covariates", "label": "个体特征", "variables": [
+      {"name": "category", "type": "categorical", "method": "categorical", "digits": 2, "label": "Category", "include_missing": true, "reference": "Low", "levels": null}
+    ]}
+  ],
+  "display": {"show_all": true, "show_n": true, "show_p_overall": true, "show_p_multiple": false, "show_p_trend": false, "p_digits": 3, "compatibility_export2word": false},
+  "outputs": {"stem": "Table_synthetic", "formats": ["docx", "csv", "rds"]}
+}

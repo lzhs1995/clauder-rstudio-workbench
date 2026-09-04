@@ -1,0 +1,9 @@
+person_id,wave,group,outcome,skewed,category
+1,1,A,10.2,1.1,Low
+2,1,A,11.8,1.4,High
+3,1,B,15.1,4.9,Low
+4,1,B,14.2,5.1,High
+1,2,A,10.9,1.2,Low
+2,2,A,12.6,1.8,
+3,2,B,15.8,5.4,Low
+4,2,B,14.9,5.8,High
