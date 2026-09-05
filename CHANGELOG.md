@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.6.0 - 2026-09-05
+
+- Add backward-compatible table spec `1.1` with resolved defaults, explicit
+  grouping levels/reference, `hide_no`, ordered subset variants, and auditable
+  normalization metadata while retaining the original spec `1.0` contract.
+- Add automatic long-panel attrition derivation that determines follow-up
+  presence before selecting exactly one baseline row per ID and blocks missing
+  IDs, duplicate baselines, overlapping waves, overwritten columns, and empty
+  groups.
+- Add ordered batch manifests and run/validate entrypoints with independent
+  output ownership, stop-after-failure behavior, preserved completed evidence,
+  recursive manifests, and SHA-256 sums.
+- Emit every resolved subset/panel variant as a deterministic
+  `<stem>__<variant-id>` evidence set in addition to the backward-compatible
+  combined outputs.
+- Expand validation to compatible structured expected/actual/detail fields,
+  cross-check metadata/RDS row and group contracts, enforce per-table
+  true-three-line OOXML with no extra rules or vertical grid, verify manifest
+  membership, byte sizes, and hashes, and add configurable font, size,
+  orientation, repeated headers, title, footnote, and widths.
+- Add one test entrypoint, declare `jsonschema` as a development dependency,
+  and gate compareGroups 4.10.3 on three operating systems plus pinned 4.10.2
+  compatibility on Linux.
+
 ## v0.5.0 - 2026-09-05
 
 - Add the third sibling skill, **`comparegroups-guide`**, for contract-driven

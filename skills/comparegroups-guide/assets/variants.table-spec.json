@@ -1,0 +1,49 @@
+{
+  "spec_version": "1.1",
+  "analysis_id": "ordered_subset_variants",
+  "input": {"path": "data/analysis.dta", "format": "dta", "id": "person_id", "time": "wave"},
+  "defaults": {"continuous_digits": 3, "categorical_digits": 2, "p_digits": 3, "include_missing": true},
+  "analysis": {
+    "group": "treatment",
+    "panel_mode": "dual",
+    "subset": "eligible == 1",
+    "note": "Ordered subgroup variants share one statistical contract.",
+    "group_reference": "Control",
+    "group_levels": [
+      {"value": 0, "label": "Control"},
+      {"value": 1, "label": "Treatment"}
+    ],
+    "variants": [
+      {"id": "female", "label": "Women", "subset": "sex == 2"},
+      {"id": "male", "label": "Men", "subset": "sex == 1"}
+    ]
+  },
+  "blocks": [
+    {
+      "id": "outcomes",
+      "label": "Outcomes",
+      "variables": [
+        {"name": "score", "type": "continuous", "method": "normal", "label": "Score", "reference": null, "levels": null}
+      ]
+    }
+  ],
+  "display": {
+    "show_all": true,
+    "show_n": true,
+    "show_p_overall": true,
+    "show_p_multiple": false,
+    "show_p_trend": false,
+    "hide_no": null,
+    "compatibility_export2word": false,
+    "docx": {
+      "font_family": "Times New Roman",
+      "font_size": 10,
+      "orientation": "landscape",
+      "repeat_header": true,
+      "title": null,
+      "footnote": null,
+      "column_widths": null
+    }
+  },
+  "outputs": {"stem": "Table_variants", "formats": ["docx", "csv", "rds"]}
+}

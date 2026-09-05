@@ -2,7 +2,7 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.5.0` release is cross-platform and targets the local ClaudeR
+The `v0.6.0` release is cross-platform and targets the local ClaudeR
 `0.14.1.9001` fork based on upstream ClaudeR `0.14.1` / `clauder-mcp 0.14.5`, while
 retaining strict native provenance and durable async progress.
 
@@ -49,7 +49,7 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-These commands use the reviewed `v0.5.0` release line.
+These commands use the reviewed `v0.6.0` release line.
 
 On Windows PowerShell:
 
@@ -82,13 +82,13 @@ python -m clauder_workbench doctor
 To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 If the Windows `git clone` is blocked by a proxy or reset connection, use the
-published `v0.5.0` tag-zip bootstrap instead:
+published `v0.6.0` tag-zip bootstrap instead:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.5.0.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.5.0"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.6.0.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.6.0"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.5.0/clauder-rstudio-workbench-v0.5.0.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.0/clauder-rstudio-workbench-v0.6.0.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -152,6 +152,20 @@ Rscript skills/comparegroups-guide/scripts/run_comparegroups.R \
   --output-root /absolute/path/new-results
 Rscript skills/comparegroups-guide/scripts/validate_comparegroups.R \
   --output-root /absolute/path/new-results --stem Table_1
+```
+
+Spec 1.1 adds reusable defaults, ordered subset variants, automatic attrition,
+explicit group recoding/reference, `hide_no`, and DOCX controls. Each resolved
+variant is emitted both in the combined evidence set and as an independent
+`<stem>__<variant-id>` DOCX/CSV/RDS/metadata set. For several independent
+specifications, run and validate one ordered batch:
+
+```bash
+Rscript skills/comparegroups-guide/scripts/run_comparegroups_batch.R \
+  --manifest /absolute/path/batch-manifest.json \
+  --output-root /absolute/path/new-batch-results
+Rscript skills/comparegroups-guide/scripts/validate_comparegroups_batch.R \
+  --output-root /absolute/path/new-batch-results
 ```
 
 The runner maps readable methods (`normal`, `nonnormal`, `categorical`) to the
@@ -238,6 +252,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.6.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds backward-compatible spec 1.1 defaults, ordered variants, automatic attrition, batch manifests, structured validation diagnostics, configurable true-three-line DOCX output, and explicit compareGroups 4.10.2/4.10.3 gates. |
 | `v0.5.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds the `comparegroups-guide` sibling skill, versioned Table 1 contract, labelled-data and panel audit, true three-line DOCX output, numeric reconciliation artifacts, validation, and cross-platform tests. |
 | `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
 | `v0.4.5` | upstream `0.14.1` / bridge `0.14.5` compatible | Requires the complete 41-tool surface (including `suggest_edit`), adds OS-independent compute-first native deferral with an unchanged strict completion gate, and writes atomic live fan-out status containing the original async job IDs. |
@@ -315,10 +330,10 @@ written to `<USER_HOME>/.clauder_workbench/evidence`.
 
 For the installer smoke transcript format, see `tests/install_smoke.md`.
 
-Current validation status for the v0.5.0 release line:
+Current validation status for the v0.6.0 release line:
 
 - Local Windows install, reinstall idempotence, and privacy scan have passed.
-- The macOS release candidate passed the 203-test Python harness suite, skill
+- The macOS release candidate passed the 206-test Python harness suite, skill
   validation, MCP stdio/tool-surface checks, real RStudio workflows,
   multi-session cleanup, and asynchronous fan-out regression tests.
 - An earlier full-green qualification ran eight workers for 4,200 seconds each
@@ -419,7 +434,7 @@ For the published Windows release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.5.0
+git checkout v0.6.0
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

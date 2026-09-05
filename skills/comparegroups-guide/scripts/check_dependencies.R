@@ -9,5 +9,6 @@ if (length(missing)) {
   quit(status = 2L)
 }
 versions <- vapply(required_packages, function(pkg) as.character(utils::packageVersion(pkg)), character(1))
+cg_require_packages()
 cat("COMPAREGROUPS_DEPENDENCIES_OK\n")
 print(versions)
