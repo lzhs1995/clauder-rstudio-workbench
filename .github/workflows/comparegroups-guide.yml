@@ -2,7 +2,7 @@ name: comparegroups-guide
 
 on:
   push:
-    branches: [main, "feature/comparegroups-guide-v0.5.0"]
+    branches: [main, "feature/comparegroups-guide-v0.6.0"]
   pull_request:
   workflow_dispatch:
 
@@ -44,18 +44,56 @@ jobs:
             any::jsonlite
             any::digest
             any::rmarkdown
+            any::remotes
+
+      - name: Pin compareGroups 4.10.3
+        run: |
+          remotes::install_version("compareGroups", version = "4.10.3", upgrade = "never")
+          stopifnot(as.character(packageVersion("compareGroups")) == "4.10.3")
+        shell: Rscript {0}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: python -m pip install jsonschema
+      - run: python -m pip install -e ".[dev]"
 
-      - name: Synthetic Python integration tests
-        run: python -m unittest tests.test_comparegroups_guide -v
+      - name: Unified comparegroups suite
+        run: python tests/run_comparegroups_suite.py
 
-      - name: Synthetic and compareGroups::regicor R tests
-        run: Rscript tests/test_comparegroups_guide.R
+  comparegroups-4-10-2:
+    name: ubuntu / compareGroups 4.10.2 compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::compareGroups
+            any::haven
+            any::labelled
+            any::officer
+            any::flextable
+            any::jsonlite
+            any::digest
+            any::rmarkdown
+            any::remotes
+      - name: Pin compareGroups 4.10.2
+        run: |
+          remotes::install_version("compareGroups", version = "4.10.2", upgrade = "never")
+          stopifnot(as.character(packageVersion("compareGroups")) == "4.10.2")
+        shell: Rscript {0}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[dev]"
+      - name: Unified compatibility suite
+        run: python tests/run_comparegroups_suite.py
 
   repository-gates:
     runs-on: ubuntu-latest
@@ -66,7 +104,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install pyyaml
+      - run: python -m pip install -e ".[dev]"
+      - name: Repository-wide Python suite
+        run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Validate all three skills
         run: |
           python .github/scripts/quick_validate.py skills/clauder-rstudio-workbench

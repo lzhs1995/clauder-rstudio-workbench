@@ -17,6 +17,10 @@ environment and emits the same stages to stdout for Rscript use:
 
 `preflight -> import -> labels -> compute -> render -> validate -> complete`
 
+The batch runner adds `batch_preflight`, one `batch_job` message per declared
+job, and `batch_complete`. Submit the whole batch in one `execute_r_async`
+call; do not submit each manifest row as a separate job.
+
 Transient polling failure is not task failure. Inspect durable outputs and poll
 the original job again. Never submit a second copy while the first can still be
 running.

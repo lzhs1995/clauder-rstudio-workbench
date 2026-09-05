@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "batch_id": "descriptive_tables",
+  "jobs": [
+    {"id": "cross_section", "spec_path": "cross-sectional.table-spec.json", "output_dir": "01_cross_section"},
+    {"id": "attrition", "spec_path": "attrition-auto.table-spec.json", "output_dir": "02_attrition"}
+  ]
+}

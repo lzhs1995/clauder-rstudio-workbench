@@ -26,13 +26,16 @@ Do not alphabetize variables or silently move them between blocks.
 Rename `[ALL]` to `全样本` and `p.overall` to `p-value`. Show the total
 column and available N by default. Multiple-comparison and trend p values are
 opt-in. Always preserve the raw numeric values separately from formatted text.
+Use `display.hide_no` when the legacy table intentionally suppresses a
+negative category such as `no`; do not infer that choice from the data.
 
 ## Coding style
 
 - Build named lists/specifications instead of repeated `get()`/`assign()`.
 - Never use `c` as a loop variable.
 - Reuse one audited base specification to derive lifecycle, sex, year, and
-  sample-selection variants.
+  sample-selection variants. Use ordered 1.1 `analysis.variants` when the group
+  is unchanged, and a batch manifest when the grouping variable changes.
 - Prefer Stata variable labels. Require an explicit decision for value-label
   ordering and reference level.
 - Use `officer` + `flextable` for complex Word output. `export2word()` remains

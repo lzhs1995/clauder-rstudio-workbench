@@ -1,0 +1,50 @@
+{
+  "spec_version": "1.1",
+  "analysis_id": "attrition_auto",
+  "input": {"path": "data/panel.dta", "format": "dta", "id": "person_id", "time": "wave"},
+  "defaults": {"continuous_digits": 3, "categorical_digits": 2, "p_digits": 3, "include_missing": false},
+  "analysis": {
+    "group": null,
+    "panel_mode": "cross_section",
+    "subset": null,
+    "note": "Baseline characteristics by observed follow-up retention.",
+    "group_reference": "Deleted",
+    "group_levels": null,
+    "attrition": {
+      "baseline_values": [1],
+      "followup_values": [2, 3],
+      "group_name": "retention_status",
+      "retained_label": "Retained",
+      "deleted_label": "Deleted"
+    }
+  },
+  "blocks": [
+    {
+      "id": "baseline",
+      "label": "Baseline characteristics",
+      "variables": [
+        {"name": "age", "type": "continuous", "method": "normal", "label": null, "reference": null, "levels": null},
+        {"name": "sex", "type": "categorical", "method": "categorical", "label": null, "reference": "Male", "levels": null}
+      ]
+    }
+  ],
+  "display": {
+    "show_all": true,
+    "show_n": true,
+    "show_p_overall": true,
+    "show_p_multiple": false,
+    "show_p_trend": false,
+    "hide_no": "no",
+    "compatibility_export2word": false,
+    "docx": {
+      "font_family": "Times New Roman",
+      "font_size": 10,
+      "orientation": "portrait",
+      "repeat_header": true,
+      "title": "Baseline attrition comparison",
+      "footnote": "Retention is derived before baseline filtering.",
+      "column_widths": null
+    }
+  },
+  "outputs": {"stem": "Table_attrition", "formats": ["docx", "csv", "rds"]}
+}

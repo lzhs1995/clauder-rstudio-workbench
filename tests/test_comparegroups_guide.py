@@ -46,6 +46,8 @@ class CompareGroupsGuideTests(unittest.TestCase):
     def test_skill_layout_and_openai_interface(self) -> None:
         self.assertTrue((SKILL / "SKILL.md").is_file())
         self.assertTrue((SKILL / "schemas" / "table-spec.schema.json").is_file())
+        self.assertTrue((SKILL / "schemas" / "table-spec-1.1.schema.json").is_file())
+        self.assertTrue((SKILL / "schemas" / "batch-manifest.schema.json").is_file())
         openai = (SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
         self.assertIn("interface:", openai)
         self.assertIn("$comparegroups-guide", openai)
@@ -74,23 +76,46 @@ class CompareGroupsGuideTests(unittest.TestCase):
         methods = schema["properties"]["blocks"]["items"]["properties"]["variables"]["items"]["properties"]["method"]["enum"]
         self.assertEqual(methods, ["normal", "nonnormal", "categorical"])
         templates = list((SKILL / "assets").glob("*.table-spec.json"))
-        self.assertEqual(len(templates), 4)
+        self.assertGreaterEqual(len(templates), 6)
         for template in templates:
             document = json.loads(template.read_text(encoding="utf-8"))
-            self.assertEqual(document["spec_version"], "1.0")
+            self.assertIn(document["spec_version"], {"1.0", "1.1"})
             self.assertNotIn("/Users/", template.read_text(encoding="utf-8"))
 
     def test_schema_validates_templates_and_rejects_missing_fields(self) -> None:
         from jsonschema import Draft202012Validator
 
-        schema = json.loads((SKILL / "schemas" / "table-spec.schema.json").read_text(encoding="utf-8"))
-        Draft202012Validator.check_schema(schema)
-        validator = Draft202012Validator(schema)
+        schemas = {
+            "1.0": json.loads((SKILL / "schemas" / "table-spec.schema.json").read_text(encoding="utf-8")),
+            "1.1": json.loads((SKILL / "schemas" / "table-spec-1.1.schema.json").read_text(encoding="utf-8")),
+        }
+        for schema in schemas.values():
+            Draft202012Validator.check_schema(schema)
         for template in (SKILL / "assets").glob("*.table-spec.json"):
-            self.assertEqual(list(validator.iter_errors(json.loads(template.read_text(encoding="utf-8")))), [])
+            document = json.loads(template.read_text(encoding="utf-8"))
+            validator = Draft202012Validator(schemas[document["spec_version"]])
+            self.assertEqual(list(validator.iter_errors(document)), [])
         missing = json.loads(SPEC.read_text(encoding="utf-8"))
         del missing["blocks"]
+        validator = Draft202012Validator(schemas["1.0"])
         self.assertTrue(any(error.validator == "required" for error in validator.iter_errors(missing)))
+
+        batch_schema = json.loads((SKILL / "schemas" / "batch-manifest.schema.json").read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(batch_schema)
+        batch = json.loads((SKILL / "assets" / "batch-manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(Draft202012Validator(batch_schema).iter_errors(batch)), [])
+
+    def test_schema_1_1_defaults_are_optional_but_methods_remain_explicit(self) -> None:
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads((SKILL / "schemas" / "table-spec-1.1.schema.json").read_text(encoding="utf-8"))
+        document = json.loads((SKILL / "assets" / "attrition-auto.table-spec.json").read_text(encoding="utf-8"))
+        variable = document["blocks"][0]["variables"][0]
+        self.assertNotIn("digits", variable)
+        self.assertNotIn("include_missing", variable)
+        self.assertEqual(list(Draft202012Validator(schema).iter_errors(document)), [])
+        del variable["method"]
+        self.assertTrue(any(error.validator == "required" for error in Draft202012Validator(schema).iter_errors(document)))
 
     def test_skill_local_markdown_links_resolve(self) -> None:
         for document in [SKILL / "SKILL.md", *(SKILL / "references").glob("*.md")]:
@@ -134,6 +159,7 @@ class CompareGroupsGuideTests(unittest.TestCase):
                 "Table_synthetic_metadata.json",
                 "validation.csv",
                 "manifest.csv",
+                "SHA256SUMS.txt",
             }
             self.assertEqual({p.name for p in output.iterdir()}, expected)
 
@@ -170,6 +196,8 @@ class CompareGroupsGuideTests(unittest.TestCase):
             )
 
             metadata = json.loads((output / "Table_synthetic_metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["spec_version"], "1.0")
+            self.assertEqual(metadata["resolution"]["input_spec_version"], "1.0")
             self.assertEqual(metadata["input_sha256"], input_hash)
             self.assertTrue(metadata["panel"]["repeated_ids"])
             warning = metadata["variants"]["compatibility_pooled"]["warning"]
@@ -180,6 +208,16 @@ class CompareGroupsGuideTests(unittest.TestCase):
             for row in manifest:
                 path = output / row["path"]
                 self.assertEqual(sha256(path), row["sha256"])
+            sums = (output / "SHA256SUMS.txt").read_text(encoding="utf-8").splitlines()
+            self.assertTrue(any(line.endswith("  manifest.csv") for line in sums))
+
+            with (output / "validation.csv").open(encoding="utf-8") as handle:
+                validation = list(csv.DictReader(handle))
+            self.assertEqual(
+                set(validation[0]),
+                {"check", "passed", "expected", "actual", "detail", "details"},
+            )
+            self.assertTrue(all(row["detail"] == "" for row in validation))
 
     def test_docx_has_three_line_borders_and_no_vertical_grid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -230,6 +268,72 @@ class CompareGroupsGuideTests(unittest.TestCase):
             result = self.run_r("audit_input.R", "--spec", bad, "--output", Path(tmp) / "audit.json")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requires explicit levels", result.stdout)
+
+    def test_unknown_group_codes_and_overlapping_attrition_waves_are_blocked(self) -> None:
+        group_spec = json.loads(SPEC.read_text(encoding="utf-8"))
+        group_spec["spec_version"] = "1.1"
+        group_spec["input"]["path"] = str(FIXTURE)
+        group_spec["analysis"]["group"] = "person_id"
+        group_spec["analysis"]["group_levels"] = [
+            {"value": 1, "label": "One"},
+            {"value": 2, "label": "Two"},
+        ]
+        group_spec["analysis"]["group_reference"] = "One"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "unknown-group.json"
+            path.write_text(json.dumps(group_spec), encoding="utf-8")
+            result = self.run_r("audit_input.R", "--spec", path, "--output", Path(tmp) / "audit.json")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown grouping codes", result.stdout)
+
+        attrition = json.loads((SKILL / "assets" / "attrition-auto.table-spec.json").read_text(encoding="utf-8"))
+        attrition["input"]["path"] = str(FIXTURE)
+        attrition["analysis"]["attrition"]["baseline_values"] = [1]
+        attrition["analysis"]["attrition"]["followup_values"] = [1]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "overlap.json"
+            path.write_text(json.dumps(attrition), encoding="utf-8")
+            result = self.run_r("audit_input.R", "--spec", path, "--output", Path(tmp) / "audit.json")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not overlap", result.stdout)
+
+    def test_batch_stops_after_failure_and_preserves_completed_evidence(self) -> None:
+        first = json.loads(SPEC.read_text(encoding="utf-8"))
+        first["input"]["path"] = str(FIXTURE)
+        second = json.loads(SPEC.read_text(encoding="utf-8"))
+        second["analysis_id"] = "missing-input"
+        second["input"]["path"] = "/definitely/not/a/real/input.csv"
+        second["outputs"]["stem"] = "Table_missing"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_path = root / "first.json"
+            second_path = root / "second.json"
+            first_path.write_text(json.dumps(first), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+            manifest = {
+                "manifest_version": "1.0",
+                "batch_id": "failure-contract",
+                "jobs": [
+                    {"id": "first", "spec_path": str(first_path), "output_dir": "01_first"},
+                    {"id": "second", "spec_path": str(second_path), "output_dir": "02_second"},
+                ],
+            }
+            manifest_path = root / "batch.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "batch-output"
+            result = self.run_r("run_comparegroups_batch.R", "--manifest", manifest_path, "--output-root", output)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertTrue((output / "01_first" / "Table_synthetic.docx").is_file())
+            self.assertTrue((output / "batch_manifest.csv").is_file())
+            self.assertTrue((output / "SHA256SUMS.txt").is_file())
+            with (output / "batch_summary.csv").open(encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual([row["status"] for row in rows], ["PASS", "FAIL"])
+            with (output / "batch_validation.csv").open(encoding="utf-8") as handle:
+                validation = list(csv.DictReader(handle))
+            failed = [row for row in validation if row["passed"].lower() == "false"]
+            self.assertTrue(failed)
+            self.assertTrue(all(row["detail"] for row in failed))
 
     def test_export2word_compatibility_mode(self) -> None:
         spec = json.loads(SPEC.read_text(encoding="utf-8"))

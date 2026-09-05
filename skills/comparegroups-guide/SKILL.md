@@ -23,7 +23,10 @@ the verified numbers with the manuscript. This skill does not replace either.
 
 ## Standard workflow
 
-1. Copy the nearest template from `assets/` and edit only the copy.
+1. Copy the nearest 1.0 or 1.1 template from `assets/` and edit only the copy.
+   Use 1.1 when defaults, ordered subset variants, automatic attrition,
+   `hide_no`, group recoding, or DOCX controls reduce repetition. Resolved
+   variants also receive independent `<stem>__<variant-id>` evidence files.
 2. Audit the actual input before choosing methods:
 
    ```bash
@@ -53,6 +56,16 @@ the verified numbers with the manuscript. This skill does not replace either.
 6. Reconcile the unformatted numeric CSV with the manuscript. Treat the DOCX
    as presentation, not as the numeric source of truth.
 
+For several independent specifications, submit one batch contract once:
+
+```bash
+Rscript scripts/run_comparegroups_batch.R \
+  --manifest /absolute/path/batch-manifest.json \
+  --output-root /absolute/path/new-batch-results
+Rscript scripts/validate_comparegroups_batch.R \
+  --output-root /absolute/path/new-batch-results
+```
+
 ## Hard rules
 
 - Never overwrite an input dataset, an old R script, or an existing DOCX.
@@ -61,10 +74,13 @@ the verified numbers with the manuscript. This skill does not replace either.
 - Prefer Stata variable/value labels, but record every override in metadata.
 - Repeated person-wave rows are not independent. With `panel_mode: "dual"`,
   produce a safe primary view and a clearly labelled pooled compatibility view.
-- For attrition comparisons, construct retained/deleted status before filtering
-  and use one baseline row per person as the formal analysis unit.
+- For attrition comparisons, either supply a reviewed status column or use the
+  1.1 automatic contract. Automatic attrition identifies follow-up presence
+  before selecting exactly one baseline row per person, and blocks any
+  non-missing ID that lacks a baseline row.
 - Use one ClaudeR async submission for a batch and poll only its original job
   ID. `running` and transient transport errors are never reasons to resubmit.
 - Use workbench fan-out only for genuinely independent table contracts.
 - A run passes only when the DOCX reopens, the numeric and display outputs are
-  complete, the manifest hashes match, and every validation row is `TRUE`.
+  complete, manifest membership/byte sizes/hashes match, and every validation
+  row is `TRUE`.

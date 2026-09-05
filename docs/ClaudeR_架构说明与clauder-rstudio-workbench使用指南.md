@@ -1,6 +1,6 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.5.0`、ClaudeR `0.14.1.9001`
+> 适用版本：`clauder-rstudio-workbench v0.6.0`、ClaudeR `0.14.1.9001`
 >（基于 upstream `0.14.1`）、`clauder-mcp 0.14.5`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
@@ -51,9 +51,9 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.5.0 推荐值 | 验证方式 |
+| 层 | v0.6.0 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.5.0` | `clauder-workbench --version` |
+| workbench | `0.6.0` | `clauder-workbench --version` |
 | ClaudeR | `0.14.1.9001` 本地 fork | `packageVersion("ClaudeR")` |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
 | MCP bridge | `0.14.5` | 安装元数据/`pyproject.toml` |
@@ -481,9 +481,21 @@ Rscript skills/comparegroups-guide/scripts/validate_comparegroups.R \
   --output-root /absolute/path/new-results --stem Table_1
 ```
 
+v0.6.0 的 `spec_version=1.1` 在不破坏 1.0 的前提下增加默认精度、显式分组
+标签/参照、`hide_no`、有序 subset variants、自动 attrition 和 DOCX 样式。不同
+group 的独立合同使用一个 batch manifest 一次提交：
+
+```bash
+Rscript skills/comparegroups-guide/scripts/run_comparegroups_batch.R \
+  --manifest /absolute/path/batch-manifest.json \
+  --output-root /absolute/path/new-batch-results
+Rscript skills/comparegroups-guide/scripts/validate_comparegroups_batch.R \
+  --output-root /absolute/path/new-batch-results
+```
+
 输出同时包含三线 DOCX、展示 CSV、未格式化数值长表、原始
-`compareGroups/createTable` RDS、输入/标签/方法/版本元数据、validation 和
-manifest。论文叙述必须以数值长表为准，DOCX 只负责展示。
+`compareGroups/createTable` RDS、输入/标签/方法/版本元数据、结构化 validation、
+manifest 和 `SHA256SUMS.txt`。论文叙述必须以数值长表为准，DOCX 只负责展示。
 
 个人做表规范已经固化：连续正态变量为“均值（标准差）”并保留 3 位小数，偏态变量
 为“中位数 [Q1, Q3]”并保留 3 位小数，分类变量为“n（%）”且比例保留 2 位；
@@ -526,6 +538,14 @@ manifest。论文叙述必须以数值长表为准，DOCX 只负责展示。
 - 引入独立 `spec_version=1.0` 的表格合同；workbench evidence schema 仍为 `0.2.4`。
 - 用真实三线 DOCX、数值长表、RDS、元数据、validation、manifest 和哈希组成可核验交付。
 - 公共仓库只包含合成数据和去标识模板；私人 `.dta`、变量清单和实证结果只在本机验收。
+
+### v0.6.0 compareGroups 工作流升级
+
+- 1.0 合同继续可运行；1.1 将默认值解析来源、分组映射和规范化合同写入 metadata。
+- 自动 attrition 先识别随访是否出现，再严格选取每人唯一基期行；重复基期和空组硬阻断。
+- 有序 variants 与 batch manifest 减少生命周期、性别、年份和样本选择表的重复配置。
+- validation 增加 expected/actual/detail，DOCX 增加样式控制但继续强制真三线和无竖线。
+- 本机固定 compareGroups 4.10.2，CI 同时门禁 4.10.2 与 4.10.3。
 
 ## 16. 一页式速查表
 
