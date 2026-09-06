@@ -10,6 +10,21 @@ rejects <- function(expr, pattern) {
   result <- tryCatch(force(expr), error = identity)
   inherits(result, "error") && grepl(pattern, conditionMessage(result), fixed = TRUE)
 }
+rejects_pipeline <- function(data, spec, pattern) {
+  input_path <- tempfile(fileext = ".csv")
+  utils::write.csv(data, input_path, row.names = FALSE)
+  full_spec <- cg_read_spec("tests/fixtures/comparegroups_synthetic.table-spec.json")
+  full_spec$spec_version <- "1.1"
+  full_spec$input <- c(list(path = input_path, format = "csv"), spec$input)
+  full_spec$analysis <- spec$analysis
+  full_spec$blocks <- list(list(id = "b", label = "Block", variables = list(list(
+    name = "x", type = "continuous", method = "normal", digits = 3L,
+    label = "X", include_missing = FALSE, reference = NULL, levels = NULL
+  ))))
+  spec_path <- tempfile(fileext = ".json")
+  cg_write_json(full_spec, spec_path)
+  rejects(cg_run(spec_path, tempfile("comparegroups-invalid-pipeline-")), pattern)
+}
 
 data(regicor, package = "compareGroups")
 regicor$bmi <- regicor$age + 100
@@ -36,25 +51,25 @@ panel$g <- factor(rep(rep(c("A", "B", "C"), each = 20), 2))
 panel$x <- panel$id + panel$wave / 10
 spec <- list(input = list(id = "id", time = "wave"), analysis = list(group = "g", panel_mode = "dual",
   group_levels = lapply(c("A", "B", "C"), function(x) list(value = x, label = x))))
-check("automatic_empty_group", rejects(cg_variants(panel[!(panel$wave == 2 & panel$g == "C"), ], spec),
+check("automatic_empty_group", rejects_pipeline(panel[!(panel$wave == 2 & panel$g == "C"), ], spec,
                                        "declared grouping levels with no observations"))
-check("duplicate_id_time", rejects(cg_variants(rbind(panel, panel), spec), "Duplicate id/time"))
+check("duplicate_id_time", rejects_pipeline(rbind(panel, panel), spec, "Duplicate id/time"))
 missing_id <- panel
 missing_id$id[[1L]] <- NA
-check("missing_id", rejects(cg_variants(missing_id, spec), "Missing id"))
+check("missing_id", rejects_pipeline(missing_id, spec, "Missing id"))
 missing_time <- panel
 missing_time$wave[[1L]] <- NA
-check("missing_time", rejects(cg_variants(missing_time, spec), "Missing time"))
+check("missing_time", rejects_pipeline(missing_time, spec, "Missing time"))
 cross_spec <- spec
 cross_spec$analysis$panel_mode <- "cross_section"
-check("cross_section_repeated_ids", rejects(cg_variants(panel, cross_spec), "cross_section requires independent"))
+check("cross_section_repeated_ids", rejects_pipeline(panel, cross_spec, "cross_section requires independent"))
 pooled_spec <- spec
 pooled_spec$analysis$panel_mode <- "pooled_compatibility"
 pooled <- cg_variants(panel, pooled_spec)
 check("pooled_warning", identical(pooled[[1L]]$id, "compatibility_pooled") && nzchar(pooled[[1L]]$warning))
 collision <- panel
 collision$wave <- ifelse(collision$wave == 1, "a b", "a/b")
-check("automatic_id_collision", rejects(cg_variants(collision, spec), "Resolved variant ids must be unique"))
+check("automatic_id_collision", rejects_pipeline(collision, spec, "Resolved variant ids must be unique"))
 
 fixture <- cg_read_spec("tests/fixtures/comparegroups_synthetic.table-spec.json")
 fixture$spec_version <- "1.1"
