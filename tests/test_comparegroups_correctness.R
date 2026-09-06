@@ -8,6 +8,9 @@ check <- function(name, value) {
 }
 rejects <- function(expr, pattern) {
   result <- tryCatch(force(expr), error = identity)
+  if (inherits(result, "error") && !grepl(pattern, conditionMessage(result), fixed = TRUE)) {
+    cat("UNEXPECTED_REJECTION", conditionMessage(result), "\n")
+  }
   inherits(result, "error") && grepl(pattern, conditionMessage(result), fixed = TRUE)
 }
 rejects_pipeline <- function(data, spec, pattern) {
@@ -17,6 +20,7 @@ rejects_pipeline <- function(data, spec, pattern) {
   full_spec$spec_version <- "1.1"
   full_spec$input <- c(list(path = input_path, format = "csv"), spec$input)
   full_spec$analysis <- spec$analysis
+  full_spec$analysis["subset"] <- list(NULL)
   full_spec$blocks <- list(list(id = "b", label = "Block", variables = list(list(
     name = "x", type = "continuous", method = "normal", digits = 3L,
     label = "X", include_missing = FALSE, reference = NULL, levels = NULL
