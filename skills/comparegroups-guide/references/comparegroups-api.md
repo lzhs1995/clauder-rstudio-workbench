@@ -58,10 +58,14 @@ levels.
 accepts one string or a list of exact strings. The runner always retains each block's
 original `compareGroups` and `createTable` objects so numeric extraction does
 not depend on a lossy combined display object.
+The numeric-long `variable` field uses the ordered original variable identity,
+not reverse matching on labels. Different variables may share a display label.
 
-`analysis.subset` is an optional R expression evaluated only against columns in
-the imported data. It is recorded verbatim in metadata; use a prepared input
-file when the selection logic is complex.
+`analysis.subset` is an optional trusted R expression evaluated with imported
+columns and base R functions in scope. It is recorded verbatim in metadata;
+this is not a security sandbox, so review the expression before execution and
+never execute an untrusted specification. Use a prepared input file when the
+selection logic is complex. The same rule applies to variant subset expressions.
 
 Ordered 1.1 `analysis.variants` add named subset expressions under the same
 group. A different group requires a separate spec in

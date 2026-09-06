@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clauder-rstudio-workbench-harness"
-version = "0.6.0"
+version = "0.6.1"
 description = "Executable harnesses for ClaudeR RStudio workbench discipline"
 requires-python = ">=3.10"
 dependencies = ["mcp>=1.0,<2", "psutil>=5.9", "pyyaml>=6"]

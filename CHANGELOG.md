@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.6.1 - Unreleased
+
+- Restrict numeric `n_available` extraction to real total/group columns;
+  `createTable` auxiliary fields such as `Fact OR/HR` are not sample sizes.
+- Map numeric rows and p values to ordered original variable identities, not
+  display-label text, so distinct variables may share a label safely.
+- Apply the same non-empty and declared-group checks to automatic panel
+  variants and explicit subsets, including deterministic unique output IDs.
+- Reject missing analysis-unit keys, duplicate person-wave rows, and repeated
+  IDs declared as independent cross-sectional observations. Keep pooled panel
+  compatibility output explicitly labelled as non-independent.
+- Reconstruct display and numeric exports from retained RDS objects during
+  independent validation and require the complete expected validation
+  checklist, rather than accepting row counts or an arbitrary all-TRUE subset.
+  Hash consistency alone is not evidence of statistical correctness.
+- Document the remaining scientific-review, trusted-subset-expression, and
+  visual DOCX review boundaries. Existing spec 1.0/1.1 formats and ClaudeR/MCP
+  compatibility targets are unchanged.
+
 ## v0.6.0 - 2026-09-05
 
 - Add backward-compatible table spec `1.1` with resolved defaults, explicit

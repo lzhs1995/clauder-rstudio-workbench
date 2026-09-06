@@ -1,6 +1,6 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.6.0`、ClaudeR `0.14.1.9001`
+> 适用版本：`clauder-rstudio-workbench v0.6.1`、ClaudeR `0.14.1.9001`
 >（基于 upstream `0.14.1`）、`clauder-mcp 0.14.5`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
@@ -51,9 +51,9 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.6.0 推荐值 | 验证方式 |
+| 层 | v0.6.1 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.6.0` | `clauder-workbench --version` |
+| workbench | `0.6.1` | `clauder-workbench --version` |
 | ClaudeR | `0.14.1.9001` 本地 fork | `packageVersion("ClaudeR")` |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
 | MCP bridge | `0.14.5` | 安装元数据/`pyproject.toml` |
@@ -497,16 +497,28 @@ Rscript skills/comparegroups-guide/scripts/validate_comparegroups_batch.R \
 `compareGroups/createTable` RDS、输入/标签/方法/版本元数据、结构化 validation、
 manifest 和 `SHA256SUMS.txt`。论文叙述必须以数值长表为准，DOCX 只负责展示。
 
+v0.6.1 加强正确性门禁：`n_available` 只来自真实全样本/分组列，不能把
+`Fact OR/HR` 等辅助字段当成样本量；数值行按原变量身份映射，允许显示标签重复。
+独立复验从保留的 RDS 对象重建数值和展示内容进行核对，并要求完整的 validation
+检查集合；“CSV 行数相同、所有剩余检查为 TRUE、重算哈希一致”不能代替内容核对。
+
 个人做表规范已经固化：连续正态变量为“均值（标准差）”并保留 3 位小数，偏态变量
 为“中位数 [Q1, Q3]”并保留 3 位小数，分类变量为“n（%）”且比例保留 2 位；
 `[ALL]` 显示为“全样本”，`p.overall` 显示为“p-value”；变量按被解释变量、解释
 变量、中介/调节变量、个体、父母、家庭、混杂因素等区块排列。
 
 对于 Stata 数据，优先保留变量标签和值标签；数值型无标签分类变量必须在合同中显式
-给出编码、显示标签和参照水平。遇到重复 person-wave 行时，`panel_mode: dual`
+给出编码、显示标签和参照水平。声明的 ID/time 不得缺失，同一 person-wave 不得重复；
+不能将重复 ID 行声明为独立横截面，也不能自动去重来通过门禁。真正跨波次重复观测时，`panel_mode: dual`
 会生成安全主表和兼容 pooled 表：正式主表按波次输出，或隐藏不成立的 pooled p 值；
 兼容表保留旧结果，但必须携带“普通 t/卡方检验假设独立行”的限制说明。删除/保留样本
 比较必须在删除记录前构造状态，并以基期一人一行为正式分析单位。
+所有自动波次表与显式 subset variants 使用相同的非空/声明分组完整性检查；显式
+`pooled_compatibility` 也必须保留非独立性警告，不能冒充正式推断主表。
+
+这仍不替代研究设计审查、原始数据核对和最终 DOCX 视觉验收。OOXML 真三线通过不等于
+中文字体、列宽、分页均合格；RDS 内容核对也不是对所有产物协同篡改的安全防护。
+合同中的 subset 是受信任的 R 表达式，不是安全沙箱，执行前必须审阅。
 
 单张小表用 ClaudeR `execute_r`；大型 `.dta` 或多表 DOCX 批处理只提交一次
 `execute_r_async`，再使用同一个 job ID 轮询

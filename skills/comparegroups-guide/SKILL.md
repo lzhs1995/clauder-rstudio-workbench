@@ -74,6 +74,11 @@ Rscript scripts/validate_comparegroups_batch.R \
 - Prefer Stata variable/value labels, but record every override in metadata.
 - Repeated person-wave rows are not independent. With `panel_mode: "dual"`,
   produce a safe primary view and a clearly labelled pooled compatibility view.
+- Declared ID/time keys must be present and non-missing, with at most one row
+  per person-wave. Repeated IDs cannot be treated as independent
+  cross-sectional rows. Never silently deduplicate or aggregate to pass a gate.
+- Check every resolved variant, including automatically generated wave tables,
+  for empty samples and lost declared groups before computation.
 - For attrition comparisons, either supply a reviewed status column or use the
   1.1 automatic contract. Automatic attrition identifies follow-up presence
   before selecting exactly one baseline row per person, and blocks any
@@ -81,6 +86,8 @@ Rscript scripts/validate_comparegroups_batch.R \
 - Use one ClaudeR async submission for a batch and poll only its original job
   ID. `running` and transient transport errors are never reasons to resubmit.
 - Use workbench fan-out only for genuinely independent table contracts.
-- A run passes only when the DOCX reopens, the numeric and display outputs are
-  complete, manifest membership/byte sizes/hashes match, and every validation
-  row is `TRUE`.
+- A run passes only when the DOCX reopens, numeric and display content matches
+  the retained RDS objects, manifest membership/byte sizes/hashes match, and
+  the complete expected validation checklist is present with every row `TRUE`.
+- Review the final DOCX visually; correct OOXML borders do not prove legible
+  typography or page layout. Audit the scientific design independently.

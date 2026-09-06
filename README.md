@@ -2,7 +2,7 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.6.0` release is cross-platform and targets the local ClaudeR
+The `v0.6.1` release line is cross-platform and targets the local ClaudeR
 `0.14.1.9001` fork based on upstream ClaudeR `0.14.1` / `clauder-mcp 0.14.5`, while
 retaining strict native provenance and durable async progress.
 
@@ -49,7 +49,8 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-These commands use the reviewed `v0.6.0` release line.
+Use a clean checkout of the exact `v0.6.1` tag with these commands. Do not
+overwrite a worktree that contains local changes.
 
 On Windows PowerShell:
 
@@ -82,13 +83,13 @@ python -m clauder_workbench doctor
 To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 If the Windows `git clone` is blocked by a proxy or reset connection, use the
-published `v0.6.0` tag-zip bootstrap instead:
+`v0.6.1` tag-zip bootstrap after that release is published:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.6.0.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.6.0"
+$zip = "$env:TEMP\clauder-rstudio-workbench-v0.6.1.zip"
+$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.6.1"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.0/clauder-rstudio-workbench-v0.6.0.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.1/clauder-rstudio-workbench-v0.6.1.zip" -OutFile $zip
 Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
 Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
@@ -252,6 +253,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
+| `v0.6.1` | local `0.14.1.9001` / bridge `0.14.5` | Corrects available-N/variable mapping, validates all resolved variants and independent analysis-unit keys, and cross-checks CSV semantics against retained RDS objects plus a complete validation checklist. |
 | `v0.6.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds backward-compatible spec 1.1 defaults, ordered variants, automatic attrition, batch manifests, structured validation diagnostics, configurable true-three-line DOCX output, and explicit compareGroups 4.10.2/4.10.3 gates. |
 | `v0.5.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds the `comparegroups-guide` sibling skill, versioned Table 1 contract, labelled-data and panel audit, true three-line DOCX output, numeric reconciliation artifacts, validation, and cross-platform tests. |
 | `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
@@ -330,7 +332,7 @@ written to `<USER_HOME>/.clauder_workbench/evidence`.
 
 For the installer smoke transcript format, see `tests/install_smoke.md`.
 
-Current validation status for the v0.6.0 release line:
+Historical qualification evidence (through v0.6.0; not v0.6.1 test results):
 
 - Local Windows install, reinstall idempotence, and privacy scan have passed.
 - The macOS release candidate passed the 206-test Python harness suite, skill
@@ -347,6 +349,19 @@ Current validation status for the v0.6.0 release line:
 - The compareGroups release gate additionally requires synthetic cross-platform
   regression, five private real-data cases on the local Mac, three-skill
   validation, a fresh native ClaudeR sync/async smoke, and privacy scanning.
+
+The v0.6.1 correctness audit found gaps despite earlier green tests. This
+patch requires new regressions for auxiliary available-N columns, duplicate
+labels, automatic panel group loss, duplicated analysis-unit keys, and CSV
+corruption with recomputed manifests. The independent validator must compare
+exported content with retained statistical objects and require the full
+validation checklist. Consult the release's own evidence for execution status;
+historical test totals do not certify the patch.
+
+These checks do not independently prove a scientific design, visually inspect
+Chinese typography or page layout, or protect against coordinated alteration
+of every retained artifact. Review the analysis unit, methods and rendered
+DOCX before using the table in a manuscript.
 
 ## Troubleshooting
 
@@ -434,7 +449,7 @@ For the published Windows release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.6.0
+git checkout v0.6.1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

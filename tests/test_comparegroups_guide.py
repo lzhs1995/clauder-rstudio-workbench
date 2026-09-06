@@ -339,6 +339,7 @@ class CompareGroupsGuideTests(unittest.TestCase):
         spec = json.loads(SPEC.read_text(encoding="utf-8"))
         spec["input"]["path"] = str(FIXTURE)
         spec["analysis"]["panel_mode"] = "cross_section"
+        spec["analysis"]["subset"] = "wave == 1"
         spec["display"]["compatibility_export2word"] = True
         with tempfile.TemporaryDirectory() as tmp:
             spec_path = Path(tmp) / "compatibility.json"

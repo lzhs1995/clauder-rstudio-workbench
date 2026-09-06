@@ -4,11 +4,16 @@
 
 Use one row per independent unit. Overall and between-group p values may be
 reported when their assumptions are reasonable.
+If `input.id` is declared, missing IDs or repeated IDs are not an independent
+cross-sectional sample and must be resolved explicitly before running.
 
 ## Panel or longitudinal data
 
-First audit `input.id` and `input.time`. If IDs repeat, `panel_mode: "dual"`
-means:
+First audit `input.id` and `input.time`. Declared keys must be non-missing and
+each person-wave pair must be unique; wave splitting cannot make duplicated
+person-wave records independent. The runner must block these records, not
+silently deduplicate or aggregate them. If IDs repeat across distinct waves,
+`panel_mode: "dual"` means:
 
 - **Primary:** if grouping is not time, generate one table per wave; if time is
   the grouping variable, show pooled time distributions but suppress pooled
@@ -19,6 +24,8 @@ means:
 
 For formal longitudinal inference, use an appropriate repeated-measures or
 cluster-aware model outside this skill.
+An explicitly requested `pooled_compatibility` view must carry the same
+independence warning; it is not a safe inferential primary analysis.
 
 With 1.1 `analysis.variants`, each named subset inherits the same group and
 block contract. Dual mode then emits IDs in deterministic order:
@@ -27,6 +34,8 @@ block contract. Dual mode then emits IDs in deterministic order:
 `primary_wave_<time>` and `compatibility_pooled` IDs remain unchanged. Every
 declared group must remain observed in every resolved variant; filtering out a
 declared group is a hard failure even when two other groups remain.
+This check applies equally to automatic wave variants without an explicit
+`analysis.variants` array. Colliding resolved IDs are also a hard failure.
 
 ## Repeated cross-sections
 

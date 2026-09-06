@@ -67,6 +67,8 @@ def main() -> int:
     commands = [
         ("python", python_target),
         ("r", [rscript, "tests/test_comparegroups_guide.R"]),
+        ("correctness", [rscript, "tests/test_comparegroups_correctness.R"]),
+        ("correctness_non_vacuity", [sys.executable, "tests/prove_comparegroups_correctness.py"]),
         ("non_vacuity", [sys.executable, "tests/prove_comparegroups_non_vacuity.py"]),
         ("skill_workbench", [sys.executable, ".github/scripts/quick_validate.py", "skills/clauder-rstudio-workbench"]),
         ("skill_cmaverse", [sys.executable, ".github/scripts/quick_validate.py", "skills/cmaverse-paired-mval"]),
