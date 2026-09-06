@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Documented Windows bootstrap safety
+        if: runner.os == 'Windows'
+        run: ./.github/scripts/test_readme_bootstrap.ps1
+        shell: pwsh
+
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.r }}

@@ -55,7 +55,7 @@ overwrite a worktree that contains local changes.
 On Windows PowerShell:
 
 ```powershell
-git clone https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -86,15 +86,23 @@ If the Windows `git clone` is blocked by a proxy or reset connection, use the
 `v0.6.1` tag-zip bootstrap after that release is published:
 
 ```powershell
-$zip = "$env:TEMP\clauder-rstudio-workbench-v0.6.1.zip"
-$tmp = "$env:TEMP\clauder-rstudio-workbench-v0.6.1"
+$ErrorActionPreference = "Stop"
 $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+if (Test-Path -LiteralPath $dest) { throw "Destination already exists: $dest" }
+$staging = Join-Path $env:TEMP ("clauder-workbench-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $staging | Out-Null
+$zip = Join-Path $staging "clauder-rstudio-workbench-v0.6.1.zip"
+$unpacked = Join-Path $staging "unpacked"
 Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.1/clauder-rstudio-workbench-v0.6.1.zip" -OutFile $zip
-Remove-Item -LiteralPath $tmp,$dest -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
-Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName -Destination $dest
+Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
+$roots = @(Get-ChildItem -LiteralPath $unpacked -Directory)
+if ($roots.Count -ne 1) { throw "Expected one repository root in release ZIP" }
+if (-not (Test-Path -LiteralPath (Join-Path $roots[0].FullName "install.ps1"))) { throw "Release ZIP has no installer" }
+New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+Move-Item -LiteralPath $roots[0].FullName -Destination $dest
 cd $dest
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
+if ($LASTEXITCODE -ne 0) { throw "Installer failed with exit code $LASTEXITCODE" }
 ```
 
 ## Running the CMAverse fan-out workflow
