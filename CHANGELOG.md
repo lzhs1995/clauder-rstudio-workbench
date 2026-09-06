@@ -2,6 +2,15 @@
 
 ## v0.6.1 - Unreleased
 
+- **Breaking validation behavior:** specs that previously treated repeated IDs
+  as independent cross sections, or accepted missing/duplicate panel keys, now
+  stop before estimation. Spec formats 1.0/1.1 are unchanged, but these inputs
+  require an explicit analysis-unit decision; see the migration section in
+  `skills/comparegroups-guide/references/data-structures.md`.
+- Fit automatic DOCX column widths within the selected page's printable area
+  without shrinking the requested font; reject explicit widths that overflow
+  or automatic layouts too dense to retain legible numeric tokens.
+  Apply orientation to the default section, including multi-page tables.
 - Restrict numeric `n_available` extraction to real total/group columns;
   `createTable` auxiliary fields such as `Fact OR/HR` are not sample sizes.
 - Map numeric rows and p values to ordered original variable identities, not

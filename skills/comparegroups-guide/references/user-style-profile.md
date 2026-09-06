@@ -26,6 +26,8 @@ Do not alphabetize variables or silently move them between blocks.
 Rename `[ALL]` to `全样本` and `p.overall` to `p-value`. Show the total
 column and available N by default. Multiple-comparison and trend p values are
 opt-in. Always preserve the raw numeric values separately from formatted text.
+`display.hide_no` affects the presentation layer only: the numeric-long audit
+export retains raw category statistics, including levels hidden in the DOCX.
 Use `display.hide_no` when the legacy table intentionally suppresses a
 negative category such as `no`; do not infer that choice from the data.
 

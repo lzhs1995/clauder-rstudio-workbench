@@ -1136,6 +1136,14 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
   font_size <- as.numeric(cg_scalar(docx$font_size, 10))
   repeat_header <- cg_bool(docx$repeat_header, TRUE)
   doc <- officer::read_docx()
+  dimensions <- officer::docx_dim(doc)
+  doc <- officer::body_set_default_section(doc, officer::prop_section(
+    page_size = officer::page_size(width = dimensions$page[["width"]],
+      height = dimensions$page[["height"]], orient = cg_scalar(docx$orientation, "portrait")),
+    page_margins = do.call(officer::page_mar, as.list(dimensions$margins))
+  ))
+  dimensions <- officer::docx_dim(doc)
+  available_width <- dimensions$page[["width"]] - sum(dimensions$margins[c("left", "right")])
   doc <- officer::body_add_par(doc, resolved_title, style = "heading 1")
   for (result in results) {
     doc <- officer::body_add_par(doc, result$label, style = "heading 2")
@@ -1158,10 +1166,38 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
       if (length(widths) != ncol(frame) || any(!is.finite(widths)) || any(widths <= 0)) {
         cg_stop("display.docx.column_widths must contain one positive width per rendered column")
       }
+      if (sum(widths) > available_width) {
+        cg_stop("display.docx.column_widths exceed the printable page width; reduce widths or select landscape")
+      }
       ft <- flextable::width(ft, j = seq_len(ncol(frame)), width = widths, unit = "in")
     } else {
       ft <- flextable::autofit(ft)
+      widths <- dim(ft)$widths
+      if (sum(widths) > available_width) {
+        token_frame <- frame
+        for (j in seq_len(ncol(frame))[-1L]) {
+          token_frame[[j]] <- vapply(as.character(frame[[j]]), function(value) {
+            if (is.na(value) || !nzchar(value)) return("")
+            tokens <- strsplit(value, "[[:space:]]+")[[1L]]
+            tokens[[which.max(nchar(tokens, type = "width"))]]
+          }, character(1))
+        }
+        token_table <- flextable::flextable(token_frame)
+        token_table <- flextable::font(token_table, fontname = font_family, part = "all")
+        token_table <- flextable::fontsize(token_table, size = font_size, part = "all")
+        minimum_widths <- flextable::dim_pretty(token_table, part = "body")$widths + 0.02
+        minimum_widths[[1L]] <- min(widths[[1L]], 1.2)
+        if (sum(minimum_widths) > available_width) {
+          cg_stop("DOCX is too dense for legible numeric cells; select landscape, an explicit smaller font, or separate comparisons")
+        }
+        extra <- pmax(widths - minimum_widths, 0)
+        widths <- minimum_widths + (available_width - sum(minimum_widths)) *
+          if (sum(extra) > 0) extra / sum(extra) else rep(1 / length(extra), length(extra))
+        ft <- flextable::width(ft, j = seq_len(ncol(frame)),
+          width = widths, unit = "in")
+      }
     }
+    ft <- flextable::set_table_properties(ft, layout = "fixed")
     ft <- flextable::paginate(ft, init = repeat_header, hdr_ftr = repeat_header)
     doc <- flextable::body_add_flextable(doc, ft)
     if (!is.null(result$warning)) doc <- officer::body_add_par(doc, paste("Note:", result$warning), style = "Normal")
@@ -1169,9 +1205,6 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
   if (!is.null(note) && nzchar(note)) doc <- officer::body_add_par(doc, paste("Note:", note), style = "Normal")
   footnote <- cg_scalar(docx$footnote, NULL)
   if (!is.null(footnote) && nzchar(footnote)) doc <- officer::body_add_par(doc, footnote, style = "Normal")
-  if (identical(cg_scalar(docx$orientation, "portrait"), "landscape")) {
-    doc <- officer::body_end_section_landscape(doc)
-  }
   tmp <- cg_atomic_path(path)
   if (!grepl("\\.docx$", tmp, ignore.case = TRUE)) tmp_docx <- paste0(tmp, ".docx") else tmp_docx <- tmp
   on.exit({ if (file.exists(tmp)) unlink(tmp); if (exists("tmp_docx") && file.exists(tmp_docx)) unlink(tmp_docx) }, add = TRUE)

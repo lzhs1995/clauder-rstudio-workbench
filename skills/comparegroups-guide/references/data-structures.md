@@ -59,3 +59,25 @@ Use ordered `jobs` when sex, lifecycle, year, or sample-selection tables need
 different grouping variables or independent specs. Each job has its own safe
 relative output directory. The batch stops after the first failure, preserves
 completed evidence, and never resubmits an async ClaudeR job.
+
+## Migration from v0.6.0
+
+v0.6.1 keeps spec formats 1.0 and 1.1 but intentionally tightens validation.
+Previously accepted data may now stop before statistics are calculated:
+
+- For a genuinely cross-sectional question, explicitly select the scientifically
+  intended wave/sample upstream and verify one non-missing ID per observation.
+  Do not take an arbitrary first row or remove `id` to bypass the check.
+- For repeated observations of the same people, declare panel `id` and `time`
+  and use `panel_mode: "dual"` for wave-specific primary tables plus labelled
+  pooled compatibility output. Ordinary pooled p values are not longitudinal
+  inference. An explicit `pooled_compatibility` request is now labelled as such.
+- Missing IDs/times and duplicated person-wave pairs must be investigated in
+  source data. This runner does not impute keys, deduplicate, or aggregate them.
+- Every declared group must occur in every resolved subset/wave. Adjust the
+  scientific grouping or specify a separate justified table contract when a
+  subgroup has different populations; do not silently drop levels.
+
+Regenerate affected artifacts in a new output directory and retain the old
+evidence. Display formatting may be unchanged even when numeric-long exports
+correctly lose auxiliary `Fact OR/HR` rows previously misreported as sample N.

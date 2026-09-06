@@ -25,6 +25,14 @@ required validation rows must fail even when all remaining rows say `TRUE`.
 Each DOCX table must use a true three-line layout: top border, header-bottom
 border, and final bottom border, with no vertical or extra internal rules. Do
 not compare DOCX hashes across reruns because Office metadata can change.
+Automatic column widths fit inside the selected page's printable area, with
+the requested font size retained and cell text allowed to wrap. If there is
+insufficient room for numeric tokens, export stops instead of forcing numbers
+into vertical fragments. Explicit
+`display.docx.column_widths` are inches and must fit within that area; otherwise
+the export stops. Use landscape or a separately specified table for dense
+comparisons. Page width checks do not replace visual review of wrapping or
+page breaks.
 Compare group sizes, raw statistics, p values/test methods, ordering, labels,
 digits, and OOXML borders.
 In the numeric-long CSV, `n` is the count for a categorical level, whereas

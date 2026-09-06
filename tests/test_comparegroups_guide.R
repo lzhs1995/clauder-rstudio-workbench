@@ -182,6 +182,7 @@ attrition_spec$analysis <- list(
 )
 attrition_spec$outputs$stem <- "Table_attrition"
 attrition_spec$display$docx$orientation <- "portrait"
+attrition_spec$display$docx$column_widths <- NULL
 attrition_path <- tempfile(fileext = ".json")
 jsonlite::write_json(attrition_spec, attrition_path, auto_unbox = TRUE, pretty = TRUE, null = "null")
 attrition_output <- tempfile("comparegroups-attrition-")

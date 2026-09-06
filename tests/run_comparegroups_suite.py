@@ -68,6 +68,7 @@ def main() -> int:
         ("python", python_target),
         ("r", [rscript, "tests/test_comparegroups_guide.R"]),
         ("correctness", [rscript, "tests/test_comparegroups_correctness.R"]),
+        ("docx_layout", [rscript, "tests/test_comparegroups_layout.R"]),
         ("correctness_non_vacuity", [sys.executable, "tests/prove_comparegroups_correctness.py"]),
         ("non_vacuity", [sys.executable, "tests/prove_comparegroups_non_vacuity.py"]),
         ("skill_workbench", [sys.executable, ".github/scripts/quick_validate.py", "skills/clauder-rstudio-workbench"]),
