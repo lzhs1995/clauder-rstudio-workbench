@@ -10,9 +10,10 @@ native `mcp__r_studio__` wrapper path. The Python harness cannot call the native
 wrapper directly. It can only record and validate evidence produced by the
 agent tool layer.
 
-If a task was created before the wrapper was registered, the task-local tool
-registry may remain frozen on either Windows or macOS even while the configured
-`clauder-mcp` server is healthy. After a real `MCP_STDIO_OK` probe, an explicitly
+The current agent may not expose the wrapper even while the configured
+`clauder-mcp` server is healthy. Tool absence alone does not identify whether
+startup, filtering or host registration caused it; do not assert a frozen
+registry without client evidence. After a real `MCP_STDIO_OK` probe, an explicitly
 authorized compute-first fan-out may use `--defer-native-smoke`. That option
 only permits MCP stdio computation and durable polling: it records
 `NATIVE-SMOKE-DEFERRED`, never satisfies this gate, and cannot make strict
@@ -51,6 +52,20 @@ The final evidence must have:
 - the same `task_key` as the long job contract
 - four non-empty `parent_evidence_ids` from the four record steps
 - raw output hashes and evidence copies for all recorded `--raw-file` values
+- `extra.client_context` matching the current client process, session and
+  configuration when consumed by `ensure-ready --require-native`
+
+After completing the four steps, verify their current applicability:
+
+```text
+clauder-workbench ensure-ready --client codex --session-name <target> --task-key <task> --require-native --native-evidence <native_smoke_PASS.json>
+```
+
+If using a non-default client configuration, pass the same `--config-file` on
+`native-smoke start` and `ensure-ready`. Include the observed R PID in the raw
+sync output as well as `--pid`; an asserted PID alone does not pass this consumer.
+The archive is authoritative after recording; source files may be moved, but
+missing or altered archived bytes invalidate the gate.
 
 ## What does not count
 
@@ -131,5 +146,11 @@ Do not ask the user to restart Codex first. Use this order:
    `install.ps1 -ConfigureCodex` on Windows if the config still uses `uvx` or a
    bare `clauder-mcp` command.
 4. Run the native-smoke sequence above.
-5. Only if the configured persistent entry is correct and repeated native-smoke
-   attempts still fail should the user restart the agent.
+5. If tools are absent rather than returning a transport error, run
+   `connection-diagnose --session-name <target>` and inspect the current agent
+   inventory and supported client controls. Independent stdio success proves
+   that route only. Do not fabricate native calls, prescribe repeated restarts,
+   or claim a reload interface exists without evidence. If a runtime reload is
+   needed, target only the proven stale component and retain the original agent
+   session. Interactive launch must preserve terminal file descriptors; an
+   output-capturing proxy is not a valid TUI launcher.

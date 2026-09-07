@@ -108,7 +108,7 @@ stopifnot(identical(v11_ids, c(
 variant_files <- unlist(lapply(v11_metadata$variant_outputs, function(entry) cg_character_vector(entry$files)), use.names = FALSE)
 stopifnot(length(variant_files) == 30L, all(file.exists(file.path(v11_output, variant_files))))
 stopifnot(all(grepl("^Table_v11__", vapply(v11_metadata$variant_outputs, function(entry) cg_scalar(entry$stem), character(1)))))
-stopifnot(identical(cg_scalar(v11_metadata$skill_versions$comparegroups_guide), "0.6.0"))
+stopifnot(identical(cg_scalar(v11_metadata$skill_versions$comparegroups_guide), "0.6.1"))
 stopifnot(isTRUE(cg_docx_structure(file.path(v11_output, "Table_v11.docx"))$landscape))
 v11_display <- utils::read.csv(file.path(v11_output, "Table_v11_display.csv"), check.names = FALSE)
 stopifnot(!any(grepl("No", v11_display$row_label, fixed = TRUE)))
@@ -182,6 +182,7 @@ attrition_spec$analysis <- list(
 )
 attrition_spec$outputs$stem <- "Table_attrition"
 attrition_spec$display$docx$orientation <- "portrait"
+attrition_spec$display$docx$column_widths <- NULL
 attrition_path <- tempfile(fileext = ".json")
 jsonlite::write_json(attrition_spec, attrition_path, auto_unbox = TRUE, pretty = TRUE, null = "null")
 attrition_output <- tempfile("comparegroups-attrition-")
@@ -264,6 +265,7 @@ stopifnot(inherits(unknown_error, "try-error"), grepl("unknown analysis fields",
 v10_numeric_group <- cg_read_spec(spec_path)
 v10_numeric_group$analysis$group <- "person_id"
 v10_numeric_group$analysis$panel_mode <- "cross_section"
+v10_numeric_group$analysis$subset <- "wave == 1"
 v10_numeric_group_path <- tempfile(fileext = ".json")
 jsonlite::write_json(v10_numeric_group, v10_numeric_group_path, auto_unbox = TRUE, pretty = TRUE, null = "null")
 v10_numeric_audit <- cg_audit(v10_numeric_group_path)

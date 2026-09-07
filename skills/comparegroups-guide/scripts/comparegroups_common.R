@@ -3,7 +3,7 @@ required_packages <- c(
   "jsonlite", "digest"
 )
 required_versions <- c(compareGroups = "4.10.2")
-comparegroups_guide_version <- "0.6.0"
+comparegroups_guide_version <- "0.6.1"
 
 cg_skill_versions <- function() list(comparegroups_guide = comparegroups_guide_version)
 
@@ -136,7 +136,7 @@ cg_atomic_move <- function(tmp, path) {
 cg_write_json <- function(value, path, pretty = TRUE) {
   tmp <- cg_atomic_path(path)
   on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
-  jsonlite::write_json(value, tmp, auto_unbox = TRUE, pretty = pretty, null = "null", na = "null")
+  jsonlite::write_json(value, tmp, auto_unbox = TRUE, pretty = pretty, null = "null", na = "null", digits = NA)
   cg_atomic_move(tmp, path)
 }
 
@@ -763,8 +763,16 @@ cg_panel_audit <- function(data, spec) {
   repeated <- FALSE
   duplicate_rows <- 0L
   if (!is.null(id)) {
+    if (anyNA(data[[id]]) || any(!nzchar(trimws(as.character(data[[id]]))))) cg_stop("Missing id values are not allowed")
     duplicate_rows <- sum(duplicated(data[[id]]) | duplicated(data[[id]], fromLast = TRUE), na.rm = TRUE)
     repeated <- duplicate_rows > 0L
+  }
+  if (!is.null(time)) {
+    if (anyNA(data[[time]]) || any(!nzchar(trimws(as.character(data[[time]]))))) cg_stop("Missing time values are not allowed")
+    if (!is.null(id) && anyDuplicated(data[c(id, time)])) cg_stop("Duplicate id/time pairs are not allowed; resolve the analysis unit explicitly")
+  }
+  if (repeated && identical(cg_scalar(spec$analysis$panel_mode, "cross_section"), "cross_section")) {
+    cg_stop("cross_section requires independent ids; use dual or pooled_compatibility for repeated observations")
   }
   list(
     id = id, time = time, rows = nrow(data), columns = ncol(data),
@@ -774,19 +782,21 @@ cg_panel_audit <- function(data, spec) {
 }
 
 cg_panel_variants <- function(data, spec, panel) {
+  force(panel)
   mode <- cg_scalar(spec$analysis$panel_mode, "cross_section")
   group <- cg_scalar(spec$analysis$group, NULL)
   time <- cg_scalar(spec$input$time, NULL)
-  if (!identical(mode, "dual") || !isTRUE(panel$repeated_ids)) {
-    return(list(list(id = "primary", label = "Primary", data = data, suppress_p = FALSE,
-                     warning = NULL)))
-  }
   compatibility_warning <- paste(
     "Compatibility pooled table: repeated person-wave rows are not independent;",
     "ordinary pooled t/chi-square/trend p-values are not formal longitudinal inference."
   )
   compatibility <- list(id = "compatibility_pooled", label = "Compatibility pooled",
                         data = data, suppress_p = FALSE, warning = compatibility_warning)
+  if (identical(mode, "pooled_compatibility")) return(list(compatibility))
+  if (!identical(mode, "dual") || !isTRUE(panel$repeated_ids)) {
+    return(list(list(id = "primary", label = "Primary", data = data, suppress_p = FALSE,
+                     warning = NULL)))
+  }
   if (!is.null(time) && !identical(group, time)) {
     time_values <- unique(data[[time]][!is.na(data[[time]])])
     primary <- lapply(time_values, function(value) {
@@ -827,31 +837,33 @@ cg_validate_variant_data <- function(data, spec, variant_id) {
 cg_variants <- function(data, spec, panel = NULL) {
   requested <- spec$analysis$variants
   if (is.null(requested) || !length(requested)) {
-    return(cg_panel_variants(data, spec, if (is.null(panel)) cg_panel_audit(data, spec) else panel))
-  }
-  out <- list()
-  for (variant in requested) {
-    base_id <- cg_scalar(variant$id)
-    base_label <- cg_scalar(variant$label, base_id)
-    selected <- cg_apply_subset(data, variant$subset)
-    selected <- cg_validate_variant_data(selected, spec, base_id)
-    children <- cg_panel_variants(selected, spec, cg_panel_audit(selected, spec))
-    for (child in children) {
-      # cross_section 的 primary 不增加冗余后缀；dual 后缀固定且可预测。
-      child_id <- if (length(children) == 1L && identical(child$id, "primary")) {
-        base_id
-      } else paste(base_id, child$id, sep = "__")
-      child$id <- child_id
-      child$label <- if (length(children) == 1L && identical(children[[1L]]$id, "primary")) {
-        base_label
-      } else paste(base_label, child$label, sep = " — ")
-      child$data <- cg_validate_variant_data(child$data, spec, child_id)
-      out[[length(out) + 1L]] <- child
+    out <- cg_panel_variants(data, spec, cg_panel_audit(data, spec))
+  } else {
+    out <- list()
+    for (variant in requested) {
+      base_id <- cg_scalar(variant$id)
+      base_label <- cg_scalar(variant$label, base_id)
+      selected <- cg_apply_subset(data, variant$subset)
+      selected <- cg_validate_variant_data(selected, spec, base_id)
+      children <- cg_panel_variants(selected, spec, cg_panel_audit(selected, spec))
+      for (child in children) {
+        child_id <- if (length(children) == 1L && identical(child$id, "primary")) {
+          base_id
+        } else paste(base_id, child$id, sep = "__")
+        child$id <- child_id
+        child$label <- if (length(children) == 1L && identical(children[[1L]]$id, "primary")) {
+          base_label
+        } else paste(base_label, child$label, sep = " - ")
+        out[[length(out) + 1L]] <- child
+      }
     }
   }
   ids <- vapply(out, `[[`, character(1), "id")
   if (anyDuplicated(ids)) cg_stop("Resolved variant ids must be unique")
-  out
+  lapply(out, function(child) {
+    child$data <- cg_validate_variant_data(child$data, spec, child$id)
+    child
+  })
 }
 
 cg_bind_fill <- function(frames) {
@@ -884,36 +896,19 @@ cg_display_frame <- function(table, block_id, block_label, variant_id, include_h
   rbind(as.data.frame(header, check.names = FALSE, stringsAsFactors = FALSE), frame)
 }
 
-cg_result_names_to_variables <- function(cg, result_names) {
-  variables <- attr(cg, "varnames.orig")
-  labels <- vapply(variables, function(variable) {
-    cg_scalar(attr(attr(cg, "Xlong")[[variable]], "label", exact = TRUE), variable)
-  }, character(1))
-  reverse <- setNames(variables, labels)
-  mapped <- unname(reverse[result_names])
-  mapped[is.na(mapped)] <- result_names[is.na(mapped)]
-  mapped
-}
-
 cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) {
   array <- compareGroups::getResults(cg, "descr")
   methods <- attr(cg, "method")
   variables <- attr(cg, "varnames.orig")
-  # createTable records exact row counts; for the numeric array, match labels in order.
-  labels <- vapply(variables, function(variable) {
-    cg_scalar(attr(attr(cg, "Xlong")[[variable]], "label", exact = TRUE), variable)
-  }, character(1))
-  variable_for_row <- character(dim(array)[1L])
-  cursor <- 1L
-  for (index in seq_along(variables)) {
-    label <- labels[[index]]
-    rows <- which(dimnames(array)[[1L]] == label | startsWith(dimnames(array)[[1L]], paste0(label, ":")))
-    rows <- setdiff(rows, which(nzchar(variable_for_row)))
-    if (!length(rows)) rows <- cursor
-    variable_for_row[rows] <- variables[[index]]
-    cursor <- max(rows) + 1L
+  if (length(dim(array)) == 2L) {
+    array <- base::array(array, dim = c(dim(array), 1L), dimnames = c(dimnames(array), list("[ALL]")))
   }
-  variable_for_row[!nzchar(variable_for_row)] <- NA_character_
+  # getResults 按原始变量顺序展开分类水平；显示标签不承担变量身份。
+  row_counts <- vapply(seq_along(cg), function(index) {
+    if (methods[[index]] == 3L) ncol(cg[[index]]$descriptive) else 1L
+  }, integer(1))
+  variable_for_row <- rep(variables, row_counts)
+  if (length(variable_for_row) != dim(array)[1L]) cg_stop("Unexpected compareGroups descriptive row layout")
   indices <- which(!is.na(array), arr.ind = TRUE)
   out <- data.frame(
     variant = variant_id,
@@ -928,7 +923,8 @@ cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) 
   )
   available <- table$avail
   if (!is.null(available) && length(available)) {
-    count_columns <- setdiff(colnames(available), c("method", "select"))
+    count_columns <- intersect(colnames(available), dimnames(array)[[3L]])
+    if (nrow(available) != length(variables)) cg_stop("Unexpected compareGroups availability row layout")
     counts <- available[, count_columns, drop = FALSE]
     count_values <- suppressWarnings(matrix(
       as.numeric(gsub(",", "", as.character(counts), fixed = TRUE)),
@@ -937,7 +933,7 @@ cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) 
     count_indices <- which(is.finite(count_values), arr.ind = TRUE)
     if (nrow(count_indices)) {
       count_labels <- rownames(counts)[count_indices[, 1L]]
-      count_variables <- cg_result_names_to_variables(cg, count_labels)
+      count_variables <- variables[count_indices[, 1L]]
       count_frame <- data.frame(
         variant = variant_id,
         block = block_id,
@@ -960,7 +956,8 @@ cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) 
         result_names <- names(values)
         if (is.null(result_names) && length(values) == length(variables)) result_names <- variables
         if (is.null(result_names)) next
-        mapped <- cg_result_names_to_variables(cg, result_names)
+        if (length(values) != length(variables)) cg_stop("Unexpected compareGroups p-value row layout")
+        mapped <- variables
         p_frame <- data.frame(
           variant = variant_id, block = block_id, variable = mapped,
           row_label = result_names, statistic = statistic,
@@ -970,7 +967,8 @@ cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) 
       } else if (length(dim(values)) == 2L) {
         indices <- which(!is.na(values), arr.ind = TRUE)
         row_labels <- dimnames(values)[[1L]][indices[, 1L]]
-        mapped <- cg_result_names_to_variables(cg, row_labels)
+        if (nrow(values) != length(variables)) cg_stop("Unexpected compareGroups p-value row layout")
+        mapped <- variables[indices[, 1L]]
         p_frame <- data.frame(
           variant = variant_id, block = block_id, variable = mapped,
           row_label = row_labels, statistic = statistic,
@@ -987,11 +985,26 @@ cg_numeric_frame <- function(cg, table, block_id, variant_id, include_p = TRUE) 
   out
 }
 
+cg_create_table <- function(cg, variables, display, suppress) {
+  digits <- setNames(vapply(variables, function(v) as.integer(cg_scalar(v$digits, 3L)), integer(1)),
+                     vapply(variables, function(v) cg_scalar(v$name), character(1)))
+  table_args <- list(
+    x = cg, digits = digits, digits.ratio = digits,
+    show.all = cg_bool(display$show_all, TRUE), show.n = cg_bool(display$show_n, TRUE),
+    show.p.overall = cg_bool(display$show_p_overall, TRUE) && !suppress,
+    show.p.mul = cg_bool(display$show_p_multiple, FALSE) && !suppress,
+    show.p.trend = cg_bool(display$show_p_trend, FALSE) && !suppress,
+    digits.p = as.integer(cg_scalar(display$p_digits, 3L))
+  )
+  hide_no <- cg_character_vector(display$hide_no)
+  if (length(hide_no)) table_args$hide.no <- hide_no
+  do.call(compareGroups::createTable, table_args)
+}
+
 cg_run_variant <- function(variant, spec) {
   data <- variant$data
   group <- cg_scalar(spec$analysis$group, NULL)
   display <- spec$display
-  hide_no <- cg_character_vector(display$hide_no)
   block_objects <- list()
   display_frames <- list()
   numeric_frames <- list()
@@ -1011,7 +1024,6 @@ cg_run_variant <- function(variant, spec) {
       methods <- setNames(vapply(part, function(v) {
         switch(cg_scalar(v$method), normal = 1, nonnormal = 2, categorical = 3)
       }, numeric(1)), variables)
-      digits <- setNames(vapply(part, function(v) as.integer(cg_scalar(v$digits, 3L)), integer(1)), variables)
       formula <- if (is.null(group)) stats::reformulate(variables) else stats::reformulate(variables, response = group)
       model_data <- data[, unique(c(group, variables)), drop = FALSE]
       cg <- compareGroups::compareGroups(
@@ -1022,16 +1034,7 @@ cg_run_variant <- function(variant, spec) {
       removed <- setdiff(variables, attr(cg, "varnames.orig"))
       if (length(removed)) cg_stop("compareGroups removed variables in block %s: %s", block_id, paste(removed, collapse = ", "))
       suppress <- isTRUE(variant$suppress_p) || is.null(group)
-      table_args <- list(
-        x = cg, digits = digits, digits.ratio = digits,
-        show.all = cg_bool(display$show_all, TRUE), show.n = cg_bool(display$show_n, TRUE),
-        show.p.overall = cg_bool(display$show_p_overall, TRUE) && !suppress,
-        show.p.mul = cg_bool(display$show_p_multiple, FALSE) && !suppress,
-        show.p.trend = cg_bool(display$show_p_trend, FALSE) && !suppress,
-        digits.p = as.integer(cg_scalar(display$p_digits, 3L))
-      )
-      if (length(hide_no)) table_args$hide.no <- hide_no
-      table <- do.call(compareGroups::createTable, table_args)
+      table <- cg_create_table(cg, part, display, suppress)
       part_name <- paste0("part_", part_index)
       part_objects[[part_name]] <- list(compareGroups = cg, createTable = table,
                                         include_missing = include_flags[which(part_ids == part_index)[1L]])
@@ -1046,11 +1049,83 @@ cg_run_variant <- function(variant, spec) {
     numeric_frames[[block_id]] <- do.call(rbind, part_numerics)
   }
   list(
-    id = variant$id, label = variant$label, warning = variant$warning,
+    id = variant$id, label = variant$label, warning = variant$warning, suppress_p = isTRUE(variant$suppress_p),
     rows = nrow(data), group_counts = if (is.null(group)) list(all = nrow(data)) else as.list(table(data[[group]], useNA = "ifany")),
     objects = block_objects, display = cg_bind_fill(display_frames),
     numeric = do.call(rbind, numeric_frames)
   )
+}
+
+cg_replay_objects <- function(objects) {
+  spec <- objects$normalized_spec
+  cg_validate_spec(spec)
+  result_frames <- lapply(objects$results, function(result) {
+    display_frames <- numeric_frames <- list()
+    expected_blocks <- vapply(spec$blocks, function(b) cg_scalar(b$id), character(1))
+    if (!identical(names(result$objects), expected_blocks)) cg_stop("Retained block identities do not match specification")
+    for (block in spec$blocks) {
+      block_id <- cg_scalar(block$id)
+      flags <- vapply(block$variables, function(v) cg_bool(v$include_missing), logical(1))
+      part_ids <- cumsum(c(TRUE, diff(as.integer(flags)) != 0L))
+      parts <- result$objects[[block_id]]$parts
+      if (!identical(names(parts), paste0("part_", unique(part_ids)))) cg_stop("Retained parts do not match specification")
+      for (index in unique(part_ids)) {
+        part <- parts[[paste0("part_", index)]]
+        variables <- block$variables[part_ids == index]
+        expected_variables <- vapply(variables, function(v) cg_scalar(v$name), character(1))
+        if (!identical(attr(part$compareGroups, "varnames.orig"), expected_variables)) cg_stop("Retained variable identities do not match specification")
+        suppress <- isTRUE(result$suppress_p) || is.null(cg_scalar(spec$analysis$group, NULL))
+        table <- cg_create_table(part$compareGroups, variables, spec$display, suppress)
+        if (!identical(table$descr, part$createTable$descr) || !identical(table$avail, part$createTable$avail)) {
+          cg_stop("Retained createTable differs from compareGroups object")
+        }
+        key <- paste(block_id, index, sep = "/")
+        display_frames[[key]] <- cg_display_frame(table, block_id, cg_scalar(block$label), result$id,
+                                                   include_header = index == unique(part_ids)[[1L]])
+        numeric_frames[[key]] <- cg_numeric_frame(part$compareGroups, table, block_id, result$id, include_p = !suppress)
+      }
+    }
+    list(display = cg_bind_fill(display_frames), numeric = cg_bind_fill(numeric_frames))
+  })
+  list(results = result_frames, display = cg_bind_fill(lapply(result_frames, `[[`, "display")),
+       numeric = cg_bind_fill(lapply(result_frames, `[[`, "numeric")))
+}
+
+cg_csv_matches <- function(path, expected, numeric = FALSE) {
+  actual <- utils::read.csv(path, colClasses = "character", check.names = FALSE,
+                            na.strings = "", fileEncoding = "UTF-8")
+  if (!identical(names(actual), names(expected)) || nrow(actual) != nrow(expected)) return(FALSE)
+  if (numeric) {
+    keys <- setdiff(names(expected), "value")
+    key_frame <- function(frame) {
+      frame <- data.frame(lapply(frame[keys], function(x) {
+        x <- as.character(x)
+        x[is.na(x)] <- ""
+        x
+      }), check.names = FALSE, stringsAsFactors = FALSE)
+      frame
+    }
+    actual_keys <- key_frame(actual)
+    expected_keys <- key_frame(expected)
+    if (anyDuplicated(actual_keys) || anyDuplicated(expected_keys)) return(FALSE)
+    actual_order <- do.call(order, actual_keys)
+    expected_order <- do.call(order, expected_keys)
+    actual_values <- suppressWarnings(as.numeric(actual$value[actual_order]))
+    expected_values <- expected$value[expected_order]
+    if (any(is.na(actual_values) & !is.na(actual$value[actual_order]))) return(FALSE)
+    if (!isTRUE(all.equal(actual_values, expected_values, tolerance = 1e-12, check.attributes = FALSE))) return(FALSE)
+    actual <- actual_keys[actual_order, , drop = FALSE]
+    expected <- expected_keys[expected_order, , drop = FALSE]
+  }
+  identical(lapply(actual, function(x) replace(as.character(x), is.na(x) | x == "", "")),
+            lapply(expected, function(x) replace(as.character(x), is.na(x) | x == "", "")))
+}
+
+cg_json_equivalent <- function(x, y) {
+  normalize <- function(value) jsonlite::fromJSON(
+    jsonlite::toJSON(value, auto_unbox = TRUE, null = "null", na = "null", digits = NA), simplifyVector = FALSE
+  )
+  identical(normalize(x), normalize(y))
 }
 
 cg_render_docx <- function(results, path, title, spec, note = NULL) {
@@ -1061,6 +1136,14 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
   font_size <- as.numeric(cg_scalar(docx$font_size, 10))
   repeat_header <- cg_bool(docx$repeat_header, TRUE)
   doc <- officer::read_docx()
+  dimensions <- officer::docx_dim(doc)
+  doc <- officer::body_set_default_section(doc, officer::prop_section(
+    page_size = officer::page_size(width = dimensions$page[["width"]],
+      height = dimensions$page[["height"]], orient = cg_scalar(docx$orientation, "portrait")),
+    page_margins = do.call(officer::page_mar, as.list(dimensions$margins))
+  ))
+  dimensions <- officer::docx_dim(doc)
+  available_width <- dimensions$page[["width"]] - sum(dimensions$margins[c("left", "right")])
   doc <- officer::body_add_par(doc, resolved_title, style = "heading 1")
   for (result in results) {
     doc <- officer::body_add_par(doc, result$label, style = "heading 2")
@@ -1083,10 +1166,38 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
       if (length(widths) != ncol(frame) || any(!is.finite(widths)) || any(widths <= 0)) {
         cg_stop("display.docx.column_widths must contain one positive width per rendered column")
       }
+      if (sum(widths) > available_width) {
+        cg_stop("display.docx.column_widths exceed the printable page width; reduce widths or select landscape")
+      }
       ft <- flextable::width(ft, j = seq_len(ncol(frame)), width = widths, unit = "in")
     } else {
       ft <- flextable::autofit(ft)
+      widths <- dim(ft)$widths
+      if (sum(widths) > available_width) {
+        token_frame <- frame
+        for (j in seq_len(ncol(frame))[-1L]) {
+          token_frame[[j]] <- vapply(as.character(frame[[j]]), function(value) {
+            if (is.na(value) || !nzchar(value)) return("")
+            tokens <- strsplit(value, "[[:space:]]+")[[1L]]
+            tokens[[which.max(nchar(tokens, type = "width"))]]
+          }, character(1))
+        }
+        token_table <- flextable::flextable(token_frame)
+        token_table <- flextable::font(token_table, fontname = font_family, part = "all")
+        token_table <- flextable::fontsize(token_table, size = font_size, part = "all")
+        minimum_widths <- flextable::dim_pretty(token_table, part = "body")$widths + 0.02
+        minimum_widths[[1L]] <- min(widths[[1L]], 1.2)
+        if (sum(minimum_widths) > available_width) {
+          cg_stop("DOCX is too dense for legible numeric cells; select landscape, an explicit smaller font, or separate comparisons")
+        }
+        extra <- pmax(widths - minimum_widths, 0)
+        widths <- minimum_widths + (available_width - sum(minimum_widths)) *
+          if (sum(extra) > 0) extra / sum(extra) else rep(1 / length(extra), length(extra))
+        ft <- flextable::width(ft, j = seq_len(ncol(frame)),
+          width = widths, unit = "in")
+      }
     }
+    ft <- flextable::set_table_properties(ft, layout = "fixed")
     ft <- flextable::paginate(ft, init = repeat_header, hdr_ftr = repeat_header)
     doc <- flextable::body_add_flextable(doc, ft)
     if (!is.null(result$warning)) doc <- officer::body_add_par(doc, paste("Note:", result$warning), style = "Normal")
@@ -1094,9 +1205,6 @@ cg_render_docx <- function(results, path, title, spec, note = NULL) {
   if (!is.null(note) && nzchar(note)) doc <- officer::body_add_par(doc, paste("Note:", note), style = "Normal")
   footnote <- cg_scalar(docx$footnote, NULL)
   if (!is.null(footnote) && nzchar(footnote)) doc <- officer::body_add_par(doc, footnote, style = "Normal")
-  if (identical(cg_scalar(docx$orientation, "portrait"), "landscape")) {
-    doc <- officer::body_end_section_landscape(doc)
-  }
   tmp <- cg_atomic_path(path)
   if (!grepl("\\.docx$", tmp, ignore.case = TRUE)) tmp_docx <- paste0(tmp, ".docx") else tmp_docx <- tmp
   on.exit({ if (file.exists(tmp)) unlink(tmp); if (exists("tmp_docx") && file.exists(tmp_docx)) unlink(tmp_docx) }, add = TRUE)
@@ -1320,7 +1428,7 @@ cg_write_variant_outputs <- function(results, output_root, stem, raw_spec, spec,
     cg_write_csv(result$numeric, variant_paths[["numeric_long"]])
     cg_write_rds(list(
       spec = raw_spec, input_spec = raw_spec, normalized_spec = spec, resolution = resolution,
-      results = setNames(list(result[c("id", "label", "warning", "rows", "group_counts", "objects")]), variant_id)
+      results = setNames(list(result[c("id", "label", "warning", "suppress_p", "rows", "group_counts", "objects")]), variant_id)
     ), variant_paths[["objects"]])
     cg_render_docx(
       list(result), variant_paths[["docx"]],
@@ -1395,7 +1503,7 @@ cg_run <- function(spec_path, output_root) {
   cg_write_csv(numeric, numeric_path)
   cg_write_rds(list(
     spec = raw_spec, input_spec = raw_spec, normalized_spec = spec, resolution = bundle$resolution,
-    results = lapply(results, function(x) x[c("id", "label", "warning", "rows", "group_counts", "objects")])
+    results = lapply(results, function(x) x[c("id", "label", "warning", "suppress_p", "rows", "group_counts", "objects")])
   ), objects_path)
 
   cg_progress("render", "creating a three-line DOCX with no vertical grid")
@@ -1454,6 +1562,10 @@ cg_run <- function(spec_path, output_root) {
   cg_write_csv(manifest, manifest_path)
   cg_write_text(cg_sha256_lines(c(output_paths, manifest_path), output_root), sums_path)
   if (!all(validation$passed)) cg_stop("Validation failed; inspect %s", validation_path)
+  independent <- cg_validate_outputs(output_root, stem)
+  if (!identical(independent$decision, "PASS")) {
+    cg_stop("Independent output validation failed: %s", jsonlite::toJSON(independent, auto_unbox = TRUE))
+  }
   cg_progress("complete", sprintf("PASS outputs=%s", output_root))
   invisible(list(
     decision = "PASS", output_root = output_root, manifest = manifest_path,
@@ -1511,6 +1623,12 @@ cg_validate_outputs <- function(output_root, stem) {
   validation <- utils::read.csv(validation_path, check.names = FALSE, stringsAsFactors = FALSE)
   required_columns <- c("check", "passed", "expected", "actual", "detail", "details")
   validation_columns <- all(required_columns %in% names(validation))
+  required_checks <- c(
+    "input_hash_unchanged", "display_nonempty", "numeric_nonempty", "objects_reload",
+    "docx_reopens", "docx_true_three_line", "docx_no_vertical_grid",
+    "all_variables_present", "panel_dual_has_compatibility", "variant_outputs_exist", "variant_docx_true_three_line"
+  )
+  validation_complete <- validation_columns && !anyDuplicated(validation$check) && setequal(validation$check, required_checks)
   values <- if (validation_columns && nrow(validation) > 0L) tolower(as.character(validation$passed)) %in% c("true", "t", "1") else FALSE
   docx <- cg_docx_structure(file.path(output_root, paste0(stem, ".docx")))
   sums_ok <- cg_verify_sha256_file(sums_path, output_root)
@@ -1530,8 +1648,8 @@ cg_validate_outputs <- function(output_root, stem) {
       jsonlite::toJSON(object_contract, auto_unbox = TRUE, null = "null", digits = NA)
     )
   }
-  display <- try(utils::read.csv(file.path(output_root, paste0(stem, "_display.csv")), check.names = FALSE, stringsAsFactors = FALSE), silent = TRUE)
-  numeric <- try(utils::read.csv(file.path(output_root, paste0(stem, "_numeric_long.csv")), check.names = FALSE, stringsAsFactors = FALSE), silent = TRUE)
+  display <- try(utils::read.csv(file.path(output_root, paste0(stem, "_display.csv")), check.names = FALSE, colClasses = "character", na.strings = ""), silent = TRUE)
+  numeric <- try(utils::read.csv(file.path(output_root, paste0(stem, "_numeric_long.csv")), check.names = FALSE, colClasses = "character", na.strings = ""), silent = TRUE)
   row_counts_ok <- metadata_ok && !inherits(display, "try-error") && !inherits(numeric, "try-error") &&
     identical(as.numeric(cg_scalar(metadata$output_contract$display_rows, NA_real_)), as.numeric(nrow(display))) &&
     identical(as.numeric(cg_scalar(metadata$output_contract$numeric_rows, NA_real_)), as.numeric(nrow(numeric)))
@@ -1550,15 +1668,50 @@ cg_validate_outputs <- function(output_root, stem) {
   variant_docx_ok <- metadata_ok && all(vapply(metadata$variant_outputs, function(entry) {
     cg_validate_docx(file.path(output_root, cg_scalar(entry$files$docx)))
   }, logical(1)))
+  semantic <- tryCatch({
+    if (!objects_ok || !metadata_ok || !cg_json_equivalent(objects$normalized_spec, metadata$normalized_spec)) {
+      cg_stop("Normalized specification differs between metadata and RDS")
+    }
+    replay <- cg_replay_objects(objects)
+    display_matches <- cg_csv_matches(file.path(output_root, paste0(stem, "_display.csv")), replay$display)
+    numeric_matches <- cg_csv_matches(file.path(output_root, paste0(stem, "_numeric_long.csv")), replay$numeric, TRUE)
+    expected_variant_ids <- if (length(objects$normalized_spec$analysis$variants)) names(objects$results) else character()
+    entries <- metadata$variant_outputs
+    entry_ids <- if (length(entries)) names(entries) else character()
+    variants_match <- identical(entry_ids, expected_variant_ids)
+    if (variants_match && length(expected_variant_ids)) {
+      variants_match <- all(vapply(expected_variant_ids, function(id) {
+        entry <- entries[[id]]
+        expected_stem <- paste0(stem, "__", cg_safe_id(id))
+        expected_files <- c(display = paste0(expected_stem, "_display.csv"),
+                            numeric_long = paste0(expected_stem, "_numeric_long.csv"),
+                            objects = paste0(expected_stem, "_objects.rds"),
+                            metadata = paste0(expected_stem, "_metadata.json"), docx = paste0(expected_stem, ".docx"))
+        if (!identical(unlist(entry$files), expected_files)) return(FALSE)
+        variant_objects <- readRDS(file.path(output_root, expected_files[["objects"]]))
+        variant_metadata <- jsonlite::fromJSON(file.path(output_root, expected_files[["metadata"]]), simplifyVector = FALSE)
+        isTRUE(all.equal(variant_objects$results, objects$results[id], check.environment = FALSE)) &&
+          identical(variant_objects$normalized_spec, objects$normalized_spec) &&
+          identical(cg_scalar(variant_metadata$variant_id), id) &&
+          isTRUE(all.equal(variant_metadata$group_counts, objects$results[[id]]$group_counts)) &&
+          identical(as.numeric(cg_scalar(variant_metadata$rows)), as.numeric(objects$results[[id]]$rows)) &&
+          cg_csv_matches(file.path(output_root, expected_files[["display"]]), replay$results[[id]]$display) &&
+          cg_csv_matches(file.path(output_root, expected_files[["numeric_long"]]), replay$results[[id]]$numeric, TRUE)
+      }, logical(1)))
+    }
+    list(display = display_matches, numeric = numeric_matches, variants = variants_match, detail = "")
+  }, error = function(e) list(display = FALSE, numeric = FALSE, variants = FALSE, detail = conditionMessage(e)))
   skill_version_ok <- metadata_ok && identical(cg_scalar(metadata$skill_versions$comparegroups_guide), comparegroups_guide_version)
   ok <- !length(missing) && manifest_paths_safe && manifest_bytes_match && manifest_entries_complete && validation_columns && all(hash_ok) && all(values) &&
     docx$three_line && sums_ok && sha256_entries_complete && spec_version_ok && variant_contract_ok &&
-    row_counts_ok && variant_ids_ok && variant_files_ok && variant_docx_ok && skill_version_ok
+    row_counts_ok && variant_ids_ok && variant_files_ok && variant_docx_ok && skill_version_ok &&
+    validation_complete && semantic$display && semantic$numeric && semantic$variants
   list(
     decision = if (ok) "PASS" else "FAIL", manifest_hashes = all(hash_ok), manifest_paths_safe = manifest_paths_safe,
     manifest_entries_complete = manifest_entries_complete, manifest_bytes_match = manifest_bytes_match,
     sha256_entries_complete = sha256_entries_complete,
     validations = all(values), validation_columns = validation_columns,
+    validation_complete = validation_complete, semantic = semantic,
     metadata_spec_version = spec_version_ok, skill_version = skill_version_ok,
     variant_contract = variant_contract_ok, row_counts = row_counts_ok, variant_ids = variant_ids_ok,
     variant_files = variant_files_ok, variant_docx = variant_docx_ok,

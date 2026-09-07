@@ -1,10 +1,58 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.6.0`、ClaudeR `0.14.1.9001`
->（基于 upstream `0.14.1`）、`clauder-mcp 0.14.5`。
+> 适用版本：`clauder-rstudio-workbench v0.6.1`、ClaudeR `0.14.1.9002`
+>（公开配套标签 `v0.14.1.9002-lzhs.1`）、`clauder-mcp 0.14.5.post1`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
 > 但其中的版本、路径和 `uvx` 建议不再代表当前推荐配置。
+
+## 连接排障补充（2026-09-07）
+
+`doctor PASS` 只表示配置与 discovery 检查通过，不代表当前 agent 已加载原生工具。
+新增诊断命令逐层区分终端、配置、bridge、活跃 RStudio 和 agent 工具：
+
+```text
+clauder-workbench connection-diagnose --session-name <实际会话名> --probe-http
+```
+
+该命令只做标记执行和 PID 核对，不拟合模型、不改研究对象、不提交异步任务。
+HTTP 必须命中明确的 discovery 会话、使用对应认证并收到成功执行标记；错误正文非空不能算成功。
+独立 MCP 通道可用时返回 `MCP_STDIO_OK`，诊断总体仍为 `WARN/2`，
+`native_gate=NOT_VERIFIED`；这不是原生发布门禁通过。
+
+当前工具列表缺少 r-studio 不能推出 RStudio 停止。先核查工具暴露、有效配置与实际进程，
+没有证据时不得断言配置写入者或“注册表冻结”。没有可用的热加载接口也不能虚构调用。
+交互式 Codex 启动必须保留 stdin/stdout/stderr 的终端属性；`rtk proxy` 等输出捕获层
+只用于非交互检查。脚本语法检查及 `mcp get` 成功不等于交互启动验证通过。
+
+## 2026-09-07 治理状态补充
+
+v0.6.1 把此前的定点诊断补丁纳入维护来源，并增加统一就绪检查、原子配置合并、公开配套来源和进程绑定原生证据。本轮 Codex 原生四步调用已在既有 RStudio 会话实测通过，包含异步完成前的阶段进度；这不证明此前配置丢失的未知写入者已找到，也不代表所有 GUI 客户端生命周期均已实测。发布状态以对应 GitHub Release 为准。
+
+三仓依赖、fork 分支与本机版本差异、Windows—Mac 故障台账及剩余整改见同目录的《ClaudeR_教程审查与SKILL设计建议》。用户已因 Claude 欠费授权 Codex 独立接管，不再等待或调用 Claude；测试及发布门禁仍保留。不要为“恢复工具”重启现有研究会话。
+
+新的统一入口（默认只读）：
+
+```text
+clauder-workbench ensure-ready --client codex --session-name <实际会话名> --task-key <任务名>
+```
+
+正式原生任务在真实四步 smoke 后追加 `--require-native --native-evidence <证据文件>`。
+门禁核对当前客户端进程/session、配置哈希、目标 R PID 和四步归档原文哈希；同一 thread
+在新进程中恢复也必须重新验证。`--client claude|copilot` 使用对应配置文件，项目级配置用
+`--config-file` 显式选择；“读到了文件”不等于证明宿主采用了它。
+`--repair safe` 只定点合并已有持久入口，不安装新版本、不启动 agent、不重启 RStudio，
+不抹掉禁用状态、其它 MCP、自定义参数/env。未知锁和损坏 discovery 保留待核查。
+
+安装与实际加载必须分开检查：`getNamespaceVersion("ClaudeR")` 是当前 R 进程版本，
+`packageVersion("ClaudeR")` 是磁盘版本。已有健康研究进程可能继续持有旧 namespace；
+不要为对齐版本号而终止它。MCP 的新磁盘入口也不证明已运行的 bridge 自动热换版。
+`$clauder` 仅作薄别名；用安装器 `--sync-clauder-alias`（Windows `-SyncClaudeRAlias`）
+备份并同步该兼容入口，连接规范只维护在核心 skill 中。
+
+宽表遇到密度阻断时，先检查列数与比较项，再在独立 spec 副本中显式设置横向/字号；
+不要删检验列以凑验收，也不要自动改论文原规格。一次 15 列面板表实测需要横向 9.5 磅，
+版式调整后仍须复核展示值、原始统计值和三线边框。
 
 ## 1. 先看结论
 
@@ -51,13 +99,13 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.6.0 推荐值 | 验证方式 |
+| 层 | v0.6.1 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.6.0` | `clauder-workbench --version` |
-| ClaudeR | `0.14.1.9001` 本地 fork | `packageVersion("ClaudeR")` |
+| workbench | `0.6.1` | `clauder-workbench --version` |
+| ClaudeR | `0.14.1.9002` / `v0.14.1.9002-lzhs.1` | 磁盘 packageVersion 与当前 getNamespaceVersion 分别核对 |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
-| MCP bridge | `0.14.5` | 安装元数据/`pyproject.toml` |
-| MCP 工具面 | 41 tools | `clauder-workbench tool-surface` |
+| MCP bridge | `0.14.5.post1` | 精确标签、manifest、安装元数据及已加载进程分别核对 |
+| MCP 工具面 | 5 个核心执行能力；其余按用途 | ensure-ready 报告必需缺失与可选缺失，保留完整工具清单 |
 | evidence schema | `0.2.4` | packaged schema |
 | macOS/Linux | `install.sh` | installer/doctor 测试 |
 | Windows | `install.ps1` | PowerShell 和跨平台回归测试 |
@@ -70,12 +118,14 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 ### 4.1 macOS/Linux
 
 ```bash
-git clone https://github.com/lzhs1995/clauder-rstudio-workbench.git \
-  "$HOME/projects/clauder-rstudio-workbench"
-cd "$HOME/projects/clauder-rstudio-workbench"
+git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git \
+  "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
+git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git \
+  "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
 
 ./install.sh \
-  --clauder-dir "$HOME/projects/ClaudeR" \
+  --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" \
   --configure-codex \
   --sync-agents-skill \
   --backup-retention 0
@@ -86,6 +136,8 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 
 `--backup-retention 0` 表示保留全部 skill 备份。安装器只有在显式指定
 `--configure-codex`、`--configure-claude` 等开关时才修改客户端配置。
+clone 目标必须不存在；已有工作树不要覆盖，先核对其精确标签和未提交修改。
+安装器在替换 R/bridge 前验证 runtime-compatibility.json；不要以任意 fork main 代替配套引用。
 
 推荐 Codex 配置形态：
 
@@ -128,8 +180,10 @@ library(ClaudeR)
 claudeAddin()
 ```
 
-修改 ClaudeR 包、bridge 或 MCP 配置后，重启相应的 Addin/MCP 客户端。
-正在运行的 agent 不一定能热加载新增 wrapper。
+修改包、bridge 或配置后，先核对磁盘来源、已加载版本和实际调用。
+工具清单采用延迟发现时，先使用宿主提供的工具搜索/发现，再判断是否未暴露。
+只有已定位加载差异、且当前宿主提供受支持的定向 reload 时才使用它；不要自动
+重启 Addin、RStudio 或 agent。正在运行的进程未必会因磁盘更新自动换版。
 
 ## 5. 连接与 Native smoke
 
@@ -497,16 +551,28 @@ Rscript skills/comparegroups-guide/scripts/validate_comparegroups_batch.R \
 `compareGroups/createTable` RDS、输入/标签/方法/版本元数据、结构化 validation、
 manifest 和 `SHA256SUMS.txt`。论文叙述必须以数值长表为准，DOCX 只负责展示。
 
+v0.6.1 加强正确性门禁：`n_available` 只来自真实全样本/分组列，不能把
+`Fact OR/HR` 等辅助字段当成样本量；数值行按原变量身份映射，允许显示标签重复。
+独立复验从保留的 RDS 对象重建数值和展示内容进行核对，并要求完整的 validation
+检查集合；“CSV 行数相同、所有剩余检查为 TRUE、重算哈希一致”不能代替内容核对。
+
 个人做表规范已经固化：连续正态变量为“均值（标准差）”并保留 3 位小数，偏态变量
 为“中位数 [Q1, Q3]”并保留 3 位小数，分类变量为“n（%）”且比例保留 2 位；
 `[ALL]` 显示为“全样本”，`p.overall` 显示为“p-value”；变量按被解释变量、解释
 变量、中介/调节变量、个体、父母、家庭、混杂因素等区块排列。
 
 对于 Stata 数据，优先保留变量标签和值标签；数值型无标签分类变量必须在合同中显式
-给出编码、显示标签和参照水平。遇到重复 person-wave 行时，`panel_mode: dual`
+给出编码、显示标签和参照水平。声明的 ID/time 不得缺失，同一 person-wave 不得重复；
+不能将重复 ID 行声明为独立横截面，也不能自动去重来通过门禁。真正跨波次重复观测时，`panel_mode: dual`
 会生成安全主表和兼容 pooled 表：正式主表按波次输出，或隐藏不成立的 pooled p 值；
 兼容表保留旧结果，但必须携带“普通 t/卡方检验假设独立行”的限制说明。删除/保留样本
 比较必须在删除记录前构造状态，并以基期一人一行为正式分析单位。
+所有自动波次表与显式 subset variants 使用相同的非空/声明分组完整性检查；显式
+`pooled_compatibility` 也必须保留非独立性警告，不能冒充正式推断主表。
+
+这仍不替代研究设计审查、原始数据核对和最终 DOCX 视觉验收。OOXML 真三线通过不等于
+中文字体、列宽、分页均合格；RDS 内容核对也不是对所有产物协同篡改的安全防护。
+合同中的 subset 是受信任的 R 表达式，不是安全沙箱，执行前必须审阅。
 
 单张小表用 ClaudeR `execute_r`；大型 `.dta` 或多表 DOCX 批处理只提交一次
 `execute_r_async`，再使用同一个 job ID 轮询

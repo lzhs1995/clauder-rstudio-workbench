@@ -38,6 +38,7 @@ from .config import (
     python_command,
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, utc_now, write_evidence
+from .diagnostics import connection_layers
 from .fanout import (
     build_submit_code,
     lint_contract_workers,
@@ -168,6 +169,7 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
         "warnings": [],
         "reasons": [],
         "path": str(CODEX_CONFIG),
+        "scope": "configured_file_only_not_running_agent",
     }
     if not CODEX_CONFIG.exists():
         result["ok"] = False
@@ -327,9 +329,34 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "discovery_sessions": discovery_sessions(),
             "toml_parse_check": toml_parse_info,
             "codex_rstudio_mcp_check": codex_rstudio_mcp_info,
+            "verification_scope": "configuration_and_discovery_only",
+            "not_verified": ["bridge_execution", "live_r_execution", "agent_native_tools", "interactive_terminal"],
         },
     )
     return emit(doc)
+
+
+def cmd_connection_diagnose(args: argparse.Namespace) -> int:
+    install_info, _ = _load_install_info()
+    layers = connection_layers(_check_codex_rstudio_mcp_config(install_info),
+                               session_name=args.session_name, timeout=args.timeout,
+                               probe_http=args.probe_http, inventory=args.agent_tool_inventory)
+    operational = layers["bridge"]["ok"] and layers["rstudio"]["ok"]
+    code = WARN if operational else BLOCK
+    reasons = ["layered diagnostic only; no native smoke or release approval is implied"]
+    if not layers["client_config"].get("ok"):
+        code = BLOCK
+        reasons.append("configured client entry fails checks; independent runtime results remain separate")
+    if args.probe_http and not layers["http"].get("ok"):
+        code = BLOCK
+        reasons.append("requested HTTP diagnostic failed; see its separate layer")
+    if layers["agent_tools"]["status"] == "INVALID":
+        code = BLOCK
+        reasons.append("invalid agent tool inventory")
+    return emit(build_evidence("connection_diagnose", "WARN" if code == WARN else "BLOCK",
+                               reasons=reasons, transport_class="MCP_STDIO_OK" if operational else "BLOCKED",
+                               session_name=args.session_name, exit_code=code,
+                               extra={"layers": layers, "native_gate": "NOT_VERIFIED", "install_provenance": install_info}))
 
 
 def cmd_transport_classify(args: argparse.Namespace) -> int:
@@ -344,6 +371,7 @@ def cmd_transport_classify(args: argparse.Namespace) -> int:
         probe_http=args.probe_http,
         probe_rscript=args.probe_rscript,
         timeout=args.timeout,
+        session_name=getattr(args, "session_name", ""),
     )
     exit_code = PASS
     if transport_class == "BLOCKED":
@@ -537,10 +565,10 @@ def _parse_utc(value: str | None) -> datetime | None:
 
 def _timestamp_fresh_enough(timestamp_utc: str | None, max_age_min: float) -> bool:
     dt = _parse_utc(timestamp_utc)
-    if dt is None:
+    if dt is None or dt.tzinfo is None:
         return False
     age_sec = (datetime.now(timezone.utc) - dt).total_seconds()
-    return age_sec <= max_age_min * 60
+    return 0 <= age_sec <= max_age_min * 60
 
 
 def _native_smoke_parent_ok(parent_docs: list[dict[str, Any]], task_key: str | None = None, max_age_min: float = 60.0) -> bool:
@@ -688,10 +716,21 @@ def _native_smoke_step_valid(step: str, entry: dict[str, Any], state: dict[str, 
     marker = entry.get("marker")
     if state.get("require_raw_file") and not raw_file:
         reasons.append(f"{step} requires --raw-file in high-assurance mode (--require-raw-file)")
-    if raw_file and marker:
+    if raw_file:
         try:
-            raw = Path(raw_file).read_text(encoding="utf-8-sig", errors="replace")
-            if str(marker) not in raw:
+            # 已归档证据与当前工作目录、原始文件后续移动无关；每次完成都复验哈希。
+            proof = entry.get("raw_file_proof")
+            if proof:
+                evidence_copy = Path(proof["evidence_copy"])
+                if not evidence_copy.is_absolute():
+                    raise ValueError("preserved evidence path must be absolute")
+                data = evidence_copy.read_bytes()
+                if hashlib.sha256(data).hexdigest() != proof["sha256"] or len(data) != proof["size_bytes"]:
+                    raise ValueError("preserved raw evidence hash/size mismatch")
+                raw = data.decode("utf-8-sig", errors="replace")
+            else:
+                raw = Path(raw_file).expanduser().read_text(encoding="utf-8-sig", errors="replace")
+            if marker and str(marker) not in raw:
                 reasons.append(f"marker not found in raw_file for {step}")
         except Exception as exc:
             reasons.append(f"could not read raw_file for {step}: {exc}")
@@ -750,6 +789,8 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             "required_steps": list(NATIVE_SMOKE_STEPS),
             "steps": {},
         }
+        from .readiness import client_context
+        state["client_context"] = client_context(args.agent or "codex", args.config_file)
         path = _write_native_smoke(task_key, state)
         doc = build_evidence(
             "native_smoke_start",
@@ -794,7 +835,7 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             "pid": args.pid,
             "job_id": args.job_id,
             "marker": args.marker,
-            "raw_file": args.raw_file,
+            "raw_file": str(Path(args.raw_file).expanduser().resolve()) if args.raw_file else None,
         }
         ok, reasons = _native_smoke_step_valid(args.step, entry, state)
         if not ok:
@@ -855,6 +896,12 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
     if args.action == "complete":
         steps = state.get("steps") or {}
         reasons: list[str] = []
+        context = state.get("client_context")
+        if context:
+            from .readiness import client_context
+            current = client_context(context["client"], Path(context["config_path"]))
+            if current != context:
+                reasons.append("native smoke client process, session or configuration changed after start")
         for step in NATIVE_SMOKE_STEPS:
             entry = steps.get(step)
             if not entry:
@@ -906,7 +953,8 @@ def cmd_native_smoke(args: argparse.Namespace) -> int:
             pid=steps.get("execute_r", {}).get("pid"),
             job_id=steps.get("execute_r_async", {}).get("job_id"),
             exit_code=PASS,
-            extra={"state_path": str(_native_smoke_path(task_key)), "steps": steps},
+            extra={"state_path": str(_native_smoke_path(task_key)), "steps": steps,
+                   "client_context": state.get("client_context")},
             agent=smoke_agent,
         )
         return emit(doc)
@@ -1831,6 +1879,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Validate that Codex config.toml parses cleanly; BLOCK if it does not.")
 
     p = sub.add_parser("transport-classify")
+    p.add_argument("--session-name", default="", help="Explicit discovery target for HTTP diagnostics")
     p.add_argument("--native-ok", action="store_true")
     p.add_argument("--mcp-stdio-ok", action="store_true")
     p.add_argument("--http-ok", action="store_true")
@@ -1841,6 +1890,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--probe-http", action=argparse.BooleanOptionalAction, default=False)
     p.add_argument("--probe-rscript", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--timeout", type=float, default=20.0)
+
+    p = sub.add_parser("connection-diagnose", help="Separate terminal, config, bridge, RStudio and agent-tool evidence")
+    p.add_argument("--session-name", default="")
+    p.add_argument("--timeout", type=float, default=30.0)
+    p.add_argument("--probe-http", action="store_true")
+    p.add_argument("--agent-tool-inventory", type=Path,
+                   help="Observed tool names as JSON; diagnostic only, never native smoke evidence")
+
+    p = sub.add_parser("ensure-ready", help="Client-specific, fail-closed readiness; never restarts RStudio")
+    p.add_argument("--client", choices=["codex", "claude", "copilot"], required=True)
+    p.add_argument("--session-name", required=True)
+    p.add_argument("--task-key", required=True)
+    p.add_argument("--config-file", type=Path)
+    p.add_argument("--repair", choices=["none", "safe"], default="none")
+    p.add_argument("--require-native", action="store_true")
+    p.add_argument("--native-evidence", type=Path)
+    p.add_argument("--timeout", type=float, default=30.0)
+    p.add_argument("--max-age-min", type=float, default=10.0)
 
     p = sub.add_parser("tool-surface")
     p.add_argument("--tools", nargs="*", default=[])
@@ -1892,6 +1959,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reason")
 
     p = sub.add_parser("native-smoke")
+    p.add_argument("--config-file", type=Path)
     p.add_argument("action", choices=["start", "record", "complete", "list", "cancel"])
     add_common_task_args(p)
     p.add_argument("--step", choices=list(NATIVE_SMOKE_STEPS))
@@ -2068,6 +2136,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "doctor":
             return cmd_doctor(args)
+        if args.cmd == "connection-diagnose":
+            return cmd_connection_diagnose(args)
+        if args.cmd == "ensure-ready":
+            from .readiness import ensure_ready
+            return emit(ensure_ready(**{k: v for k, v in vars(args).items() if k != "cmd"}))
         if args.cmd == "transport-classify":
             return cmd_transport_classify(args)
         if args.cmd == "tool-surface":

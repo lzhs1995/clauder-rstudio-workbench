@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "workbench_version": "0.6.1",
+  "clauder_repository": "https://github.com/lzhs1995/ClaudeR.git",
+  "clauder_ref": "v0.14.1.9002-lzhs.1",
+  "clauder_commit": "73685a67f82ff42d4e257dc103e23d3ab6708fb4",
+  "r_package_version": "0.14.1.9002",
+  "mcp_bridge_version": "0.14.5.post1",
+  "required_capabilities": ["list_sessions", "connect_session", "execute_r", "execute_r_async", "get_async_result"],
+  "critical_file_sha256": {
+    "R/ui.R": "67e15cb2d9bbababb1414b5ca8e3284b11e4e6c2ef2c2e38359af33ca4d1bba6",
+    "DESCRIPTION": "1c2a5a08e624071dfd527a2f717d791fb4c6141ff85c830dcb8aeb619db4dd44",
+    "clauder-mcp/pyproject.toml": "b26451d6534830289f98399b5b43478c10066744f8fee5fbf9d00c519fef9fde",
+    "clauder-mcp/src/clauder_mcp/server.py": "d2e15131bdeea298661adf09bd0dac6e5d68272cc36b0433d1ac5e23af90af48",
+    "inst/scripts/persistent_r_mcp.py": "d2e15131bdeea298661adf09bd0dac6e5d68272cc36b0433d1ac5e23af90af48"
+  },
+  "scope": "exact source pairing; installed files and already-loaded processes must be verified separately"
+}

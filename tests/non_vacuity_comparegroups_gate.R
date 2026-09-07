@@ -42,6 +42,7 @@ fixture <- cg_read_spec(fixture_spec_path)
 numeric_group_spec <- fixture
 numeric_group_spec$analysis$group <- "person_id"
 numeric_group_spec$analysis$panel_mode <- "cross_section"
+numeric_group_spec$analysis$subset <- "wave == 1"
 numeric_group_path <- tempfile(fileext = ".json")
 jsonlite::write_json(numeric_group_spec, numeric_group_path, auto_unbox = TRUE, null = "null")
 stopifnot(length(cg_audit(numeric_group_path)$group_counts) == 4L)
@@ -115,7 +116,7 @@ stopifnot(identical(cg_run(variant_path, variant_output)$decision, "PASS"))
 metadata <- jsonlite::fromJSON(file.path(variant_output, "Table_synthetic_metadata.json"), simplifyVector = FALSE)
 variant_files <- unlist(lapply(metadata$variant_outputs, function(entry) cg_character_vector(entry$files)), use.names = FALSE)
 stopifnot(length(variant_files) == 15L, all(file.exists(file.path(variant_output, variant_files))))
-stopifnot(identical(cg_scalar(metadata$skill_versions$comparegroups_guide), "0.6.0"))
+stopifnot(identical(cg_scalar(metadata$skill_versions$comparegroups_guide), "0.6.1"))
 stopifnot(identical(cg_validate_outputs(variant_output, "Table_synthetic")$decision, "PASS"))
 
 # 同一生产函数对七类真实失败生成可定位的 validation.csv 行。
