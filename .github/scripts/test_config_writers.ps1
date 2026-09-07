@@ -44,7 +44,13 @@ try {
     Write-CodexConfig
     if ($before -cne [System.IO.File]::ReadAllText($codex, $utf8)) { throw "Not idempotent" }
     if (-not $before.Contains("# user's comment") -or -not $before.Contains("enabled=false") -or -not $before.Contains("startup_timeout_sec=240")) { throw "Custom Codex fields lost" }
-    if ($before.StartsWith([char]0xfeff)) { throw "Unexpected BOM" }
+    # ReadAllText may strip BOM, and .NET Framework culture-aware StartsWith
+    # treats U+FEFF as ignorable. Inspect actual bytes, with a positive control.
+    function Test-Utf8Bom([byte[]]$bytes) {
+        return ($bytes.Length -ge 3 -and $bytes[0] -eq 0xef -and $bytes[1] -eq 0xbb -and $bytes[2] -eq 0xbf)
+    }
+    if (-not (Test-Utf8Bom ([byte[]]@(0xef,0xbb,0xbf,0x23)))) { throw "BOM detector positive control failed" }
+    if (Test-Utf8Bom ([System.IO.File]::ReadAllBytes($codex))) { throw "Unexpected BOM bytes" }
     foreach ($p in @((Join-Path $root ".claude.json"), (Join-Path $root ".copilot/mcp-config.json"), $WorkspaceMcpPath)) {
         $doc = [System.IO.File]::ReadAllText($p, $utf8) | ConvertFrom-Json
         if ($doc.custom -ne 1 -or $doc.mcpServers.other.command -ne "other") { throw "Unrelated JSON settings lost" }

@@ -7,6 +7,11 @@ The `v0.6.1` release line targets the published ClaudeR
 pair: R `0.14.1.9002` / bridge `0.14.5.post1`. Exact source identity and critical
 hashes are in [runtime-compatibility.json](runtime-compatibility.json).
 
+This maintained line derives from upstream ClaudeR `0.14.1`, with the
+`0.14.1.9001` progress/backpressure patches followed by `0.14.1.9002`
+discovery reliability fixes. Upstream main at `8a322717` is already `0.15.0`;
+it is a different compatibility target, not the installed paired runtime.
+
 **Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
 supports Windows. Both configure a persistent platform-native `clauder-mcp`
 entry and share the same fan-out, progress, resource, and completion gates.
@@ -34,6 +39,10 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
 - Optional MCP configuration for Codex, Claude Code, or GitHub Copilot CLI.
 
 Neither installer modifies MCP client configuration unless an explicit configure switch is passed.
+
+The optional legacy `$clauder` alias is a thin adapter, not a fourth domain
+skill. Use `--sync-clauder-alias` (macOS/Linux) or `-SyncClaudeRAlias` (Windows)
+to refresh an old alias with backup. New users can invoke the core skill directly.
 
 Formal completion keeps resource-gate admission evidence fresh for 120 minutes
 by default. Long-soak contracts can override this with
@@ -76,7 +85,7 @@ claudeAddin()
 In Codex:
 
 ```text
-$clauder 连接Rstudio
+$clauder-rstudio-workbench 连接RStudio
 ```
 
 Run `clauder-workbench ensure-ready --client codex --session-name <target>

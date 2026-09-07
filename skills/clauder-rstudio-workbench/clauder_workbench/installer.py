@@ -261,6 +261,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--configure-claude", action="store_true", help="merge user .claude.json without launching Claude")
     parser.add_argument("--configure-copilot", action="store_true")
     parser.add_argument("--sync-agents-skill", action="store_true")
+    parser.add_argument("--sync-clauder-alias", action="store_true", help="install the thin legacy $clauder alias with backup")
     parser.add_argument("--skip-r-package", action="store_true")
     parser.add_argument("--skip-mcp", action="store_true")
     parser.add_argument("--skip-harness", action="store_true")
@@ -341,6 +342,10 @@ def main(argv: list[str] | None = None) -> int:
             uv_cache_dir,
             dry_run=args.dry_run,
         )
+
+    if args.sync_clauder_alias:
+        _install_skill(repo_root / "adapters" / "clauder", codex_home / "skills",
+                       backup_retention=args.backup_retention, dry_run=args.dry_run)
 
     configured_clients = ["codex"] if args.configure_codex else []
     from .config_store import update_config

@@ -12,6 +12,7 @@ param(
     [switch]$SkipClaudeR,
     [switch]$DevSync,
     [switch]$SyncAgentsSkill,
+    [switch]$SyncClaudeRAlias,
     [string]$AgentsHome = "$env:USERPROFILE\.agents",
     [string]$HarnessPython = "",
     [string]$WorkbenchBinDir = "$env:USERPROFILE\bin",
@@ -865,6 +866,9 @@ try {
     if (-not ($DevSync -or $SkipClaudeR)) { Install-ClaudeR } else { Set-ClaudeRExistingSourceInfo; Write-Step "Skipping ClaudeR install" }
     if ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot -or $ConfigureWorkspaceMcp) { Install-ClaudeRMcpTool | Out-Null }
     Install-Skill
+    if ($SyncClaudeRAlias) {
+        Install-OneSkill -Source (Join-Path $PSScriptRoot "adapters\clauder") -DestRoot (Join-Path $CodexHome "skills")
+    }
     Install-AgentsSkill
     Install-Harness
     Install-HarnessWrapper
