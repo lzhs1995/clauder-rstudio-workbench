@@ -75,7 +75,10 @@ def render_config(raw: bytes | None, *, client: str, command: str, home: str,
     if server.get("url"):
         raise ValueError("r-studio is a URL transport; explicit migration is required")
     old_command = str(server.get("command") or "")
-    args = list(server.get("args") or [])
+    args = server.get("args", [])
+    if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
+        raise ValueError("args must be a string array; refusing lossy conversion")
+    args = list(args)
     old_name = old_command.replace("\\", "/").rsplit("/", 1)[-1]
     if old_name in {"uvx", "uvx.exe"}:
         if len(args) >= 3 and args[:1] == ["--from"] and args[2] == "clauder-mcp":

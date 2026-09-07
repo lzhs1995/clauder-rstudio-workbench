@@ -242,7 +242,11 @@ def _write_install_info(
         "clauder_mcp_install_mode": "uv_tool_from_local_fork",
         "clauder_mcp_install_from": str(clauder_dir / "clauder-mcp"),
         "clauder_mcp_exe_sha256": _sha256(mcp_command),
-        "r_studio_startup_timeout_sec": 180.0,
+        "recommended_r_studio_startup_timeout_sec": 180.0,
+        "runtime_verification_scope": "source declarations and executable hash, not running namespaces",
+        "loaded_r_namespace": "NOT_CHECKED",
+        "loaded_mcp_server": "NOT_CHECKED",
+        "harness_install_mode": "packaged",
         "uv_cache_dir": str(uv_cache_dir),
     }
     print(f"Install info: {destination / 'INSTALL_INFO.json'}")

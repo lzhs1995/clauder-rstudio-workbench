@@ -108,6 +108,14 @@ NO_PROXY="internal.example"
         with self.assertRaises(ValueError):
             store.update_config(self.path, **self.kw)
 
+    def test_malformed_arguments_are_not_converted_or_written(self):
+        for args in ('"--agent-id mine"', '{id="mine"}', '[1,2]'):
+            raw = ('[mcp_servers.r-studio]\ncommand="/old/clauder-mcp"\nargs=' + args + '\n').encode()
+            self.path.write_bytes(raw)
+            with self.assertRaises(ValueError):
+                store.update_config(self.path, **self.kw)
+            self.assertEqual(self.path.read_bytes(), raw)
+
 
 if __name__ == '__main__':
     unittest.main()

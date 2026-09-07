@@ -166,9 +166,9 @@ UV_CACHE_DIR = "/Users/<USER>/Library/Caches/uv"
 On macOS, `install.sh --configure-codex` installs that executable with
 `uv tool install --force --from <USER_HOME>/projects/ClaudeR/clauder-mcp
 clauder-mcp`. Windows uses `install.ps1 -ConfigureCodex`,
-`clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The local Mac
-candidate is the user-maintained fork branch based on upstream ClaudeR `0.14.1`
-and MCP bridge `0.14.5`. Never use bare `uvx clauder-mcp` or bare
+`clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The published
+pair is based on upstream ClaudeR `0.14.1`, with R `0.14.1.9002`
+and MCP bridge `0.14.5.post1`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 

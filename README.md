@@ -469,7 +469,9 @@ processes; it must not be replaced with cleanup against real user discovery.
 Confirm all three layers:
 
 1. The R code includes `clauder_progress(stage, message)` markers.
-2. RStudio has loaded the patched ClaudeR package after reinstall/restart.
+2. Compare `getNamespaceVersion("ClaudeR")` with `packageVersion("ClaudeR")`.
+   A running namespace can remain older than the disk installation; do not
+   interrupt a healthy research session merely to make these labels match.
 3. The MCP command points to the patched local bridge, not plain `uvx clauder-mcp`.
 
 ## Upgrade
@@ -477,9 +479,10 @@ Confirm all three layers:
 To upgrade macOS/Linux and reinstall the paired ClaudeR worktree:
 
 ```bash
-cd "$HOME/projects/clauder-rstudio-workbench"
-git fetch origin
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --backup-retention 0
+git clone --branch v0.6.1 --depth 1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-workbench-v0.6.1-release"
+git clone --branch v0.14.1.9002-lzhs.1 --depth 1 https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-release"
+cd "$HOME/projects/clauder-workbench-v0.6.1-release"
+./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-release" --configure-codex --sync-agents-skill --sync-clauder-alias --backup-retention 0
 ```
 
 For the published Windows release:
@@ -506,7 +509,7 @@ may be overwritten.
 | `<USER_HOME>/.agents/skills/clauder-rstudio-workbench` | Shared agents runtime copy | No | Written by an installer |
 | `<USER_HOME>/.clauder_workbench` | evidence / inflight state | No | Written by harness |
 | GitHub `lzhs1995/clauder-rstudio-workbench` | Published source | Yes | Colleagues clone tags/releases |
-| editable Python install | `python -m clauder_workbench` across directories | n/a | Points to the development source |
+| packaged Python install | `clauder-workbench` across directories | n/a | Installed copy; editable is development-only |
 
 Development sync:
 
@@ -526,7 +529,7 @@ PATH; macOS installs the wrapper directly under `<USER_HOME>/.local/bin`.
 - No API keys.
 - No full validation log. Only a short portable smoke transcript is included because the complete validation history contains local project context.
 - No PyPI publication for the forked `clauder-mcp`.
-- No upstream PR bundle; upstream contributions should be split later.
+- The portable discovery/binding fix is separately proposed in [upstream PR #30](https://github.com/IMNMV/ClaudeR/pull/30); submission does not imply upstream acceptance.
 
 ## Agent Metadata
 

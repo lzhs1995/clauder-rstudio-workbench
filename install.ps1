@@ -310,7 +310,11 @@ function Write-InstallInfo($Dest) {
         clauder_mcp_install_mode = "uv_tool_from_local_lzhs_fork"
         clauder_mcp_install_from = (Join-Path $ClaudeRDir "clauder-mcp")
         clauder_mcp_exe_sha256 = (Get-FileSha256 (Get-ClaudeRMcpExe))
-        r_studio_startup_timeout_sec = 180.0
+        recommended_r_studio_startup_timeout_sec = 180.0
+        runtime_verification_scope = "source declarations and executable hash, not running namespaces"
+        loaded_r_namespace = "NOT_CHECKED"
+        loaded_mcp_server = "NOT_CHECKED"
+        harness_install_mode = "packaged"
         uv_cache_dir = (Get-WorkbenchUvCacheDir)
         prewarm_result = $script:McpPrewarmResult
         dev_sync = [bool]$DevSync
