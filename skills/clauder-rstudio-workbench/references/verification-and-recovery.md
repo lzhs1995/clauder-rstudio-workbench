@@ -17,7 +17,10 @@
 1. Check whether RStudio and the ClaudeR Addin are running.
 2. Check session discovery files under `<USER_HOME>\.claude_r_sessions`.
 3. Check the MCP config points to the intended ClaudeR bridge.
-4. Restart the agent/MCP process after config changes.
+4. Run `connection-diagnose --session-name <target>` to distinguish configured
+   state, bridge readiness, live R execution and current agent tool exposure.
+   Verify the actual loaded runtime before considering a supported targeted
+   reload; do not default to restarting RStudio or the user session.
 5. Use HTTP only to diagnose Addin health, not to claim MCP-only success.
 
 ## Evidence Chain

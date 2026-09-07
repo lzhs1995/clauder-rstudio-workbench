@@ -1,6 +1,6 @@
 param(
     [string]$ClaudeRRepo = "https://github.com/lzhs1995/ClaudeR.git",
-    [string]$ClaudeRRef = "v0.2.0-lzhs.1",
+    [string]$ClaudeRRef = "v0.14.1.9002-lzhs.1",
     [string]$ClaudeRDir = "$env:USERPROFILE\projects\ClaudeR",
     [string]$CodexHome = "$env:USERPROFILE\.codex",
     [string]$RExe = "",
@@ -28,6 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$script:InstallerRoot = $PSScriptRoot
 $script:ClaudeRSourceType = "unknown"
 $script:ClaudeRSourceUrl = $ClaudeRRepo
 $script:McpPrewarmResult = [ordered]@{
@@ -309,7 +310,7 @@ function Write-InstallInfo($Dest) {
         clauder_mcp_install_from = (Join-Path $ClaudeRDir "clauder-mcp")
         clauder_mcp_exe_sha256 = (Get-FileSha256 (Get-ClaudeRMcpExe))
         r_studio_startup_timeout_sec = 180.0
-        uv_cache_dir = "C:\tmp\uv-cache"
+        uv_cache_dir = (Get-WorkbenchUvCacheDir)
         prewarm_result = $script:McpPrewarmResult
         dev_sync = [bool]$DevSync
     }
@@ -477,6 +478,7 @@ function Get-FileSha256($Path) {
 
 function Install-ClaudeRMcpTool {
     Write-Step "Installing persistent ClaudeR MCP entry from lzhs fork"
+    Test-PairedSource
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
     if (-not (Test-Path -LiteralPath (Join-Path $bridge "pyproject.toml"))) {
         throw "ClaudeR MCP bridge source missing or invalid: $bridge"
@@ -532,6 +534,7 @@ function Install-ClaudeR {
         Install-ClaudeRZipFallback $_.Exception.Message
     }
 
+    Test-PairedSource
     $resolvedR = Find-RExe
     Invoke-Checked $resolvedR @("CMD", "INSTALL", $ClaudeRDir)
 }
@@ -658,17 +661,17 @@ function Install-AgentsSkill {
 
 function Install-Harness {
     if ($SkipHarness) {
-        Write-Step "Skipping harness editable install"
+        Write-Step "Skipping harness package install"
         return
     }
     Write-Step "Installing harness package"
     $python = Find-HarnessPython
-    $args = @("-m", "pip", "install", "--user", "-e", $PSScriptRoot)
+    $args = @("-m", "pip", "install", "--user", $PSScriptRoot)
     Write-Host "+ $python $($args -join ' ')" -ForegroundColor DarkGray
     if ($DryRun) { return }
     & $python @args
     if ($LASTEXITCODE -ne 0) {
-        throw "Harness editable install failed with exit code ${LASTEXITCODE}."
+        throw "Harness package install failed with exit code ${LASTEXITCODE}."
     }
 }
 
@@ -796,201 +799,65 @@ function Add-WorkbenchBinToUserPath($Dir) {
     Write-Host "User PATH updated. Restart terminals/agents for inherited PATH to refresh."
 }
 
-function Write-CodexConfig {
-    Write-Step "Configuring Codex MCP"
-    $configDir = Join-Path $CodexHome ""
-    $config = Join-Path $CodexHome "config.toml"
-    if (-not (Test-Path $configDir) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force $configDir | Out-Null
-    }
-    if (-not (Test-Path $config) -and -not $DryRun) {
-        New-Item -ItemType File -Force $config | Out-Null
-    }
-    Backup-File $config
-
-    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
-    $mcpExe = Get-ClaudeRMcpExe
-    if (-not (Test-Path -LiteralPath $mcpExe) -and -not $DryRun) {
-        $mcpExe = Install-ClaudeRMcpTool
-    }
-    $userProfile = $env:USERPROFILE
-    $uvCacheDir = "C:\tmp\uv-cache"
-    if (-not (Test-Path -LiteralPath $uvCacheDir) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force -Path $uvCacheDir | Out-Null
-    }
-    $block = @"
-[mcp_servers.r-studio]
-command = "$($mcpExe.Replace('\', '\\'))"
-startup_timeout_sec = 180.0
-
-[mcp_servers.r-studio.env]
-USERPROFILE = "$($userProfile.Replace('\', '\\'))"
-PYTHONIOENCODING = "utf-8"
-NO_PROXY = "127.0.0.1,localhost"
-UV_CACHE_DIR = "$($uvCacheDir.Replace('\', '\\'))"
-"@
-
-    Write-Host "Codex MCP block:"
-    Write-Host $block
-    if ($DryRun) { return }
-
-    # v0.2.4: 用 UTF-8 安全读写，避免 PS 5.1 默认 ANSI/CP936 读取 + BOM 写入污染中文路径
-    $content = Read-Utf8File $config
-    $content = Remove-TomlSections $content @("mcp_servers.r-studio", "mcp_servers.r-studio.env")
-    $content = $content.TrimEnd()
-    if ($content) {
-        $content = $content + "`r`n`r`n" + $block + "`r`n"
-    } else {
-        $content = $block + "`r`n"
-    }
-    Write-Utf8NoBom $config $content
-
-    # v0.2.4: 写后 TOML 解析自检；fail 自动回滚备份
-    if (-not (Test-TomlParseable $config)) {
-        $restored = Restore-FromLatestBackup $config
-        if ($restored) {
-            throw "Codex config.toml write produced invalid TOML; restored from backup '$restored'. See guide 27.11 for root cause and manual recovery."
-        } else {
-            throw "Codex config.toml write produced invalid TOML and no backup found. Manual recovery required; see guide 27.11."
-        }
-    }
-    Write-Host "Codex config.toml parse OK"
+function Get-WorkbenchUvCacheDir {
+    $base = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $env:USERPROFILE "AppData\Local" }
+    return (Join-Path $base "uv\cache")
 }
 
-function Remove-TomlSections($Content, [string[]]$SectionNames) {
-    if (-not $Content) { return "" }
-    $lines = $Content -split "\r?\n"
-    $out = New-Object System.Collections.Generic.List[string]
-    $skip = $false
-
-    foreach ($line in $lines) {
-        if ($line -match '^\s*\[([^\]]+)\]\s*$') {
-            $name = $Matches[1]
-            $skip = $SectionNames -contains $name
-            if (-not $skip) {
-                $out.Add($line)
-            }
-            continue
-        }
-
-        if (-not $skip) {
-            $out.Add($line)
-        }
+function Test-PairedSource {
+    if ($DryRun) { return }
+    $manifest = Join-Path $script:InstallerRoot "runtime-compatibility.json"
+    if (-not (Test-Path -LiteralPath $manifest)) { throw "Missing published runtime-compatibility.json" }
+    $py = Find-HarnessPython
+    $priorPythonPath = $env:PYTHONPATH
+    $env:PYTHONPATH = Join-Path $script:InstallerRoot "skills\clauder-rstudio-workbench"
+    try {
+        & $py -m clauder_workbench.compatibility --manifest $manifest --source $ClaudeRDir | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "ClaudeR source does not match the published pair; runtime was not changed" }
+    } finally {
+        $env:PYTHONPATH = $priorPythonPath
     }
+}
 
-    return (($out -join "`r`n").TrimEnd())
+function Write-ScopedMcpConfig([string]$Client, [string]$Path) {
+    # 共用 Python 原子合并器；不删除整段配置，不调用 Claude，不覆盖其它 MCP。
+    $py = Find-HarnessPython
+    $oldPythonPath = $env:PYTHONPATH
+    $env:PYTHONPATH = Join-Path $script:InstallerRoot "skills\clauder-rstudio-workbench"
+    try {
+        $configArgs = @("-m", "clauder_workbench.config_store", "--client", $Client,
+            "--path", $Path, "--command", (Get-ClaudeRMcpExe),
+            "--home", $env:USERPROFILE, "--cache", (Get-WorkbenchUvCacheDir))
+        if ($DryRun) { $configArgs += "--dry-run" }
+        & $py @configArgs | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Scoped MCP update blocked. Preserve the configuration and private backup; no rollback over external changes."
+        }
+    } finally {
+        $env:PYTHONPATH = $oldPythonPath
+    }
+}
+
+function Write-CodexConfig {
+    Write-Step "Configuring Codex MCP (atomic scoped merge)"
+    Write-ScopedMcpConfig "codex" (Join-Path $CodexHome "config.toml")
 }
 
 function Configure-ClaudeCode {
-    Write-Step "Configuring Claude Code MCP"
-    $claudeJson = Join-Path $env:USERPROFILE ".claude.json"
-    Backup-File $claudeJson
-    $mcpExe = Get-ClaudeRMcpExe
-    $removeArgs = @(
-        "mcp", "remove", "r-studio", "-s", "user"
-    )
-    Write-Host "+ claude $($removeArgs -join ' ')"
-    if (-not $DryRun) {
-        & claude @removeArgs | Out-Host
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Existing Claude Code r-studio MCP entry was not removed. Continuing with add."
-        }
-    }
-    $addArgs = @(
-        "mcp", "add", "--transport", "stdio", "--scope", "user",
-        "-e", "USERPROFILE=$env:USERPROFILE",
-        "-e", "PYTHONIOENCODING=utf-8",
-        "-e", "NO_PROXY=127.0.0.1,localhost",
-        "-e", "UV_CACHE_DIR=C:\tmp\uv-cache",
-        "r-studio", "--", $mcpExe
-    )
-    Invoke-Checked "claude" $addArgs
-    Verify-ClaudeCodeMcp
-}
-
-function Verify-ClaudeCodeMcp {
-    if ($DryRun) { return }
-    Write-Host "+ claude mcp list"
-    $list = & claude mcp list 2>&1
-    $exit = $LASTEXITCODE
-    $list | Out-Host
-    if ($exit -ne 0 -or -not (($list | Out-String) -match 'r-studio')) {
-        throw "Claude Code MCP verification failed: r-studio was not found in 'claude mcp list'."
-    }
+    Write-Step "Configuring Claude Code MCP (user file only; no Claude process launch)"
+    Write-ScopedMcpConfig "claude" (Join-Path $env:USERPROFILE ".claude.json")
 }
 
 function Write-CopilotConfig {
-    Write-Step "Configuring GitHub Copilot MCP"
-    $dir = Join-Path $env:USERPROFILE ".copilot"
-    $config = Join-Path $dir "mcp-config.json"
-    if (-not (Test-Path $dir) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force $dir | Out-Null
-    }
-    if (-not (Test-Path $config) -and -not $DryRun) {
-        Write-Utf8NoBom $config "{}"
-    }
-    Backup-File $config
-
-    $bridge = Join-Path $ClaudeRDir "clauder-mcp"
-    $obj = [ordered]@{
-        mcpServers = [ordered]@{
-            "r-studio" = [ordered]@{
-                type = "local"
-                command = (Get-ClaudeRMcpExe)
-                args = @()
-                env = [ordered]@{
-                    USERPROFILE = $env:USERPROFILE
-                    PYTHONIOENCODING = "utf-8"
-                    NO_PROXY = "127.0.0.1,localhost"
-                    UV_CACHE_DIR = "C:\tmp\uv-cache"
-                }
-                tools = @("*")
-            }
-        }
-    }
-    $json = $obj | ConvertTo-Json -Depth 10
-    Write-Host $json
-    if (-not $DryRun) {
-        Write-Utf8NoBom $config $json
-    }
+    Write-Step "Configuring GitHub Copilot MCP (preserve other servers)"
+    Write-ScopedMcpConfig "copilot" (Join-Path $env:USERPROFILE ".copilot\mcp-config.json")
 }
 
 function Write-WorkspaceMcpConfig {
     if (-not $ConfigureWorkspaceMcp) { return }
-    Write-Step "Configuring workspace .mcp.json"
     $target = $WorkspaceMcpPath
-    if (-not $target) {
-        $target = Join-Path (Get-Location) ".mcp.json"
-    }
-    $dir = Split-Path -Parent $target
-    if ($dir -and -not (Test-Path -LiteralPath $dir) -and -not $DryRun) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    }
-    if (-not (Test-Path -LiteralPath $target) -and -not $DryRun) {
-        Write-Utf8NoBom $target "{}"
-    }
-    Backup-File $target
-    $obj = [ordered]@{
-        mcpServers = [ordered]@{
-            "r-studio" = [ordered]@{
-                type = "local"
-                command = (Get-ClaudeRMcpExe)
-                args = @()
-                tools = @("*")
-                env = [ordered]@{
-                    USERPROFILE = $env:USERPROFILE
-                    NO_PROXY = "127.0.0.1,localhost"
-                    PYTHONIOENCODING = "utf-8"
-                    UV_CACHE_DIR = "C:\tmp\uv-cache"
-                }
-            }
-        }
-    }
-    $json = $obj | ConvertTo-Json -Depth 10
-    Write-Host $json
-    if (-not $DryRun) {
-        Write-Utf8NoBom $target $json
-    }
+    if (-not $target) { $target = Join-Path (Get-Location) ".mcp.json" }
+    Write-ScopedMcpConfig "claude" $target
 }
 
 try {
@@ -1010,8 +877,8 @@ try {
     Refresh-InstallInfo
 
     Write-Step "Done"
-    Write-Host "Restart Codex/Claude/Copilot after MCP configuration changes."
-    Write-Host "In RStudio, run: library(ClaudeR); claudeAddin()"
+    Write-Host "Verify with ensure-ready --client <client> --session-name <target>. Configuration is not native-tool proof."
+    Write-Host "Keep existing RStudio sessions alive. Use a supported targeted MCP reload only if the loaded bridge is stale."
 }
 finally {
     if ($LogFile) {

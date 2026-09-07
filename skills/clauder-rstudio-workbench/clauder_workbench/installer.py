@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .config import default_uv_cache_dir
 
 
 def _run(command: list[str], *, dry_run: bool = False) -> None:
@@ -113,57 +114,14 @@ def _remove_toml_sections(text: str, names: set[str]) -> str:
 
 
 def update_codex_config(
-    config_path: Path,
-    mcp_command: Path,
-    home: Path,
-    uv_cache_dir: Path,
-    *,
+    config_path: Path, mcp_command: Path, home: Path, uv_cache_dir: Path, *,
     dry_run: bool = False,
 ) -> Path | None:
-    existing = config_path.read_text(encoding="utf-8-sig") if config_path.exists() else ""
-    cleaned = _remove_toml_sections(
-        existing,
-        {"mcp_servers.r-studio", "mcp_servers.r-studio.env"},
-    )
-    env_lines = [
-        f"HOME = {_toml_string(home)}",
-        'PYTHONIOENCODING = "utf-8"',
-        'NO_PROXY = "127.0.0.1,localhost"',
-        f"UV_CACHE_DIR = {_toml_string(uv_cache_dir)}",
-    ]
-    if os.name == "nt":
-        env_lines.insert(1, f"USERPROFILE = {_toml_string(home)}")
-    block = "\n".join([
-        "[mcp_servers.r-studio]",
-        f"command = {_toml_string(mcp_command)}",
-        "startup_timeout_sec = 180.0",
-        "",
-        "[mcp_servers.r-studio.env]",
-        *env_lines,
-    ])
-    updated = f"{cleaned}\n\n{block}\n" if cleaned else f"{block}\n"
-
-    try:
-        import tomllib
-    except ImportError:  # pragma: no cover - Python 3.10 fallback
-        import tomli as tomllib  # type: ignore[no-redef]
-    tomllib.loads(updated)
-
-    backup = None
-    if config_path.exists():
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        backup = config_path.with_name(f"{config_path.name}.bak_{stamp}")
-    print(f"Codex config: {config_path}")
-    if backup:
-        print(f"Codex config backup: {backup}")
-    if dry_run:
-        return backup
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    if backup:
-        shutil.copy2(config_path, backup)
-    _atomic_write(config_path, updated)
-    tomllib.loads(config_path.read_text(encoding="utf-8"))
-    return backup
+    from .config_store import update_config
+    result = update_config(config_path, client="codex", command=mcp_command,
+                           home=home, cache=uv_cache_dir, dry_run=dry_run)
+    print(json.dumps(result, ensure_ascii=False))
+    return Path(result["backup"]) if result.get("backup") else None
 
 
 def _skill_sources(repo_root: Path) -> list[Path]:
@@ -298,8 +256,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clauder-dir", type=Path, default=Path.home() / "projects" / "ClaudeR")
     parser.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
     parser.add_argument("--agents-home", type=Path, default=Path.home() / ".agents")
-    parser.add_argument("--uv-cache-dir", type=Path, default=Path.home() / "Library" / "Caches" / "uv")
+    parser.add_argument("--uv-cache-dir", type=Path, default=default_uv_cache_dir())
     parser.add_argument("--configure-codex", action="store_true")
+    parser.add_argument("--configure-claude", action="store_true", help="merge user .claude.json without launching Claude")
+    parser.add_argument("--configure-copilot", action="store_true")
     parser.add_argument("--sync-agents-skill", action="store_true")
     parser.add_argument("--skip-r-package", action="store_true")
     parser.add_argument("--skip-mcp", action="store_true")
@@ -327,6 +287,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"Invalid workbench repository: {repo_root}")
     if not (clauder_dir / "DESCRIPTION").exists() or not (clauder_dir / "clauder-mcp").exists():
         raise SystemExit(f"Invalid ClaudeR repository: {clauder_dir}")
+    manifest = repo_root / "runtime-compatibility.json"
+    if manifest.exists():
+        from .compatibility import verify_source
+        pair = verify_source(manifest, clauder_dir)
+        print(json.dumps({"runtime_compatibility": pair}))
+        if not pair["ok"]:
+            raise SystemExit("ClaudeR source does not match the published pair; runtime was not changed")
 
     if not args.skip_r_package:
         r_command = shutil.which("R")
@@ -344,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
             str(clauder_dir / "clauder-mcp"), "clauder-mcp",
         ], dry_run=args.dry_run)
     if not args.skip_harness:
-        _run([uv or "uv", "tool", "install", "--force", "--editable", str(repo_root)], dry_run=args.dry_run)
+        _run([uv or "uv", "tool", "install", "--force", str(repo_root)], dry_run=args.dry_run)
 
     destinations: list[Path] = []
     for source in _skill_sources(repo_root):
@@ -376,6 +343,15 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     configured_clients = ["codex"] if args.configure_codex else []
+    from .config_store import update_config
+    for client, selected, path in (
+        ("claude", args.configure_claude, Path.home() / ".claude.json"),
+        ("copilot", args.configure_copilot, Path.home() / ".copilot" / "mcp-config.json"),
+    ):
+        if selected:
+            update_config(path, client=client, command=mcp_command, home=Path.home(),
+                          cache=uv_cache_dir, dry_run=args.dry_run)
+            configured_clients.append(client)
     unique_destinations: dict[Path, Path] = {}
     for destination in destinations:
         unique_destinations.setdefault(destination.resolve(strict=False), destination)
@@ -391,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
         )
 
-    print("Install complete. Restart MCP clients after configuration changes.")
+    print("Install complete. Verify the selected client's actual tools with native-smoke; configuration alone is not readiness. Do not restart RStudio. Use a supported targeted client reload only if its loaded configuration is stale.")
     return 0
 
 

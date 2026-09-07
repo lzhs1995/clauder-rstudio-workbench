@@ -23,6 +23,19 @@ def _env_path(name: str, default: Path | None = None) -> Path | None:
 
 
 HOME = _home()
+
+
+def default_uv_cache_dir(home: Path | None = None, platform: str | None = None) -> Path:
+    """按平台选择用户可写缓存；不依赖根目录或管理员权限。"""
+    base = home if home is not None else HOME
+    platform = platform or sys.platform
+    if platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA") or base / "AppData" / "Local") / "uv" / "cache"
+    if platform == "darwin":
+        return base / "Library" / "Caches" / "uv"
+    return Path(os.environ.get("XDG_CACHE_HOME") or base / ".cache") / "uv"
+
+
 STATE_DIR = HOME / ".clauder_workbench"
 EVIDENCE_DIR = STATE_DIR / "evidence"
 INFLIGHT_DIR = STATE_DIR / "inflight"
@@ -46,7 +59,7 @@ PERSISTENT_MCP = _env_path(
 )
 UV_CACHE_DIR = _env_path(
     "CLAUDER_WORKBENCH_UV_CACHE_DIR",
-    Path("C:/tmp/uv-cache") if IS_WINDOWS else HOME / "Library" / "Caches" / "uv",
+    default_uv_cache_dir(),
 )
 DISCOVERY_DIR = _env_path("CLAUDER_WORKBENCH_DISCOVERY_DIR", HOME / ".claude_r_sessions")
 CODEX_CONFIG = _env_path("CLAUDER_WORKBENCH_CODEX_CONFIG", HOME / ".codex" / "config.toml")

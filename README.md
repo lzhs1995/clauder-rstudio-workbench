@@ -2,9 +2,10 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.6.1` release line is cross-platform and targets the local ClaudeR
-`0.14.1.9001` fork based on upstream ClaudeR `0.14.1` / `clauder-mcp 0.14.5`, while
-retaining strict native provenance and durable async progress.
+The `v0.6.1` release line targets the published ClaudeR
+[`v0.14.1.9002-lzhs.1`](https://github.com/lzhs1995/ClaudeR/releases/tag/v0.14.1.9002-lzhs.1)
+pair: R `0.14.1.9002` / bridge `0.14.5.post1`. Exact source identity and critical
+hashes are in [runtime-compatibility.json](runtime-compatibility.json).
 
 **Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
 supports Windows. Both configure a persistent platform-native `clauder-mcp`
@@ -43,9 +44,13 @@ the CLI default.
 
 On macOS/Linux:
 
+Use new, non-existing versioned destinations; never overwrite a dirty checkout.
+
 ```bash
-cd "$HOME/projects/clauder-rstudio-workbench"
-./install.sh --clauder-dir "$HOME/projects/ClaudeR" --configure-codex --sync-agents-skill --backup-retention 0
+git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
+git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" --configure-codex --sync-agents-skill --backup-retention 0
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
@@ -61,7 +66,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCode
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
 ```
 
-Then restart Codex and start ClaudeR inside RStudio:
+Keep an existing healthy RStudio/addin alive. For a new RStudio session only:
 
 ```r
 library(ClaudeR)
@@ -73,6 +78,20 @@ In Codex:
 ```text
 $clauder 连接Rstudio
 ```
+
+Run `clauder-workbench ensure-ready --client codex --session-name <target>
+--task-key <task>` to check the selected target. For formal native tasks, add
+`--require-native --native-evidence <current-native-smoke.json>`. Configuration,
+HTTP, independent stdio and the agent-native tool surface are separate layers.
+Do not prescribe repeated restarts or claim that disk installation updated
+already-loaded code. Use a supported targeted MCP reload only if that exact
+loaded component is stale. The core skill documents the native evidence chain.
+
+All config writers merge only `r-studio`, preserve custom fields/disabled state,
+and retain private backups plus hash-only writer logs. `ensure-ready` defaults
+to read-only; `--repair safe` is an explicit, bounded config merge, not an
+installer or a process reset. See the
+[source and failure-mode review](docs/ClaudeR_教程审查与SKILL设计建议.md).
 
 If the wrapper path is not available on Windows, use the portable fallback:
 
@@ -261,7 +280,7 @@ Installer prerequisites:
 
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
-| `v0.6.1` | local `0.14.1.9001` / bridge `0.14.5` | Corrects available-N/variable mapping, validates all resolved variants and independent analysis-unit keys, and cross-checks CSV semantics against retained RDS objects plus a complete validation checklist. |
+| `v0.6.1` | `v0.14.1.9002-lzhs.1` / bridge `0.14.5.post1` | Corrects table semantics/layout and adds atomic config merging, client-specific ensure-ready, process-bound native evidence, non-editable installs and the published discovery-safe runtime pair. |
 | `v0.6.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds backward-compatible spec 1.1 defaults, ordered variants, automatic attrition, batch manifests, structured validation diagnostics, configurable true-three-line DOCX output, and explicit compareGroups 4.10.2/4.10.3 gates. |
 | `v0.5.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds the `comparegroups-guide` sibling skill, versioned Table 1 contract, labelled-data and panel audit, true three-line DOCX output, numeric reconciliation artifacts, validation, and cross-platform tests. |
 | `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
@@ -430,9 +449,11 @@ Do not start long fan-out work after a single `Transport closed`.
 ### Windows opens a second RStudio session and the first one aborts
 
 Do not use an unpatched ClaudeR build whose stale discovery cleanup uses
-`tools::pskill(pid, signal = 0)`. Install the maintained fork branch based on
-ClaudeR 0.14.1 (or the older Windows `v0.2.0-lzhs.1` release), restart RStudio,
-then rerun a multi-session safety check before trusting concurrent sessions.
+`tools::pskill(pid, signal = 0)`. Install the exact maintained pair and verify
+the loaded PID/discovery functions before trusting concurrent sessions. Do not
+stop a healthy research session as an exploratory test. The paired source's
+`tests/discovery-reliability.R` uses isolated temporary records and owned child
+processes; it must not be replaced with cleanup against real user discovery.
 
 ### `Latest progress:` does not appear
 

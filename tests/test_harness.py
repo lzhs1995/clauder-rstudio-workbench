@@ -719,8 +719,8 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("Invoke-McpPrewarm", text)
         self.assertIn("ConfigureWorkspaceMcp", text)
         self.assertIn("uv_tool_from_local_lzhs_fork", text)
-        self.assertIn("startup_timeout_sec = 180.0", text)
-        self.assertIn("UV_CACHE_DIR", text)
+        self.assertIn('Write-ScopedMcpConfig "codex"', text)
+        self.assertIn('"clauder_workbench.config_store"', text)
         self.assertIn("clauder_mcp_source", text)
         self.assertIn("clauder_mcp_command", text)
         main_start = text.index("try {\n    Test-Prerequisites")
@@ -936,11 +936,17 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("UTF8Encoding($false)", text)
 
     def test_installer_codex_write_uses_no_bom_and_self_check(self) -> None:
-        text = Path("install.ps1").read_text(encoding="utf-8")
-        self.assertNotIn("Set-Content -LiteralPath $config -Value $content -Encoding UTF8", text)
-        self.assertIn("Write-Utf8NoBom $config $content", text)
-        self.assertIn("Test-TomlParseable $config", text)
-        self.assertIn("Restore-FromLatestBackup $config", text)
+        # v0.6.1 的合并器是运行时代码；验证实际 UTF-8/解析结果，而非旧实现的字符串。
+        from clauder_workbench.config_store import update_config
+        import tomlkit
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / "config.toml"
+            path.write_text("# 科研\n[projects.'中文目录']\ntrust_level='trusted'\n", encoding="utf-8")
+            update_config(path, client="codex", command=root / "clauder-mcp", home=root, cache=root / "cache")
+            raw = path.read_bytes()
+            self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
+            self.assertEqual(tomlkit.parse(raw.decode("utf-8"))["projects"]["中文目录"]["trust_level"], "trusted")
 
     def test_doctor_check_toml_parse_flag_registered(self) -> None:
         parser = build_parser()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import secrets
 import time
 from typing import Any
 
@@ -52,6 +53,8 @@ EXPECTED_R_STUDIO_TOOLS = {
     "verify_references",
     "wait_for_message",
 }
+
+CORE_R_STUDIO_TOOLS = {"list_sessions", "connect_session", "execute_r", "execute_r_async", "get_async_result"}
 
 
 def _load_codex_rstudio_server() -> tuple[str, list[str], dict[str, str]] | None:
@@ -142,14 +145,14 @@ def extract_job_id(text: str) -> str | None:
     return None
 
 
-async def _session_run(timeout: float, runner: Any) -> dict[str, Any]:
+async def _session_run(timeout: float, runner: Any, server_spec=None) -> dict[str, Any]:
     try:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
     except Exception as exc:  # pragma: no cover - depends on optional package
         return {"ok": False, "reason": f"mcp python package unavailable: {exc}"}
 
-    command, args, env_extra = _server_spec()
+    command, args, env_extra = server_spec if server_spec is not None else _server_spec()
     params = StdioServerParameters(command=command, args=args, env=_server_env(env_extra))
 
     async def run() -> dict[str, Any]:
@@ -300,6 +303,47 @@ def probe_mcp_stdio(timeout: float = 20.0) -> dict[str, Any]:
     result = list_tools(timeout=timeout)
     result["transport_class"] = "MCP_STDIO_OK" if result.get("ok") else "BLOCKED"
     return result
+
+
+def connection_probe(session_name: str = "", timeout: float = 30.0, *, server_spec=None, config_path=None) -> dict[str, Any]:
+    """只读分层探针；不提交异步作业，不将 tools/list 等同于活跃 RStudio。"""
+    if server_spec is None and not _load_codex_rstudio_server():
+        return {"ok": False, "bridge_ok": False, "reason": "no usable configured r-studio entry; diagnostic will not install or use an implicit fallback"}
+
+    async def runner(session: Any, command: str, args: list[str]) -> dict[str, Any]:
+        tools = sorted(tool.name for tool in (await session.list_tools()).tools)
+        missing = sorted(CORE_R_STUDIO_TOOLS - set(tools))
+        out: dict[str, Any] = {
+            "ok": False, "bridge_ok": not missing, "tools": tools, "missing": missing,
+            "command": command, "args": args, "config_path": str(config_path or CODEX_CONFIG),
+            "missing_optional": sorted(EXPECTED_R_STUDIO_TOOLS - set(tools) - CORE_R_STUDIO_TOOLS),
+            "config_scope": "configured_file_not_running_agent_effective_config", "steps": [],
+        }
+        if missing:
+            return {**out, "reason": "bridge tool surface is incomplete"}
+        listed = _tool_result(await session.call_tool("list_sessions", {}), tool_name="list_sessions")
+        out["steps"].append(listed)
+        if not listed["ok"]:
+            return {**out, "reason": "list_sessions failed"}
+        if not session_name:
+            return {**out, "reason": "specify --session-name before live R execution; bridge tools are available"}
+        bound = _tool_result(await session.call_tool("connect_session", {"session_name": session_name}), tool_name="connect_session")
+        out["steps"].append(bound)
+        if not bound["ok"]:
+            return {**out, "reason": "connect_session failed"}
+        marker = "CLAUDER_DIAG_" + secrets.token_hex(12)
+        code = f"cat('{marker} pid=', Sys.getpid(), ' r=', as.character(getRversion()), '\\n', sep='')"
+        executed = _tool_result(await session.call_tool("execute_r", {"code": code}), tool_name="execute_r")
+        out["steps"].append(executed)
+        match = re.search(re.escape(marker) + r" pid=(\d+) r=([^\s]+)", executed["text"])
+        ok = bool(executed["ok"] and match)
+        return {**out, "ok": ok, "session_name": session_name,
+                "pid": int(match[1]) if ok else None, "r_version": match[2] if ok else None,
+                "reason": "live R execution verified via MCP stdio" if ok else "live execution marker missing or errored"}
+
+    if server_spec is not None:
+        return asyncio.run(_session_run(timeout, runner, server_spec=server_spec))
+    return asyncio.run(_session_run(timeout, runner))
 
 
 async def _submit_async_async(*, session_name: str, code: str, timeout: float) -> dict[str, Any]:

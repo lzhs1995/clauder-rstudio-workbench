@@ -1,10 +1,48 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.6.1`、ClaudeR `0.14.1.9001`
->（基于 upstream `0.14.1`）、`clauder-mcp 0.14.5`。
+> 适用版本：`clauder-rstudio-workbench v0.6.1`、ClaudeR `0.14.1.9002`
+>（公开配套标签 `v0.14.1.9002-lzhs.1`）、`clauder-mcp 0.14.5.post1`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
 > 但其中的版本、路径和 `uvx` 建议不再代表当前推荐配置。
+
+## 连接排障补充（2026-09-07）
+
+`doctor PASS` 只表示配置与 discovery 检查通过，不代表当前 agent 已加载原生工具。
+新增诊断命令逐层区分终端、配置、bridge、活跃 RStudio 和 agent 工具：
+
+```text
+clauder-workbench connection-diagnose --session-name <实际会话名> --probe-http
+```
+
+该命令只做标记执行和 PID 核对，不拟合模型、不改研究对象、不提交异步任务。
+HTTP 必须命中明确的 discovery 会话、使用对应认证并收到成功执行标记；错误正文非空不能算成功。
+独立 MCP 通道可用时返回 `MCP_STDIO_OK`，诊断总体仍为 `WARN/2`，
+`native_gate=NOT_VERIFIED`；这不是原生发布门禁通过。
+
+当前工具列表缺少 r-studio 不能推出 RStudio 停止。先核查工具暴露、有效配置与实际进程，
+没有证据时不得断言配置写入者或“注册表冻结”。没有可用的热加载接口也不能虚构调用。
+交互式 Codex 启动必须保留 stdin/stdout/stderr 的终端属性；`rtk proxy` 等输出捕获层
+只用于非交互检查。脚本语法检查及 `mcp get` 成功不等于交互启动验证通过。
+
+## 2026-09-07 治理状态补充
+
+当前已发布安装仍为 v0.6.0 + 定点诊断补丁，v0.6.1 尚未发布。本轮 Codex 原生四步调用已在既有 RStudio 会话实测通过，包含异步完成前的阶段进度；这不证明此前失效的根因已消除，也不代表候选安装和跨平台生命周期验收完成。
+
+三仓依赖、fork 分支与本机版本差异、Windows—Mac 故障台账及剩余整改见同目录的《ClaudeR_教程审查与SKILL设计建议》。用户已因 Claude 欠费授权 Codex 独立接管，不再等待或调用 Claude；测试及发布门禁仍保留。不要为“恢复工具”重启现有研究会话。
+
+新的统一入口（默认只读）：
+
+```text
+clauder-workbench ensure-ready --client codex --session-name <实际会话名> --task-key <任务名>
+```
+
+正式原生任务在真实四步 smoke 后追加 `--require-native --native-evidence <证据文件>`。
+门禁核对当前客户端进程/session、配置哈希、目标 R PID 和四步归档原文哈希；同一 thread
+在新进程中恢复也必须重新验证。`--client claude|copilot` 使用对应配置文件，项目级配置用
+`--config-file` 显式选择；“读到了文件”不等于证明宿主采用了它。
+`--repair safe` 只定点合并已有持久入口，不安装新版本、不启动 agent、不重启 RStudio，
+不抹掉禁用状态、其它 MCP、自定义参数/env。未知锁和损坏 discovery 保留待核查。
 
 ## 1. 先看结论
 
@@ -54,10 +92,10 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 | 层 | v0.6.1 推荐值 | 验证方式 |
 |---|---|---|
 | workbench | `0.6.1` | `clauder-workbench --version` |
-| ClaudeR | `0.14.1.9001` 本地 fork | `packageVersion("ClaudeR")` |
+| ClaudeR | `0.14.1.9002` / `v0.14.1.9002-lzhs.1` | 磁盘 packageVersion 与当前 getNamespaceVersion 分别核对 |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
-| MCP bridge | `0.14.5` | 安装元数据/`pyproject.toml` |
-| MCP 工具面 | 41 tools | `clauder-workbench tool-surface` |
+| MCP bridge | `0.14.5.post1` | 精确标签、manifest、安装元数据及已加载进程分别核对 |
+| MCP 工具面 | 5 个核心执行能力；其余按用途 | ensure-ready 报告必需缺失与可选缺失，保留完整工具清单 |
 | evidence schema | `0.2.4` | packaged schema |
 | macOS/Linux | `install.sh` | installer/doctor 测试 |
 | Windows | `install.ps1` | PowerShell 和跨平台回归测试 |
@@ -70,12 +108,14 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 ### 4.1 macOS/Linux
 
 ```bash
-git clone https://github.com/lzhs1995/clauder-rstudio-workbench.git \
-  "$HOME/projects/clauder-rstudio-workbench"
-cd "$HOME/projects/clauder-rstudio-workbench"
+git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git \
+  "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
+git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git \
+  "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
 
 ./install.sh \
-  --clauder-dir "$HOME/projects/ClaudeR" \
+  --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" \
   --configure-codex \
   --sync-agents-skill \
   --backup-retention 0
@@ -86,6 +126,8 @@ cd "$HOME/projects/clauder-rstudio-workbench"
 
 `--backup-retention 0` 表示保留全部 skill 备份。安装器只有在显式指定
 `--configure-codex`、`--configure-claude` 等开关时才修改客户端配置。
+clone 目标必须不存在；已有工作树不要覆盖，先核对其精确标签和未提交修改。
+安装器在替换 R/bridge 前验证 runtime-compatibility.json；不要以任意 fork main 代替配套引用。
 
 推荐 Codex 配置形态：
 

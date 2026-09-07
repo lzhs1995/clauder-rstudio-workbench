@@ -41,6 +41,7 @@ Use the matching entrypoint from this skill directory, or use the installed
 ```bash
 ./harness/run.sh doctor
 ./harness/run.sh doctor --expect-client codex --check-toml-parse
+./harness/run.sh connection-diagnose --session-name <target> --probe-http
 ./harness/run.sh transport-classify
 ./harness/run.sh tool-surface
 ./harness/run.sh resource-gate advise --current-parallel 1 --memory-threshold 85
@@ -177,6 +178,61 @@ when older backup pruning is intended.
 
 Cold start means every MCP launch asks `uvx --from ...` to resolve/build before serving JSON-RPC. Warm start means the uv cache helps but the launch still goes through `uvx`. Hot/persistent start means Codex launches `clauder-mcp` (`clauder-mcp.exe` on Windows) directly. Long async/fan-out tasks require the hot path plus a native smoke in the current tool layer.
 
+## Layered connection diagnosis
+
+Start a connection check with the explicit client and target:
+
+```text
+clauder-workbench ensure-ready --client codex --session-name <target> --task-key <task>
+```
+
+This is read-only and can prove `MCP_STDIO_OK`, not agent-native readiness. For
+formal native work, run the actual native smoke, then add
+`--require-native --native-evidence <fresh-native-smoke.json>`. The consumer
+checks the exact task/client, live R PID, current client process/session and
+configuration hash, plus all four archived raw hashes. A resumed thread in a
+different process needs fresh evidence even if the thread ID did not change.
+For non-Codex clients, supply their real documented session identity through
+`CLAUDER_WORKBENCH_CLIENT_SESSION_ID`; lack of provenance is a BLOCK, not proof.
+
+`--client claude|copilot` reads that client's file, never silently the Codex
+configuration. `--config-file` selects a project/scoped file explicitly; file
+readiness does not prove that the running host chose that file. `--repair safe`
+is opt-in and only merges the existing persistent executable/home/cache entry.
+It preserves disabled state, custom args/env and other servers; it does not
+install software, launch an agent, reset RStudio or reclaim an unknown lock.
+
+Release configuration writers share private atomic writes, per-file locking,
+backups and a hash-only writer journal. A non-cooperating external application
+can still replace a config outside that lock; a conflict blocks, and the next
+readiness check detects loss/change. Do not promise that a lock prevents every
+external configuration writer.
+
+The paired discovery-reliability bridge requires explicit selection when
+multiple sessions are available. A lost/changed binding must BLOCK; inspect
+and explicitly reconnect only to the intended identity, never retry code in
+a different research session. Readers preserve malformed discovery records.
+
+`doctor` validates configuration and discovery only; its PASS is not live R or
+agent-native proof. Use `connection-diagnose --session-name <target>` to separate
+terminal file descriptors, configured client entry, independent MCP bridge,
+explicit live RStudio PID and observed agent tools. `--probe-http` selects the
+same discovery session and uses its authentication; it never guesses port 8787.
+`--agent-tool-inventory <names.json>` accepts observed tool names, but even a
+matching name cannot satisfy `native-smoke`. A healthy diagnostic returns WARN
+(2) with `MCP_STDIO_OK` and `native_gate=NOT_VERIFIED`, not a release PASS.
+
+Do not confuse a missing tool in the current agent surface with a stopped
+RStudio. Inspect the actual tool inventory and supported client controls; do
+not claim hot reload, an immutable registry, or a config writer without evidence.
+If no supported reload control is exposed, report that specific limitation and
+retain native gates while continuing authorized stdio diagnostics.
+
+Interactive agent launchers must inherit a real terminal on stdin/stdout/stderr.
+Do not wrap a TUI in output-capturing `rtk proxy`, a pipe or `capture_output`.
+Use RTK for noninteractive checks. Test launch plumbing with a harmless stub in
+a PTY; syntax checks and `mcp get` alone do not test interactive launch.
+
 ## Core Workflow
 
 1. **Connect**
@@ -209,13 +265,16 @@ Cold start means every MCP launch asks `uvx --from ...` to resolve/build before 
 - A formal soak is complete only when its recoverable `soak-monitor` evidence also passes the schedule, latency, resource, state-gap, and restart-budget checks.
 - HTTP fallback can diagnose whether the Addin HTTP server is alive, but it is not MCP-only success evidence.
 - If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
-- After changing ClaudeR source, R package installation, or MCP config, restart the relevant agent/MCP process. Running agents may not hot-load changes.
+- After changing source, installation or MCP config, verify which runtime actually loaded it. Use a supported targeted MCP reload only when needed; do not automatically restart RStudio or repeatedly ask the user to restart the agent.
 
 ## Compatible Release
 
 This skill collection release `v0.6.1` is paired with the
-`lzhs1995/ClaudeR` local fork branch `0.14.1.9001`, based on upstream ClaudeR `0.14.1`, and MCP
-bridge `0.14.5`. The collection includes this workbench skill and the companion
+`lzhs1995/ClaudeR` published tag `v0.14.1.9002-lzhs.1`, R package `0.14.1.9002`, and MCP
+bridge `0.14.5.post1`. See the collection's `runtime-compatibility.json` for exact
+commit and critical-file hashes. Installers verify the pair before replacing
+runtime code; disk installation is distinct from a process's loaded code.
+The collection includes this workbench skill and the companion
 `cmaverse-paired-mval` and `comparegroups-guide` skills.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
