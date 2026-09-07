@@ -109,7 +109,7 @@
 ### 4.1 独立接管后的新增验收
 
 - 用户已撤销本任务的 Claude 协作要求；状态记录为 SOLO_TAKEOVER。上方握手失败是历史事实，不再是等待 Claude 的理由。
-- 最终测试清单包含 Python 260 项；readiness 15 项、配置存储 9 项、配套来源 4 项，覆盖换进程恢复、错误 PID、配置改变、归档篡改、显式禁用、畸形参数及并发冲突。隔离变异测试补出了“原生证据声明不同 R 目标”的独立负例；运行结果以对应提交 CI/Release 证据为准。
+- 最终测试清单包含 Python 261 项；readiness 15 项、配置存储 9 项、配套来源 4 项及缺失配对清单的安装阻断负例，覆盖换进程恢复、错误 PID、配置改变、归档篡改、显式禁用、畸形参数及并发冲突。隔离变异测试补出了“原生证据声明不同 R 目标”的独立负例；运行结果以对应提交 CI/Release 证据为准。
 - Windows 四个配置入口（Codex、Claude 用户文件、Copilot、workspace）已改为定点合并；新增 PowerShell 5.1/7 的实际函数执行测试，最终结论以 CI 为准。
 - Windows 缓存已统一改为 LOCALAPPDATA/uv/cache；macOS/Linux/Windows 正式 harness 安装均不再默认 editable。
 - fork `73685a6`：bridge 40/40、发现层 10/10、R CMD check、R 功能检查、Windows/macOS/Linux 双进程发现与异步背压回归均通过。首轮 Windows CI 的 `R` 命令被 PowerShell 解释成 Invoke-History，已改为显式 bash 执行 R CMD INSTALL；这不是 RStudio 失效。

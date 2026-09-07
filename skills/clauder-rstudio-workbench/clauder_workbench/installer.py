@@ -293,6 +293,8 @@ def main(argv: list[str] | None = None) -> int:
     if not (clauder_dir / "DESCRIPTION").exists() or not (clauder_dir / "clauder-mcp").exists():
         raise SystemExit(f"Invalid ClaudeR repository: {clauder_dir}")
     manifest = repo_root / "runtime-compatibility.json"
+    if (not args.skip_r_package or not args.skip_mcp) and not manifest.is_file():
+        raise SystemExit("Runtime compatibility manifest is required before updating R or MCP; nothing was installed")
     if manifest.exists():
         from .compatibility import verify_source
         pair = verify_source(manifest, clauder_dir)

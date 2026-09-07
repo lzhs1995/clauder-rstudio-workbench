@@ -10,6 +10,19 @@ from clauder_workbench import config, installer
 
 
 class RuntimeInstallDefaultsTests(unittest.TestCase):
+    def test_runtime_install_without_pair_manifest_fails_before_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text("[project]\nname='test'\nversion='0.0.0'\n")
+            (root / "DESCRIPTION").write_text("Package: ClaudeR\n")
+            (root / "clauder-mcp").mkdir()
+            with mock.patch.object(installer, "_run") as run, mock.patch.object(installer, "_install_skill") as install_skill:
+                for flags in ([], ["--skip-r-package"], ["--skip-mcp"]):
+                    with self.subTest(flags=flags), self.assertRaisesRegex(SystemExit, "manifest is required"):
+                        installer.main(["--repo-root", str(root), "--clauder-dir", str(root), *flags])
+                run.assert_not_called()
+                install_skill.assert_not_called()
+
     def test_platform_cache_paths(self):
         base = Path("/example/home")
         with mock.patch.dict(os.environ, {}, clear=True):
