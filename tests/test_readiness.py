@@ -115,6 +115,16 @@ class ReadinessTests(unittest.TestCase):
         path, _ = self.make_native_fixture()
         self.assertEqual(self.ready(require_native=True, native_evidence=path)["transport_class"], "NATIVE_MCP_OK")
 
+    def test_native_evidence_names_a_different_rstudio_target(self):
+        path, doc = self.make_native_fixture()
+        for field, value in (("session_name", "another-rstudio"), ("pid", "456")):
+            with self.subTest(field=field):
+                # 客户端上下文、配置、原始归档均合法，只更改声明的 R 目标。
+                path.write_text(json.dumps({**doc, field: value}))
+                result = self.ready(require_native=True, native_evidence=path)
+                self.assertEqual(result["decision"], "BLOCK")
+                self.assertIn("NATIVE_RSTUDIO_IDENTITY_MISMATCH", result["reasons"])
+
     def test_cross_session_evidence_is_rejected(self):
         path, _ = self.make_native_fixture()
         with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "different-thread"}):
