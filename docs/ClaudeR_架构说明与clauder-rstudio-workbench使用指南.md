@@ -180,8 +180,10 @@ library(ClaudeR)
 claudeAddin()
 ```
 
-修改 ClaudeR 包、bridge 或 MCP 配置后，重启相应的 Addin/MCP 客户端。
-正在运行的 agent 不一定能热加载新增 wrapper。
+修改包、bridge 或配置后，先核对磁盘来源、已加载版本和实际调用。
+工具清单采用延迟发现时，先使用宿主提供的工具搜索/发现，再判断是否未暴露。
+只有已定位加载差异、且当前宿主提供受支持的定向 reload 时才使用它；不要自动
+重启 Addin、RStudio 或 agent。正在运行的进程未必会因磁盘更新自动换版。
 
 ## 5. 连接与 Native smoke
 

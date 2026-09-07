@@ -213,6 +213,10 @@ multiple sessions are available. A lost/changed binding must BLOCK; inspect
 and explicitly reconnect only to the intended identity, never retry code in
 a different research session. Readers preserve malformed discovery records.
 
+If the host defers tool catalogs, use its supported tool search/discovery before
+declaring `r-studio` absent. Absence from the initial prompt is not proof that
+the MCP server failed to register.
+
 `doctor` validates configuration and discovery only; its PASS is not live R or
 agent-native proof. Use `connection-diagnose --session-name <target>` to separate
 terminal file descriptors, configured client entry, independent MCP bridge,
