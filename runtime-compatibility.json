@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "workbench_version": "0.6.1",
+  "workbench_version": "0.6.2",
   "clauder_repository": "https://github.com/lzhs1995/ClaudeR.git",
   "clauder_ref": "v0.14.1.9002-lzhs.1",
   "clauder_commit": "73685a67f82ff42d4e257dc103e23d3ab6708fb4",

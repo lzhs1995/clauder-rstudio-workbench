@@ -5,14 +5,15 @@ import shutil
 import sys
 from pathlib import Path
 
+from .platform_runtime import cache_dir, resolve_runtime, user_home
 
-IS_WINDOWS = os.name == "nt"
+
+_RUNTIME = resolve_runtime()
+IS_WINDOWS = _RUNTIME.system == "windows"
 
 
 def _home() -> Path:
-    if IS_WINDOWS:
-        return Path(os.environ.get("USERPROFILE") or Path.home()).expanduser()
-    return Path(os.environ.get("HOME") or Path.home()).expanduser()
+    return user_home()
 
 
 def _env_path(name: str, default: Path | None = None) -> Path | None:
@@ -22,18 +23,13 @@ def _env_path(name: str, default: Path | None = None) -> Path | None:
     return default
 
 
-HOME = _home()
+HOME = _RUNTIME.home
 
 
 def default_uv_cache_dir(home: Path | None = None, platform: str | None = None) -> Path:
     """按平台选择用户可写缓存；不依赖根目录或管理员权限。"""
     base = home if home is not None else HOME
-    platform = platform or sys.platform
-    if platform == "win32":
-        return Path(os.environ.get("LOCALAPPDATA") or base / "AppData" / "Local") / "uv" / "cache"
-    if platform == "darwin":
-        return base / "Library" / "Caches" / "uv"
-    return Path(os.environ.get("XDG_CACHE_HOME") or base / ".cache") / "uv"
+    return cache_dir(base, system=platform)
 
 
 STATE_DIR = HOME / ".clauder_workbench"
@@ -44,18 +40,14 @@ NATIVE_SMOKE_DIR = STATE_DIR / "native_smoke"
 NATIVE_SMOKE_ARCHIVE_DIR = NATIVE_SMOKE_DIR / "archive"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA") or (HOME / "AppData" / "Local"))
-DEFAULT_PYTHON314 = (
-    LOCALAPPDATA / "Programs" / "Python" / "Python314" / "python.exe"
-    if IS_WINDOWS
-    else Path(sys.executable)
-)
+DEFAULT_PYTHON314 = _RUNTIME.default_python
 PYTHON_EXE = _env_path("CLAUDER_WORKBENCH_PYTHON", DEFAULT_PYTHON314)
 PYTHON314 = PYTHON_EXE
 WINDOWS_STORE_PYTHON = LOCALAPPDATA / "Microsoft" / "WindowsApps" / "python3.exe"
 LOCAL_CLAUDER_BRIDGE = _env_path("CLAUDER_WORKBENCH_CLAUDER_MCP", HOME / "projects" / "ClaudeR" / "clauder-mcp")
 PERSISTENT_MCP = _env_path(
     "CLAUDER_WORKBENCH_MCP_COMMAND",
-    HOME / ".local" / "bin" / ("clauder-mcp.exe" if IS_WINDOWS else "clauder-mcp"),
+    _RUNTIME.bridge_path,
 )
 UV_CACHE_DIR = _env_path(
     "CLAUDER_WORKBENCH_UV_CACHE_DIR",
