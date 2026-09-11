@@ -10,6 +10,17 @@ from .mcp_client import connection_probe
 from .transport import discovery_sessions, http_execute_probe, terminal_status
 
 
+STARTUP_STATES = (
+    "CONFIG_VALID",
+    "BRIDGE_VALID",
+    "RSTUDIO_DISCOVERED",
+    "TARGET_BOUND",
+    "NATIVE_TOOLS_OBSERVED",
+    "NATIVE_SMOKE_VERIFIED",
+    "READY",
+)
+
+
 def agent_tool_status(inventory: Path | None) -> dict[str, Any]:
     # 工具名仅作为外部观察，不能建立 native-smoke 的证据链。
     result: dict[str, Any] = {"status": "UNKNOWN", "native_verified": False,
@@ -29,6 +40,78 @@ def agent_tool_status(inventory: Path | None) -> dict[str, Any]:
     except (OSError, ValueError, AttributeError) as exc:
         result.update(status="INVALID", reason=str(exc))
     return result
+
+
+def startup_contract(layers: dict[str, Any], *, session_name: str = "") -> dict[str, Any]:
+    """Classify connection readiness without confusing independent layers.
+
+    This is intentionally evidence-oriented: a configured file, a working
+    stdio bridge, a live discovery record and the current agent tool registry
+    are separate gates.  The function never treats HTTP/stdio as native proof.
+    """
+    states: list[dict[str, Any]] = []
+
+    config_ok = bool((layers.get("client_config") or {}).get("ok"))
+    states.append({"state": "CONFIG_VALID", "ok": config_ok,
+                   "reason": None if config_ok else "CONFIG_INVALID"})
+    bridge_ok = bool((layers.get("bridge") or {}).get("ok"))
+    states.append({"state": "BRIDGE_VALID", "ok": bridge_ok,
+                   "reason": None if bridge_ok else "BRIDGE_NOT_STARTABLE"})
+
+    rstudio = layers.get("rstudio") or {}
+    discovery = rstudio.get("discovery") or []
+    named = [item for item in discovery if item.get("session_name") == session_name] if session_name else []
+    healthy = [item for item in discovery if item.get("port_open") and item.get("token_present")]
+    discovered_ok = len(named) == 1 and bool(named[0].get("port_open")) if session_name else len(healthy) == 1
+    if discovered_ok:
+        discovery_reason = None
+    elif session_name and not named:
+        discovery_reason = "DISCOVERY_RECORD_MISSING"
+    elif session_name and len(named) > 1:
+        discovery_reason = "DISCOVERY_RECORD_AMBIGUOUS"
+    elif discovery and not healthy:
+        discovery_reason = "DISCOVERY_RECORD_STALE"
+    elif len(healthy) > 1:
+        discovery_reason = "TARGET_NAME_MISMATCH"
+    else:
+        discovery_reason = "RSTUDIO_ADDIN_NOT_RUNNING"
+    states.append({"state": "RSTUDIO_DISCOVERED", "ok": discovered_ok, "reason": discovery_reason})
+
+    bound_ok = bool(rstudio.get("ok"))
+    states.append({"state": "TARGET_BOUND", "ok": bound_ok,
+                   "reason": None if bound_ok else "TARGET_NAME_MISMATCH"})
+
+    tools = layers.get("agent_tools") or {}
+    tools_ok = tools.get("status") == "OBSERVED_PRESENT"
+    tool_reason = None if tools_ok else (
+        "CODEX_NATIVE_TOOLS_NOT_REGISTERED" if tools.get("status") == "OBSERVED_ABSENT"
+        else "NATIVE_TOOLS_NOT_OBSERVED"
+    )
+    states.append({"state": "NATIVE_TOOLS_OBSERVED", "ok": tools_ok, "reason": tool_reason})
+
+    # An inventory is only an observation.  The four-call native-smoke chain
+    # remains the sole proof that the current task can execute RStudio tools.
+    smoke_ok = bool((layers.get("native") or {}).get("ok"))
+    states.append({"state": "NATIVE_SMOKE_VERIFIED", "ok": smoke_ok,
+                   "reason": None if smoke_ok else "NATIVE_SMOKE_NOT_VERIFIED"})
+
+    ready = all(item["ok"] for item in states)
+    reason = None if ready else next(item["reason"] for item in states if not item["ok"])
+    next_action = {
+        "CONFIG_INVALID": "repair the selected client entry, then rerun diagnostics",
+        "BRIDGE_NOT_STARTABLE": "verify the persistent clauder-mcp executable and provenance",
+        "RSTUDIO_ADDIN_NOT_RUNNING": "run ClaudeR claudeAddin() and Start Server in the target RStudio",
+        "DISCOVERY_RECORD_MISSING": "use an existing discovered session name; do not guess a target",
+        "DISCOVERY_RECORD_STALE": "start the Addin for the intended RStudio session; stale records are not reused",
+        "DISCOVERY_RECORD_AMBIGUOUS": "select exactly one discovered session by name and PID",
+        "TARGET_NAME_MISMATCH": "bind to a session listed by list_sessions/discovery",
+        "CODEX_NATIVE_TOOLS_NOT_REGISTERED": "create a fresh Codex task context; MCP tools are task-scoped",
+        "NATIVE_TOOLS_NOT_OBSERVED": "supply the current task tool inventory, then run native-smoke",
+        "NATIVE_SMOKE_NOT_VERIFIED": "run list_sessions → execute_r → execute_r_async/get_async_result in the current task",
+    }.get(reason or "", "run the four-step native smoke in the current task")
+    return {"states": states, "ok": ready, "reason": reason,
+            "next_action": next_action,
+            "native_gate": "NATIVE_SMOKE_OK" if smoke_ok else "NOT_VERIFIED"}
 
 
 def connection_layers(config_check: dict[str, Any], *, session_name: str = "",

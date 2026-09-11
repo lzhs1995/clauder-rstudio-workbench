@@ -38,7 +38,7 @@ from .config import (
     python_command,
 )
 from .evidence import build_evidence, load_json, print_json, stable_task_key, utc_now, write_evidence
-from .diagnostics import connection_layers
+from .diagnostics import connection_layers, startup_contract
 from .fanout import (
     build_submit_code,
     lint_contract_workers,
@@ -341,9 +341,13 @@ def cmd_connection_diagnose(args: argparse.Namespace) -> int:
     layers = connection_layers(_check_codex_rstudio_mcp_config(install_info),
                                session_name=args.session_name, timeout=args.timeout,
                                probe_http=args.probe_http, inventory=args.agent_tool_inventory)
+    contract = startup_contract(layers, session_name=args.session_name)
+    # connection-diagnose remains a layered diagnostic: independent stdio and
+    # live RStudio can be WARN/usable, while the contract separately records
+    # that current-task native readiness is still unverified.
     operational = layers["bridge"]["ok"] and layers["rstudio"]["ok"]
     code = WARN if operational else BLOCK
-    reasons = ["layered diagnostic only; no native smoke or release approval is implied"]
+    reasons = [contract["reason"] or "layered diagnostic only; no native smoke or release approval is implied"]
     if not layers["client_config"].get("ok"):
         code = BLOCK
         reasons.append("configured client entry fails checks; independent runtime results remain separate")
@@ -356,7 +360,9 @@ def cmd_connection_diagnose(args: argparse.Namespace) -> int:
     return emit(build_evidence("connection_diagnose", "WARN" if code == WARN else "BLOCK",
                                reasons=reasons, transport_class="MCP_STDIO_OK" if operational else "BLOCKED",
                                session_name=args.session_name, exit_code=code,
-                               extra={"layers": layers, "native_gate": "NOT_VERIFIED", "install_provenance": install_info}))
+                               extra={"layers": layers, "startup_contract": contract,
+                                      "native_gate": contract["native_gate"],
+                                      "install_provenance": install_info}))
 
 
 def cmd_transport_classify(args: argparse.Namespace) -> int:
