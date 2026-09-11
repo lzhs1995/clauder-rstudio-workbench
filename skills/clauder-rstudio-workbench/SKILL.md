@@ -263,6 +263,18 @@ a PTY; syntax checks and `mcp get` alone do not test interactive launch.
 
 ## Required Safety Rules
 
+### Connection startup contract
+
+`connection-diagnose` reports the independent gates in order:
+`CONFIG_VALID → BRIDGE_VALID → RSTUDIO_DISCOVERED → TARGET_BOUND →
+NATIVE_TOOLS_OBSERVED → NATIVE_SMOKE_VERIFIED`. Configuration/stdio/HTTP
+success is not native readiness. If the current task has no
+`mcp__r_studio__*` tools, the stable diagnosis is
+`CODEX_NATIVE_TOOLS_NOT_REGISTERED` or `NATIVE_TOOLS_NOT_OBSERVED`; create a
+fresh Codex task context instead of sending an unsupported `SIGHUP`. If a
+target name is missing or stale, use the session name returned by discovery;
+never guess `default` or `chapter6_mac`.
+
 - **Windows multi-session warning**: do not trust a ClaudeR build whose stale discovery cleanup uses `tools::pskill(pid, signal = 0)` as a liveness probe. Use a patched build with a read-only PID check.
 - Before native-wrapper work, run `clauder-workbench doctor --expect-client codex --check-toml-parse`; BLOCK if the Codex MCP entry is not the persistent absolute executable, is missing `startup_timeout_sec` or `UV_CACHE_DIR`, or lacks local fork provenance.
 - A Codex native-wrapper long job is ready only after `native-smoke complete` records `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test from the current Codex tool layer.
@@ -273,7 +285,7 @@ a PTY; syntax checks and `mcp get` alone do not test interactive launch.
 
 ## Compatible Release
 
-This skill collection release `v0.6.2` is paired with the
+This skill collection release `v0.6.3` is paired with the
 `lzhs1995/ClaudeR` published tag `v0.14.1.9002-lzhs.1`, R package `0.14.1.9002`, and MCP
 bridge `0.14.5.post1`. See the collection's `runtime-compatibility.json` for exact
 commit and critical-file hashes. Installers verify the pair before replacing

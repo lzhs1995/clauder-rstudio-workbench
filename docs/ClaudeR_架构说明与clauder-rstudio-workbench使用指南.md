@@ -1,6 +1,6 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.6.2`、ClaudeR `0.14.1.9002`
+> 适用版本：`clauder-rstudio-workbench v0.6.3`、ClaudeR `0.14.1.9002`
 >（公开配套标签 `v0.14.1.9002-lzhs.1`）、`clauder-mcp 0.14.5.post1`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
@@ -99,9 +99,9 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.6.2 推荐值 | 验证方式 |
+| 层 | v0.6.3 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.6.2` | `clauder-workbench --version` |
+| workbench | `0.6.3` | `clauder-workbench --version` |
 | ClaudeR | `0.14.1.9002` / `v0.14.1.9002-lzhs.1` | 磁盘 packageVersion 与当前 getNamespaceVersion 分别核对 |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
 | MCP bridge | `0.14.5.post1` | 精确标签、manifest、安装元数据及已加载进程分别核对 |

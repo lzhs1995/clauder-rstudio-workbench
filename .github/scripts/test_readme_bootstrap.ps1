@@ -18,7 +18,7 @@ $script:installCalled = $false
 
 function Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile)
-    if ($Uri -notmatch '^https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0\.6\.2/clauder-rstudio-workbench-v0\.6\.2\.zip$') {
+    if ($Uri -notmatch '^https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0\.6\.3/clauder-rstudio-workbench-v0\.6\.3\.zip$') {
         throw "Unexpected release URL"
     }
     Copy-Item -LiteralPath $script:fixtureZip -Destination $OutFile

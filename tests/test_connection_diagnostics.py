@@ -203,6 +203,30 @@ class LayerTests(unittest.TestCase):
         self.assertEqual(result["transport_class"], "MCP_STDIO_OK")
         self.assertEqual(result["extra"]["native_gate"], "NOT_VERIFIED")
 
+    def test_startup_contract_distinguishes_frozen_task_from_rstudio(self):
+        layers = {
+            "client_config": {"ok": True},
+            "bridge": {"ok": True},
+            "rstudio": {"ok": False, "discovery": []},
+            "agent_tools": {"status": "OBSERVED_ABSENT"},
+        }
+        contract = diagnostics.startup_contract(layers, session_name="chapter6_mac")
+        self.assertFalse(contract["ok"])
+        self.assertEqual(contract["reason"], "DISCOVERY_RECORD_MISSING")
+        self.assertEqual(contract["native_gate"], "NOT_VERIFIED")
+        self.assertTrue(any(s["reason"] == "CODEX_NATIVE_TOOLS_NOT_REGISTERED" for s in contract["states"]))
+
+    def test_startup_contract_requires_native_smoke_after_tool_observation(self):
+        layers = {
+            "client_config": {"ok": True},
+            "bridge": {"ok": True},
+            "rstudio": {"ok": True, "discovery": [{"session_name": "A", "pid": 42, "port_open": True, "token_present": True}]},
+            "agent_tools": {"status": "OBSERVED_PRESENT"},
+        }
+        contract = diagnostics.startup_contract(layers, session_name="A")
+        self.assertFalse(contract["ok"])
+        self.assertEqual(contract["reason"], "NATIVE_SMOKE_NOT_VERIFIED")
+
 
 if __name__ == "__main__":
     unittest.main()
