@@ -1,6 +1,6 @@
 # ClaudeR 架构说明与 `clauder-rstudio-workbench` 使用指南
 
-> 适用版本：`clauder-rstudio-workbench v0.6.1`、ClaudeR `0.14.1.9002`
+> 适用版本：`clauder-rstudio-workbench v0.6.2`、ClaudeR `0.14.1.9002`
 >（公开配套标签 `v0.14.1.9002-lzhs.1`）、`clauder-mcp 0.14.5.post1`。
 >
 > 本文是当前权威指南。2026 年 5 月的 Windows 初创手册已保留为历史证据，
@@ -99,15 +99,15 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 3. 当前兼容矩阵
 
-| 层 | v0.6.1 推荐值 | 验证方式 |
+| 层 | v0.6.2 推荐值 | 验证方式 |
 |---|---|---|
-| workbench | `0.6.1` | `clauder-workbench --version` |
+| workbench | `0.6.2` | `clauder-workbench --version` |
 | ClaudeR | `0.14.1.9002` / `v0.14.1.9002-lzhs.1` | 磁盘 packageVersion 与当前 getNamespaceVersion 分别核对 |
 | upstream 基线 | ClaudeR `0.14.1` | 安装元数据与源码提交 |
 | MCP bridge | `0.14.5.post1` | 精确标签、manifest、安装元数据及已加载进程分别核对 |
 | MCP 工具面 | 5 个核心执行能力；其余按用途 | ensure-ready 报告必需缺失与可选缺失，保留完整工具清单 |
 | evidence schema | `0.2.4` | packaged schema |
-| macOS/Linux | `install.sh` | installer/doctor 测试 |
+| macOS/Linux | `install.sh` | installer/doctor/平台路径测试 |
 | Windows | `install.ps1` | PowerShell 和跨平台回归测试 |
 
 不要使用裸 `uvx clauder-mcp` 或裸 `uv tool install clauder-mcp` 作为稳定入口。
@@ -115,14 +115,14 @@ clauder-rstudio-workbench：在控制链两侧执行 doctor、guard、fan-out、
 
 ## 4. 安装与升级
 
-### 4.1 macOS/Linux
+### 4.1 macOS
 
 ```bash
 git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git \
   "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
-git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git \
-  "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
-cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+git clone --branch v0.6.2 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git \
+  "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
 
 ./install.sh \
   --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" \
@@ -139,24 +139,45 @@ cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
 clone 目标必须不存在；已有工作树不要覆盖，先核对其精确标签和未提交修改。
 安装器在替换 R/bridge 前验证 runtime-compatibility.json；不要以任意 fork main 代替配套引用。
 
+### 4.1.1 Linux
+
+Linux 使用与 macOS 相同的 POSIX 安装入口和 workbench 行为合同，但不复用 macOS
+缓存目录：默认使用 `$XDG_CACHE_HOME/uv`，未设置时使用 `~/.cache/uv`。bridge
+名称为 `clauder-mcp`，持久入口位于 `~/.local/bin`。在无桌面环境中可使用普通终端、
+systemd user service 或其他受控后台托管；tmux/caffeinate 不是 Linux 必需依赖。
+
+```bash
+git clone --branch v0.6.2 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git \
+  "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
+./install.sh \
+  --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" \
+  --configure-codex --sync-agents-skill --backup-retention 0
+"$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
+```
+
+Linux 与 macOS 共用同一套配置合并、discovery、native evidence 和科研 skill；只有
+用户目录、缓存和后台托管边界不同。安装后仍必须对目标 RStudio 会话执行相同的
+`list_sessions → connect_session → execute_r` 和正式 native smoke。
+
 推荐 Codex 配置形态：
 
 ```toml
 [mcp_servers.r-studio]
-command = "/Users/<USER>/.local/bin/clauder-mcp"
+command = "/home/<USER>/.local/bin/clauder-mcp"
 startup_timeout_sec = 180.0
 
 [mcp_servers.r-studio.env]
-HOME = "/Users/<USER>"
+HOME = "/home/<USER>"
 PYTHONIOENCODING = "utf-8"
 NO_PROXY = "127.0.0.1,localhost"
-UV_CACHE_DIR = "/Users/<USER>/Library/Caches/uv"
+UV_CACHE_DIR = "/home/<USER>/.cache/uv"
 ```
 
 ### 4.2 Windows
 
 ```powershell
-git clone https://github.com/lzhs1995/clauder-rstudio-workbench.git `
+git clone --branch v0.6.2 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git `
   "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 Set-Location "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 

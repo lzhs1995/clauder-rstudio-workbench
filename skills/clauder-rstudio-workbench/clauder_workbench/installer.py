@@ -16,6 +16,7 @@ from typing import Any
 
 from . import __version__
 from .config import default_uv_cache_dir
+from .platform_runtime import resolve_runtime
 
 
 def _run(command: list[str], *, dry_run: bool = False) -> None:
@@ -255,7 +256,9 @@ def _write_install_info(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Install ClaudeR workbench on macOS/Linux")
+    parser = argparse.ArgumentParser(
+        description="Install ClaudeR workbench on Windows, macOS, or Linux"
+    )
     parser.add_argument("--repo-root", type=Path)
     parser.add_argument("--clauder-dir", type=Path, default=Path.home() / "projects" / "ClaudeR")
     parser.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
@@ -281,12 +284,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    runtime = resolve_runtime()
     repo_root = (args.repo_root or Path(__file__).resolve().parents[3]).expanduser().resolve()
     clauder_dir = args.clauder_dir.expanduser().resolve()
     codex_home = args.codex_home.expanduser().resolve()
     agents_home = args.agents_home.expanduser().resolve()
     uv_cache_dir = args.uv_cache_dir.expanduser().resolve()
-    mcp_command = Path.home() / ".local" / "bin" / ("clauder-mcp.exe" if os.name == "nt" else "clauder-mcp")
+    # Keep the persistent bridge location in the shared platform contract.
+    mcp_command = runtime.bridge_path
 
     if not (repo_root / "pyproject.toml").exists():
         raise SystemExit(f"Invalid workbench repository: {repo_root}")
@@ -344,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
         update_codex_config(
             codex_home / "config.toml",
             mcp_command,
-            Path.home(),
+            runtime.home,
             uv_cache_dir,
             dry_run=args.dry_run,
         )
@@ -356,11 +361,11 @@ def main(argv: list[str] | None = None) -> int:
     configured_clients = ["codex"] if args.configure_codex else []
     from .config_store import update_config
     for client, selected, path in (
-        ("claude", args.configure_claude, Path.home() / ".claude.json"),
-        ("copilot", args.configure_copilot, Path.home() / ".copilot" / "mcp-config.json"),
+        ("claude", args.configure_claude, runtime.home / ".claude.json"),
+        ("copilot", args.configure_copilot, runtime.home / ".copilot" / "mcp-config.json"),
     ):
         if selected:
-            update_config(path, client=client, command=mcp_command, home=Path.home(),
+            update_config(path, client=client, command=mcp_command, home=runtime.home,
                           cache=uv_cache_dir, dry_run=args.dry_run)
             configured_clients.append(client)
     unique_destinations: dict[Path, Path] = {}

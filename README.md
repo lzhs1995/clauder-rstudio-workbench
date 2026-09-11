@@ -2,7 +2,7 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.6.1` release line targets the published ClaudeR
+The `v0.6.2` release line targets the published ClaudeR
 [`v0.14.1.9002-lzhs.1`](https://github.com/lzhs1995/ClaudeR/releases/tag/v0.14.1.9002-lzhs.1)
 pair: R `0.14.1.9002` / bridge `0.14.5.post1`. Exact source identity and critical
 hashes are in [runtime-compatibility.json](runtime-compatibility.json).
@@ -12,9 +12,12 @@ This maintained line derives from upstream ClaudeR `0.14.1`, with the
 discovery reliability fixes. Upstream main at `8a322717` is already `0.15.0`;
 it is a different compatibility target, not the installed paired runtime.
 
-**Platform status:** `install.sh` supports macOS/Linux and `install.ps1`
-supports Windows. Both configure a persistent platform-native `clauder-mcp`
-entry and share the same fan-out, progress, resource, and completion gates.
+**Platform status:** Windows, macOS, and Linux are first-class supported
+targets. `install.sh` is used on macOS/Linux and `install.ps1` on Windows;
+both configure a persistent platform-native `clauder-mcp` entry and share the
+same fan-out, progress, resource, and completion gates. OS-specific behaviour
+is limited to paths, executable names, shells, and cache locations; the
+connection and evidence contracts are shared.
 
 The maintained Chinese architecture and operations manual is
 [ClaudeR 架构说明与 clauder-rstudio-workbench 使用指南](docs/ClaudeR_架构说明与clauder-rstudio-workbench使用指南.md).
@@ -51,29 +54,36 @@ the CLI default.
 
 ## Quick Start
 
-On macOS/Linux:
+On macOS:
 
 Use new, non-existing versioned destinations; never overwrite a dirty checkout.
 
 ```bash
 git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
-git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
-cd "$HOME/projects/clauder-rstudio-workbench-v0.6.1"
+git clone --branch v0.6.2 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.2"
 ./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" --configure-codex --sync-agents-skill --backup-retention 0
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-Use a clean checkout of the exact `v0.6.1` tag with these commands. Do not
+Use a clean checkout of the exact `v0.6.2` tag with these commands. Do not
 overwrite a worktree that contains local changes.
 
 On Windows PowerShell:
 
 ```powershell
-git clone --branch v0.6.1 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.6.2 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
 ```
+
+On Linux, use the same POSIX installer as macOS. The workbench resolves
+`$HOME`, stores its default uv cache under `$XDG_CACHE_HOME/uv` (or
+`$HOME/.cache/uv`), and installs `clauder-mcp`/`clauder-workbench` under
+`$HOME/.local/bin`. A desktop RStudio session and the addin HTTP endpoint are
+still required; headless/systemd launches must preserve `HOME` and
+`XDG_CACHE_HOME` and use the same user account as RStudio.
 
 Keep an existing healthy RStudio/addin alive. For a new RStudio session only:
 
@@ -111,7 +121,7 @@ python -m clauder_workbench doctor
 To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 If the Windows `git clone` is blocked by a proxy or reset connection, use the
-`v0.6.1` tag-zip bootstrap after that release is published:
+`v0.6.2` tag-zip bootstrap after that release is published:
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -119,9 +129,9 @@ $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 if (Test-Path -LiteralPath $dest) { throw "Destination already exists: $dest" }
 $staging = Join-Path $env:TEMP ("clauder-workbench-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $staging | Out-Null
-$zip = Join-Path $staging "clauder-rstudio-workbench-v0.6.1.zip"
+$zip = Join-Path $staging "clauder-rstudio-workbench-v0.6.2.zip"
 $unpacked = Join-Path $staging "unpacked"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.1/clauder-rstudio-workbench-v0.6.1.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.2/clauder-rstudio-workbench-v0.6.2.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
 $roots = @(Get-ChildItem -LiteralPath $unpacked -Directory)
 if ($roots.Count -ne 1) { throw "Expected one repository root in release ZIP" }
@@ -290,6 +300,7 @@ Installer prerequisites:
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
 | `v0.6.1` | `v0.14.1.9002-lzhs.1` / bridge `0.14.5.post1` | Corrects table semantics/layout and adds atomic config merging, client-specific ensure-ready, process-bound native evidence, non-editable installs and the published discovery-safe runtime pair. |
+| `v0.6.2` | `v0.14.1.9002-lzhs.1` / bridge `0.14.5.post1` | Makes Windows, macOS, and Linux runtime boundaries explicit and tested, with shared path/cache/executable contracts, Linux installer smoke coverage, and platform-specific operational guidance. |
 | `v0.6.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds backward-compatible spec 1.1 defaults, ordered variants, automatic attrition, batch manifests, structured validation diagnostics, configurable true-three-line DOCX output, and explicit compareGroups 4.10.2/4.10.3 gates. |
 | `v0.5.0` | local `0.14.1.9001` / bridge `0.14.5` | Adds the `comparegroups-guide` sibling skill, versioned Table 1 contract, labelled-data and panel audit, true three-line DOCX output, numeric reconciliation artifacts, validation, and cross-platform tests. |
 | `v0.4.6` | local `0.14.1.9001` / bridge `0.14.5` | Adds file-backed async output compatibility, a non-mutating legacy pipe rescue loop, and cycle-safe soak-monitor evidence serialization. |
@@ -479,9 +490,9 @@ Confirm all three layers:
 To upgrade macOS/Linux and reinstall the paired ClaudeR worktree:
 
 ```bash
-git clone --branch v0.6.1 --depth 1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-workbench-v0.6.1-release"
+git clone --branch v0.6.2 --depth 1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-workbench-v0.6.2-release"
 git clone --branch v0.14.1.9002-lzhs.1 --depth 1 https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-release"
-cd "$HOME/projects/clauder-workbench-v0.6.1-release"
+cd "$HOME/projects/clauder-workbench-v0.6.2-release"
 ./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-release" --configure-codex --sync-agents-skill --sync-clauder-alias --backup-retention 0
 ```
 
@@ -490,7 +501,7 @@ For the published Windows release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.6.1
+git checkout v0.6.2
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 
