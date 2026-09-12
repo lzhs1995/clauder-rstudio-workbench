@@ -20,6 +20,7 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - For recoverable long-soak monitoring, read [soak-monitor.md](references/soak-monitor.md).
 - For running many parallel R workers from one session, read [parallel-async-fanout.md](references/parallel-async-fanout.md).
 - For native wrapper smoke and `Transport closed` recovery, read [native-mcp-gate.md](references/native-mcp-gate.md).
+- For reusing an already-running ClaudeR session without manual Addin interaction, read [warm-session-reuse.md](references/warm-session-reuse.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
 
@@ -34,6 +35,27 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
   fan-out, monitoring, and completion discipline used by both domain skills.
 
 ## Executable Harness Layer
+
+### Every Codex session: first-priority bootstrap
+
+The user-level Codex `SessionStart` hook now runs:
+
+```bash
+clauder-workbench session-bootstrap --client codex
+```
+
+This is a fail-closed preflight for the persistent local ClaudeR bridge,
+`~/.codex/config.toml`, and the 180-second startup contract. It writes a
+`session_bootstrap` evidence record for every session. It intentionally reports
+native tool registration as `UNKNOWN`: a shell hook cannot see the current
+Codex app-server tool registry. Therefore any RStudio work still begins with
+the current task's real `mcp__r_studio__*` native smoke; configuration, Python
+stdio, or HTTP output can never be promoted to native evidence.
+
+If the hook blocks, repair the global Codex entry before doing analysis. Do not
+restart RStudio or substitute HTTP/stdio. Once native tools are present, reuse
+the already-running ClaudeR session from `list_sessions` as described in
+[`warm-session-reuse.md`](references/warm-session-reuse.md).
 
 Use the matching entrypoint from this skill directory, or use the installed
 `clauder-workbench` command after either installer installs the Python package:
@@ -172,6 +194,13 @@ and MCP bridge `0.14.5.post1`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
+The installer materializes the configured path as a stable launcher. It calls
+the embedded uv-tool Python directly and imports `clauder_mcp.main`, while
+preserving the original uv-generated entry point as `clauder-mcp.uv-tool`.
+This prevents Desktop app-server `ENOENT` failures after uv refreshes a
+symlink or shebang target. The configured path remains unchanged for Codex,
+Claude Code, and Copilot.
+
 The macOS/Linux installer keeps all runtime skill backups by default. Use
 `--backup-retention 0` to make that policy explicit; pass a positive number only
 when older backup pruning is intended.
@@ -238,6 +267,15 @@ Use RTK for noninteractive checks. Test launch plumbing with a harmless stub in
 a PTY; syntax checks and `mcp get` alone do not test interactive launch.
 
 ## Core Workflow
+
+### Warm-session reuse first
+
+When the current task exposes native `mcp__r_studio__*` tools, call
+`list_sessions` before requesting any user action. If it returns one active
+session, reuse it directly; do not call `claudeAddin()` again or create a new
+RStudio session. Bind explicitly only when more than one active session is
+returned. The complete real-world sequence and its evidence requirements are
+documented in [warm-session-reuse.md](references/warm-session-reuse.md).
 
 1. **Connect**
    - Confirm the active RStudio session with `list_sessions`.

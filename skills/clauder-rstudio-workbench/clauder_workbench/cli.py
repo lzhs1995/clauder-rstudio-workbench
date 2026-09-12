@@ -1884,6 +1884,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--check-toml-parse", action="store_true",
                    help="Validate that Codex config.toml parses cleanly; BLOCK if it does not.")
 
+    p = sub.add_parser(
+        "session-bootstrap",
+        help="Global Codex SessionStart preflight; validates persistent ClaudeR/RStudio configuration",
+    )
+    p.add_argument("--client", choices=["codex", "claude", "copilot"], default="codex")
+    p.add_argument("--no-fail-closed", action="store_true",
+                   help="Always return zero (for informational hooks); native registration is still not claimed")
+
     p = sub.add_parser("transport-classify")
     p.add_argument("--session-name", default="", help="Explicit discovery target for HTTP diagnostics")
     p.add_argument("--native-ok", action="store_true")
@@ -2142,6 +2150,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "doctor":
             return cmd_doctor(args)
+        if args.cmd == "session-bootstrap":
+            from .session_bootstrap import run as run_session_bootstrap
+            return run_session_bootstrap(client=args.client, fail_closed=not args.no_fail_closed)
         if args.cmd == "connection-diagnose":
             return cmd_connection_diagnose(args)
         if args.cmd == "ensure-ready":
