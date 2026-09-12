@@ -33,6 +33,13 @@ class PlatformRuntime:
         return self.home / ".local" / "bin" / self.bridge_name
 
     @property
+    def bridge_python_path(self) -> Path:
+        """Python embedded in the uv tool environment, used by the stable launcher."""
+        if self.system == "windows":
+            return self.home / "AppData" / "Local" / "uv" / "tools" / "clauder-mcp" / "Scripts" / "python.exe"
+        return self.home / ".local" / "share" / "uv" / "tools" / "clauder-mcp" / "bin" / "python"
+
+    @property
     def workbench_path(self) -> Path:
         if self.system == "windows":
             return self.home / "bin" / self.workbench_name
