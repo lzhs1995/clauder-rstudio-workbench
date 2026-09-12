@@ -467,6 +467,18 @@ ids into the final PASS, and preserves raw output hashes/copies for later audit.
 
 Do not start long fan-out work after a single `Transport closed`.
 
+### Codex Desktop shows no `mcp__r_studio__*`
+
+This is a task-level Desktop registry condition, not proof that RStudio or the
+ClaudeR bridge is missing. The workbench verifies the persistent command,
+discovery, and live R execution, but cannot refresh an app-server tool snapshot
+that was created before MCP `ready`. Treat the condition as
+`CODEX_NATIVE_TOOLS_NOT_REGISTERED`: do not use stdio/HTTP as a native
+substitute, do not send unsupported signals, and do not restart RStudio. Open a
+fresh Desktop task and rerun the native-smoke gate; only the four real
+`mcp__r_studio__*` calls can close the gate. A permanent fix requires Desktop to
+re-query tools when MCP `ready` is received.
+
 ### Windows opens a second RStudio session and the first one aborts
 
 Do not use an unpatched ClaudeR build whose stale discovery cleanup uses

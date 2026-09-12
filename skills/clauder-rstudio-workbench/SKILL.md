@@ -321,6 +321,26 @@ never guess `default` or `chapter6_mac`.
 - If a Codex direct wrapper returns `Transport closed`, treat it as a failed native gate: run the doctor/provenance check, prewarm or reinstall the persistent entry, and retry the native smoke. Do not ask the user to repeatedly restart Codex as the primary recovery path.
 - After changing source, installation or MCP config, verify which runtime actually loaded it. Use a supported targeted MCP reload only when needed; do not automatically restart RStudio or repeatedly ask the user to restart the agent.
 
+### Desktop app-server tool-registry boundary
+
+Codex Desktop owns the task-level native tool registry. The workbench can make
+the MCP entry deterministic and can validate the bridge, discovery records, and
+R execution, but it cannot force a proprietary Desktop app-server to refresh a
+registry snapshot after an MCP server reaches `ready`. Therefore:
+
+- `mcpServerStatus=ready`, `doctor`, `session-bootstrap`, and an independent
+  stdio/HTTP probe are diagnostic layers only; none proves that the current
+  task exposes `mcp__r_studio__*`.
+- A new task must inventory the real tool names before any R work. If no
+  `mcp__r_studio__*` names are present, emit
+  `CODEX_NATIVE_TOOLS_NOT_REGISTERED`, do not fabricate native evidence, and
+  do not send an unsupported signal or restart RStudio.
+- The only successful completion state is a fresh task inventory followed by
+  native `list_sessions`, `execute_r`, `execute_r_async`, and
+  `get_async_result`. A Desktop product fix must refresh that inventory when
+  MCP `ready` arrives; until then the workbench reports the boundary as an
+  explicit blocker rather than hiding it behind a workaround.
+
 ## Compatible Release
 
 This skill collection release `v0.6.3` is paired with the
