@@ -194,6 +194,13 @@ and MCP bridge `0.14.5.post1`. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
+The installer materializes the configured path as a stable launcher. It calls
+the embedded uv-tool Python directly and imports `clauder_mcp.main`, while
+preserving the original uv-generated entry point as `clauder-mcp.uv-tool`.
+This prevents Desktop app-server `ENOENT` failures after uv refreshes a
+symlink or shebang target. The configured path remains unchanged for Codex,
+Claude Code, and Copilot.
+
 The macOS/Linux installer keeps all runtime skill backups by default. Use
 `--backup-retention 0` to make that policy explicit; pass a positive number only
 when older backup pruning is intended.

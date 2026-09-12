@@ -125,6 +125,47 @@ def update_codex_config(
     return Path(result["backup"]) if result.get("backup") else None
 
 
+def _install_stable_bridge_launcher(runtime: Any, *, dry_run: bool = False) -> Path:
+    """Replace uv's symlink entry with a stable, directly executable launcher.
+
+    Desktop app-server reports ENOENT when it follows a stale uv-generated
+    shebang/symlink chain.  The launcher keeps the public path stable while
+    invoking the embedded uv Python directly.
+    """
+    target = runtime.bridge_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if runtime.system == "windows":
+        content = (
+            "@echo off\r\n"
+            f'"{runtime.bridge_python_path}" -c "from clauder_mcp import main; raise SystemExit(main())" %*\r\n'
+        )
+    else:
+        content = (
+            "#!/bin/sh\n"
+            "set -eu\n"
+            f'PYTHON="${{CLAUDER_WORKBENCH_MCP_PYTHON:-{runtime.bridge_python_path}}}"\n'
+            'exec "$PYTHON" -c \'from clauder_mcp import main; raise SystemExit(main())\' "$@"\n'
+        )
+    if dry_run:
+        print(f"Would install stable bridge launcher: {target}")
+        return target
+    if target.is_symlink():
+        backup = target.with_name(target.name + ".uv-tool")
+        if not backup.exists():
+            target.rename(backup)
+        else:
+            target.unlink()
+    elif target.exists():
+        existing = target.read_text(encoding="utf-8", errors="ignore")
+        if existing != content:
+            backup = target.with_name(target.name + ".bak")
+            shutil.copy2(target, backup)
+    _atomic_write(target, content)
+    if runtime.system != "windows":
+        target.chmod(0o755)
+    return target
+
+
 def _skill_sources(repo_root: Path) -> list[Path]:
     skills_root = repo_root / "skills"
     return sorted(
@@ -300,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = repo_root / "runtime-compatibility.json"
     if (not args.skip_r_package or not args.skip_mcp) and not manifest.is_file():
         raise SystemExit("Runtime compatibility manifest is required before updating R or MCP; nothing was installed")
-    if manifest.exists():
+    if manifest.exists() and (not args.skip_r_package or not args.skip_mcp):
         from .compatibility import verify_source
         pair = verify_source(manifest, clauder_dir)
         print(json.dumps({"runtime_compatibility": pair}))
@@ -322,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
             uv or "uv", "tool", "install", "--force", "--from",
             str(clauder_dir / "clauder-mcp"), "clauder-mcp",
         ], dry_run=args.dry_run)
+    # Keep the Codex/Claude/Copilot command path stable across uv upgrades.
+    _install_stable_bridge_launcher(runtime, dry_run=args.dry_run)
     if not args.skip_harness:
         _run([uv or "uv", "tool", "install", "--force", str(repo_root)], dry_run=args.dry_run)
 
