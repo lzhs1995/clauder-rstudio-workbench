@@ -1369,6 +1369,14 @@ def _p6_durable_violations(requirements: list[dict[str, Any]], artifact_checks: 
 
 def cmd_completion_check(args: argparse.Namespace) -> int:
     contract = _load_contract(args.contract)
+    empirical_check = None
+    empirical_path = getattr(args, "empirical_contract", None) or contract.get("empirical_contract")
+    if empirical_path:
+        from .empirical_trace import audit_contract
+        try:
+            empirical_check = audit_contract(load_json(empirical_path))
+        except (OSError, ValueError) as exc:
+            empirical_check = {"pass": False, "errors": [str(exc)]}
     contract_require_files = contract.get("require_file") or contract.get("require_files") or []
     if isinstance(contract_require_files, str):
         contract_require_files = [contract_require_files]
@@ -1451,7 +1459,12 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
         policy = "strict" if args.mode == "formal" else "warn"
     if policy == "skip":
         policy_violations = []
-    if policy_violations and policy == "strict":
+    if empirical_check is not None and not empirical_check["pass"]:
+        exit_code = CONTRACT_FAILED
+        decision = "CONTRACT_FAILED"
+        policy_violations.append("EMPIRICAL-TRACE-CONTRACT-FAILED")
+        reasons.extend(empirical_check["errors"])
+    elif policy_violations and policy == "strict":
         exit_code = CONTRACT_FAILED
         decision = "CONTRACT_FAILED"
     elif policy_violations or not artifacts["ok"]:
@@ -1479,6 +1492,7 @@ def cmd_completion_check(args: argparse.Namespace) -> int:
             "policy": policy,
             "contract": str(args.contract or ""),
             "resource_gate_check": resource_gate_check,
+            "empirical_trace": empirical_check,
         },
     )
     return emit(doc)
@@ -2038,6 +2052,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=["formal", "diagnostic"], default="formal")
     p.add_argument("--policy", choices=["auto", "strict", "warn", "skip"], default="auto")
     p.add_argument("--contract")
+    p.add_argument("--empirical-contract", help="Validate frozen sample/result/precision lineage without running R.")
     p.add_argument("--task-key")
     p.add_argument("--parent-evidence", nargs="*", action="extend", default=[])
     p.add_argument("--require-file", action="append", default=[])

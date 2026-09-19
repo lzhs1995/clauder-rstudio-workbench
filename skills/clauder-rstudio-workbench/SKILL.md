@@ -23,6 +23,9 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - For reusing an already-running ClaudeR session without manual Addin interaction, read [warm-session-reuse.md](references/warm-session-reuse.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
+- For tracing manuscript claims through data, samples, models and outputs, read
+  [empirical-lineage.md](references/empirical-lineage.md). Full tracing and
+  necessary reruns are separate from full model re-estimation.
 
 ## Domain skill routing
 

@@ -20,6 +20,8 @@ the verified numbers with the manuscript. This skill does not replace either.
 - Contract fields and parameter mapping: [comparegroups-api.md](references/comparegroups-api.md)
 - ClaudeR sync/async workflow: [clauder-integration.md](references/clauder-integration.md)
 - Required validation: [validation.md](references/validation.md)
+- For submission refinement and cross-software/sample reconciliation:
+  [manuscript-reconciliation.md](references/manuscript-reconciliation.md)
 
 ## Standard workflow
 
