@@ -7,12 +7,15 @@ the Codex app-server and is only observable from the current task layer.
 """
 from __future__ import annotations
 
-import json
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 from .config import BLOCK, CODEX_CONFIG, EVIDENCE_DIR, LOCAL_CLAUDER_BRIDGE, PASS, PERSISTENT_MCP, UV_CACHE_DIR
 from .evidence import build_evidence, print_json, write_evidence
@@ -22,7 +25,6 @@ def _toml_ok() -> tuple[bool, str | None]:
     if not CODEX_CONFIG.exists():
         return False, f"Codex config missing: {CODEX_CONFIG}"
     try:
-        import tomllib
         raw = CODEX_CONFIG.read_bytes()
         if raw.startswith(b"\xef\xbb\xbf"):
             raw = raw[3:]
@@ -38,7 +40,6 @@ def _server_config() -> tuple[bool, list[str], dict[str, Any]]:
     details: dict[str, Any] = {"config_path": str(CODEX_CONFIG)}
     if not ok:
         return False, reasons, details
-    import tomllib
     raw = CODEX_CONFIG.read_bytes()
     if raw.startswith(b"\xef\xbb\xbf"):
         raw = raw[3:]
@@ -94,8 +95,13 @@ def run(*, client: str = "codex", fail_closed: bool = True) -> int:
     )
     path = write_evidence(evidence, evidence_dir=EVIDENCE_DIR)
     evidence.setdefault("extra", {})["evidence_path"] = str(path)
-    # Hook consumers can display this without parsing human output.
-    print_json({"continue": decision == "PASS", "session_bootstrap": evidence})
+    # Codex rejects unknown top-level fields in SessionStart output. Keep the
+    # detailed preflight receipt in its evidence file, not in a custom JSON key.
+    output: dict[str, Any] = {"continue": decision == "PASS"}
+    if decision != "PASS":
+        output["stopReason"] = "; ".join(evidence["reasons"])
+        output["systemMessage"] = f"ClaudeR startup preflight blocked; evidence: {path}"
+    print_json(output)
     return exit_code if fail_closed else PASS
 
 
