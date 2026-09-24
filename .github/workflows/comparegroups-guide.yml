@@ -34,6 +34,12 @@ jobs:
 
       - uses: r-lib/actions/setup-pandoc@v2
 
+      - name: Install XQuartz for macOS R graphics
+        if: runner.os == 'macOS'
+        # The macOS gdtools binary links /opt/X11/lib/libXrender.1.dylib.
+        # Package installation alone does not prove that it can be loaded.
+        run: brew install --cask xquartz
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           # This repository is a skill collection, not an R package.  The
@@ -55,6 +61,14 @@ jobs:
         run: |
           remotes::install_version("compareGroups", version = "4.10.3", upgrade = "never")
           stopifnot(as.character(packageVersion("compareGroups")) == "4.10.3")
+        shell: Rscript {0}
+
+      - name: Verify R graphics namespaces load
+        run: |
+          for (pkg in c("gdtools", "compareGroups", "flextable")) {
+            loadNamespace(pkg)
+            message(pkg, " ", as.character(packageVersion(pkg)), " loaded")
+          }
         shell: Rscript {0}
 
       - uses: actions/setup-python@v5
