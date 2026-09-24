@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.6 - 2026-09-24
+
+- Emit only Codex-supported SessionStart output fields. Successful preflights
+  no longer fail with `hook returned invalid session start JSON output`; full
+  receipts remain in the evidence files and failed preflights remain blocked.
+- Use the declared `tomli` fallback for bootstrap validation on Python 3.10,
+  and include bootstrap output checks in the cross-platform connection CI.
+
 ## v0.6.1 - Unreleased
 
 - **Breaking validation behavior:** specs that previously treated repeated IDs

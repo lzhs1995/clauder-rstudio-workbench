@@ -1,6 +1,8 @@
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,8 +26,12 @@ class SessionBootstrapTests(unittest.TestCase):
             with patch.object(session_bootstrap, "CODEX_CONFIG", config), \
                  patch.object(session_bootstrap, "PERSISTENT_MCP", bridge), \
                  patch.object(session_bootstrap, "LOCAL_CLAUDER_BRIDGE", bridge), \
-                 patch.object(session_bootstrap, "EVIDENCE_DIR", root / "evidence"):
+                 patch.object(session_bootstrap, "EVIDENCE_DIR", root / "evidence"), \
+                 redirect_stdout(io.StringIO()) as stdout:
                 self.assertEqual(session_bootstrap.run(fail_closed=True), 0)
+                # Codex 0.156.1 denies unknown SessionStart output fields.
+                # The full receipt must not leak into a custom top-level key.
+                self.assertEqual(json.loads(stdout.getvalue()), {"continue": True})
                 records = list((root / "evidence").glob("*_session_bootstrap_*.json"))
                 self.assertEqual(len(records), 1)
                 doc = json.loads(records[0].read_text())
@@ -39,8 +45,17 @@ class SessionBootstrapTests(unittest.TestCase):
             config.write_text("not = [valid\n", encoding="utf-8")
             with patch.object(session_bootstrap, "CODEX_CONFIG", config), \
                  patch.object(session_bootstrap, "LOCAL_CLAUDER_BRIDGE", root / "missing"), \
-                 patch.object(session_bootstrap, "EVIDENCE_DIR", root / "evidence"):
+                 patch.object(session_bootstrap, "EVIDENCE_DIR", root / "evidence"), \
+                 redirect_stdout(io.StringIO()) as stdout:
                 self.assertEqual(session_bootstrap.run(fail_closed=True), 3)
+                output = json.loads(stdout.getvalue())
+                self.assertEqual(set(output), {"continue", "stopReason", "systemMessage"})
+                self.assertIs(output["continue"], False)
+                self.assertIn("Codex config is not valid TOML", output["stopReason"])
+                records = list((root / "evidence").glob("*_session_bootstrap_*.json"))
+                self.assertEqual(len(records), 1)
+                self.assertEqual(json.loads(records[0].read_text())["decision"], "BLOCK")
+                self.assertIn(str(records[0]), output["systemMessage"])
 
 
 if __name__ == "__main__":
