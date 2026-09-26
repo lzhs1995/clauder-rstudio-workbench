@@ -43,3 +43,25 @@ session and job; a saved log, compatible numbers or a found output is insufficie
 Documented scientific partials must remain visible even when a manuscript is ready.
 If NLM finds a serious discrepancy, return to the affected local evidence chain;
 do not let an external review opinion directly change a coefficient or study design.
+
+## Result assembly and relocated caches
+
+Checker 1.1 supports tables with `row_keys`, for example `["model_id", "term"]`,
+and an explicit `expected_rows` list of key arrays. Declare the current full key
+set, optional `expected_n`, and `expected_cell_rows` (`key` array plus `values`
+object). Legacy `row_key` contracts remain valid. Do not join compound keys with
+an ambiguous separator or use a historical chapter's row count as a default.
+
+A full p-value vector assigned to a one-row `data.frame` can silently recycle
+scalar columns and multiply rows. Bind each scalar to its model/term, check
+lengths before construction, then validate complete unique keys and cell values.
+Correcting assembly in a new output directory does not require re-estimation
+when saved objects already contain the correct values. Retain the failed table
+and demonstrate the failure with a synthetic negative case.
+
+A readable archive symlink does not prove a canonical-root gate or an ancestor
+dependency works. Preserve required roots, or declare a new portable entry with
+provenance mapping. Execute each promised entry and compare actual outputs;
+label cached postprocessing separately from model re-estimation. Native R and
+Rscript reading the same cache are not independent scientific replications.
+Skill installation must not restart a live R process or replace its fixed code.

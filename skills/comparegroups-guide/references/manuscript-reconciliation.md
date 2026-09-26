@@ -25,3 +25,10 @@ Resolve it against the exact table variant and local data chain, preserve the ra
 report and quote, and update only confirmed errors. Then regenerate affected
 outputs and invalidate their downstream review. The numerical engine and existing
 compareGroups validation remain authoritative; long-text review adds a separate gate.
+
+When combining variants, retain compound table/variant/group/row keys. Do not
+bind a p-value vector to one display row and rely on R recycling. Check the full
+expected key set, group denominators and missing counts after assembly. The
+workbench empirical checker accepts `row_keys` and array-shaped `expected_rows`.
+These declared-result checks do not change analysis units, make dependent waves
+independent, or authorize unrelated table regeneration.

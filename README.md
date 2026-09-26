@@ -2,7 +2,7 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.6.3` release line targets the published ClaudeR
+The `v0.6.7` release line targets the published ClaudeR
 [`v0.14.1.9002-lzhs.1`](https://github.com/lzhs1995/ClaudeR/releases/tag/v0.14.1.9002-lzhs.1)
 pair: R `0.14.1.9002` / bridge `0.14.5.post1`. Exact source identity and critical
 hashes are in [runtime-compatibility.json](runtime-compatibility.json).
@@ -60,19 +60,19 @@ Use new, non-existing versioned destinations; never overwrite a dirty checkout.
 
 ```bash
 git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
-git clone --branch v0.6.3 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-rstudio-workbench-v0.6.3"
-cd "$HOME/projects/clauder-rstudio-workbench-v0.6.3"
+git clone --branch v0.6.7 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-rstudio-workbench-v0.6.7"
+cd "$HOME/projects/clauder-rstudio-workbench-v0.6.7"
 ./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1" --configure-codex --sync-agents-skill --backup-retention 0
 "$HOME/.local/bin/clauder-workbench" doctor --expect-client codex --check-toml-parse
 ```
 
-Use a clean checkout of the exact `v0.6.3` tag with these commands. Do not
+Use a clean checkout of the exact `v0.6.7` tag with these commands. Do not
 overwrite a worktree that contains local changes.
 
 On Windows PowerShell:
 
 ```powershell
-git clone --branch v0.6.3 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
+git clone --branch v0.6.7 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 & "$env:USERPROFILE\bin\clauder-workbench.cmd" doctor
@@ -121,7 +121,7 @@ python -m clauder_workbench doctor
 To make the short `clauder-workbench doctor` command available in future terminals, rerun the installer with `-AddHarnessToPath`.
 
 If the Windows `git clone` is blocked by a proxy or reset connection, use the
-  `v0.6.3` tag-zip bootstrap after that release is published:
+  `v0.6.7` tag-zip bootstrap after that release is published:
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -129,9 +129,9 @@ $dest = "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 if (Test-Path -LiteralPath $dest) { throw "Destination already exists: $dest" }
 $staging = Join-Path $env:TEMP ("clauder-workbench-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $staging | Out-Null
-$zip = Join-Path $staging "clauder-rstudio-workbench-v0.6.3.zip"
+$zip = Join-Path $staging "clauder-rstudio-workbench-v0.6.7.zip"
 $unpacked = Join-Path $staging "unpacked"
-Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.3/clauder-rstudio-workbench-v0.6.3.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0.6.7/clauder-rstudio-workbench-v0.6.7.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
 $roots = @(Get-ChildItem -LiteralPath $unpacked -Directory)
 if ($roots.Count -ne 1) { throw "Expected one repository root in release ZIP" }
@@ -503,9 +503,9 @@ Confirm all three layers:
 To upgrade macOS/Linux and reinstall the paired ClaudeR worktree:
 
 ```bash
-git clone --branch v0.6.3 --depth 1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-workbench-v0.6.3-release"
+git clone --branch v0.6.7 --depth 1 https://github.com/lzhs1995/clauder-rstudio-workbench.git "$HOME/projects/clauder-workbench-v0.6.7-release"
 git clone --branch v0.14.1.9002-lzhs.1 --depth 1 https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-release"
-cd "$HOME/projects/clauder-workbench-v0.6.3-release"
+cd "$HOME/projects/clauder-workbench-v0.6.7-release"
 ./install.sh --clauder-dir "$HOME/projects/ClaudeR-v0.14.1.9002-release" --configure-codex --sync-agents-skill --sync-clauder-alias --backup-retention 0
 ```
 
@@ -514,7 +514,7 @@ For the published Windows release:
 ```powershell
 cd "$env:USERPROFILE\projects\clauder-rstudio-workbench"
 git fetch --tags
-git checkout v0.6.3
+git checkout v0.6.7
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
 ```
 

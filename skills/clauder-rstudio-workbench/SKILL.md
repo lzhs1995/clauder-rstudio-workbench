@@ -346,7 +346,7 @@ registry snapshot after an MCP server reaches `ready`. Therefore:
 
 ## Compatible Release
 
-This skill collection release `v0.6.3` is paired with the
+This skill collection release `v0.6.7` is paired with the
 `lzhs1995/ClaudeR` published tag `v0.14.1.9002-lzhs.1`, R package `0.14.1.9002`, and MCP
 bridge `0.14.5.post1`. See the collection's `runtime-compatibility.json` for exact
 commit and critical-file hashes. Installers verify the pair before replacing

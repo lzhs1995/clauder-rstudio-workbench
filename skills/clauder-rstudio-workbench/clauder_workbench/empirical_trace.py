@@ -11,6 +11,8 @@ import hashlib
 import json
 from pathlib import Path
 
+CHECKER_VERSION = "1.1"
+
 
 class TraceError(ValueError):
     pass
@@ -30,6 +32,9 @@ def checked_file(ref):
     path = Path(ref["path"])
     if not path.is_absolute() or not path.is_file() or digest(path) != ref["sha256"]:
         raise TraceError("FILE_MISSING_OR_CHANGED")
+    if "bytes" in ref and (type(ref["bytes"]) is not int or ref["bytes"] < 0
+                           or path.stat().st_size != ref["bytes"]):
+        raise TraceError("FILE_SIZE_MISMATCH")
     return path
 
 
@@ -46,7 +51,9 @@ def rows(ref):
 
 def keyed(ref, keys):
     columns, values = rows(ref)
-    if not keys or not set(keys) <= set(columns):
+    if (not isinstance(keys, list) or not keys
+            or any(not isinstance(k, str) or not k.strip() for k in keys)
+            or len(keys) != len(set(keys)) or not set(keys) <= set(columns)):
         raise TraceError("EXPLICIT_SAMPLE_KEYS_REQUIRED")
     index = {}
     for value in values:
@@ -55,6 +62,66 @@ def keyed(ref, keys):
             raise TraceError("MISSING_OR_DUPLICATED_SAMPLE_KEY")
         index[key] = value
     return columns, index
+
+
+def audit_table(table):
+    """Check a declared result row set without assembling or repairing results.
+
+    Legacy row_key/expected_cells stay valid. row_keys uses tuple-shaped JSON
+    arrays so model/term/group values never need an ambiguous joined string.
+    """
+    composite = "row_keys" in table
+    if composite and "row_key" in table:
+        raise TraceError("TABLE_KEY_CONTRACT_AMBIGUOUS")
+    keys = table["row_keys"] if composite else [table["row_key"]]
+    columns, index = keyed(table["artifact"], keys)
+    required = table.get("required_columns", [])
+    if (not isinstance(required, list) or any(not isinstance(k, str) for k in required)
+            or len(required) != len(set(required)) or not set(required) <= set(columns)):
+        raise TraceError("TABLE_COLUMNS_MISSING")
+    if "expected_n" in table and (type(table["expected_n"]) is not int
+                                   or table["expected_n"] != len(index)):
+        raise TraceError("TABLE_ROW_COUNT_MISMATCH")
+
+    def row_tuple(value):
+        value = value if composite else [value]
+        if (not isinstance(value, list) or len(value) != len(keys)
+                or any(not isinstance(v, str) or not v.strip() for v in value)):
+            raise TraceError("TABLE_EXPECTED_KEY_INVALID")
+        return tuple(value)
+
+    expected = table.get("expected_rows")
+    if composite and expected is None:
+        raise TraceError("TABLE_EXPECTED_ROW_SET_REQUIRED")
+    if expected is not None:
+        if not isinstance(expected, list):
+            raise TraceError("TABLE_EXPECTED_KEY_INVALID")
+        expected_keys = [row_tuple(value) for value in expected]
+        if len(expected_keys) != len(set(expected_keys)):
+            raise TraceError("TABLE_EXPECTED_KEYS_DUPLICATED")
+        if set(index) != set(expected_keys):
+            raise TraceError("TABLE_ROWS_MISSING_OR_EXTRA")
+
+    cells = table.get("expected_cells", {})
+    if not isinstance(cells, dict) or (composite and cells):
+        raise TraceError("TABLE_USE_EXPECTED_CELL_ROWS_FOR_COMPOSITE_KEYS")
+    checks = [((key,), values) for key, values in cells.items()]
+    cell_rows = table.get("expected_cell_rows", [])
+    if not isinstance(cell_rows, list):
+        raise TraceError("TABLE_CELL_ROWS_INVALID")
+    for row in cell_rows:
+        if not isinstance(row, dict) or set(row) != {"key", "values"}:
+            raise TraceError("TABLE_CELL_ROWS_INVALID")
+        checks.append((row_tuple(row["key"]), row["values"]))
+    seen = set()
+    for key, values in checks:
+        if key in seen or not isinstance(values, dict) or not values:
+            raise TraceError("TABLE_CELL_ROWS_INVALID")
+        seen.add(key)
+        if key not in index or any(k not in columns or index[key][k] != str(v) for k, v in values.items()):
+            raise TraceError("TABLE_DENOMINATOR_LABEL_OR_MISSINGNESS_MISMATCH")
+    return {"row_keys": keys, "rows": len(index), "columns": columns,
+            "expected_row_set_checked": expected is not None, "checked_cell_rows": len(checks)}
 
 
 def sample_fingerprint(ref, keys):
@@ -102,7 +169,7 @@ def compare_csv(spec):
 
 
 def audit_contract(contract):
-    errors, partials, comparisons, samples = [], [], [], []
+    errors, partials, comparisons, samples, tables = [], [], [], [], []
     try:
         if contract.get("schema_version") != 1 or not contract.get("task_id"):
             raise TraceError("TRACE_IDENTITY_REQUIRED")
@@ -127,14 +194,7 @@ def audit_contract(contract):
         if not samples:
             raise TraceError("EMPIRICAL_SAMPLE_CONTRACT_REQUIRED")
         for table in contract.get("tables", []):
-            columns, index = keyed(table["artifact"], [table["row_key"]])
-            if not set(table.get("required_columns", [])) <= set(columns):
-                raise TraceError("TABLE_COLUMNS_MISSING")
-            if table.get("expected_rows") is not None and set(index) != {(x,) for x in table["expected_rows"]}:
-                raise TraceError("TABLE_ROWS_MISSING_OR_EXTRA")
-            for row_name, fields in table.get("expected_cells", {}).items():
-                if (row_name,) not in index or any(index[(row_name,)].get(k) != str(v) for k, v in fields.items()):
-                    raise TraceError("TABLE_DENOMINATOR_LABEL_OR_MISSINGNESS_MISMATCH")
+            tables.append(audit_table(table))
         for spec in contract.get("comparisons", []):
             comparisons.append(compare_csv(spec))
         for model in contract.get("models", []):
@@ -165,7 +225,8 @@ def audit_contract(contract):
                 raise TraceError("FULL_REPRODUCTION_NOT_PROVEN")
     except (ValueError, KeyError, TypeError, OSError) as exc:
         errors.append(str(exc))
-    return {"schema_version": 1, "pass": not errors, "errors": errors, "samples": samples,
+    return {"schema_version": 1, "checker_version": CHECKER_VERSION,
+            "pass": not errors, "errors": errors, "samples": samples, "tables": tables,
             "comparisons": comparisons, "documented_partials": partials,
             "status": "OPEN" if errors else "CLOSED_WITH_DOCUMENTED_PARTIALS" if partials else "CLOSED",
             "full_reproduction": not errors and contract.get("full_reproduction") is True,
