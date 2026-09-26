@@ -15,10 +15,14 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("bootstrap-test-" + [guid]::Ne
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 $script:fixtureZip = ""
 $script:installCalled = $false
+$projectText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "../../pyproject.toml") -Raw
+$releaseVersion = [regex]::Match($projectText, '(?m)^version = "([^"]+)"').Groups[1].Value
+if (-not $releaseVersion) { throw "Missing package release version" }
+$script:expectedReleaseUrl = "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v$releaseVersion/clauder-rstudio-workbench-v$releaseVersion.zip"
 
 function Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile)
-    if ($Uri -notmatch '^https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v0\.6\.3/clauder-rstudio-workbench-v0\.6\.3\.zip$') {
+    if ($Uri -cne $script:expectedReleaseUrl) {
         throw "Unexpected release URL"
     }
     Copy-Item -LiteralPath $script:fixtureZip -Destination $OutFile
