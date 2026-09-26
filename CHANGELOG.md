@@ -1,3 +1,7 @@
+## 0.6.7 — 2026-09-26
+
+Add compound result-key and value-map checks, preserve cached-postprocessing scope, and align collection metadata with the unchanged pinned ClaudeR runtime. Includes prior empirical workflow PR #20; later startup fixes remain intact.
+
 # Changelog
 
 ## v0.6.6 - 2026-09-24

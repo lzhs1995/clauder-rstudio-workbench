@@ -23,6 +23,9 @@ This skill is the operating protocol for using ClaudeR as a live RStudio workben
 - For reusing an already-running ClaudeR session without manual Addin interaction, read [warm-session-reuse.md](references/warm-session-reuse.md).
 - For tool selection, read [clauder-tool-map.md](references/clauder-tool-map.md).
 - For completion checks, read [verification-and-recovery.md](references/verification-and-recovery.md).
+- For tracing manuscript claims through data, samples, models and outputs, read
+  [empirical-lineage.md](references/empirical-lineage.md). Full tracing and
+  necessary reruns are separate from full model re-estimation.
 
 ## Domain skill routing
 
@@ -343,7 +346,7 @@ registry snapshot after an MCP server reaches `ready`. Therefore:
 
 ## Compatible Release
 
-This skill collection release `v0.6.3` is paired with the
+This skill collection release `v0.6.7` is paired with the
 `lzhs1995/ClaudeR` published tag `v0.14.1.9002-lzhs.1`, R package `0.14.1.9002`, and MCP
 bridge `0.14.5.post1`. See the collection's `runtime-compatibility.json` for exact
 commit and critical-file hashes. Installers verify the pair before replacing

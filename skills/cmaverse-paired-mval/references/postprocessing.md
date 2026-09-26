@@ -57,9 +57,9 @@ gtsave(temp_table.t, filename = filename.png, expand = 30, vwidth = 1400, vheigh
 
 - Append a run tag (e.g. `sameboot_n100`) to every output filename so original
   files are never overwritten.
-- Repeated `gtsave()` to the same docx on Windows can throw
-  `pandoc document conversion failed with error 22`; delete the old docx/png
-  before writing, exactly as the original script does.
+- Repeated `gtsave()` to an existing DOCX can fail. Use a fresh versioned output
+  path, and inspect the retained error; error 22 alone does not prove a collision.
+  Do not delete archived DOCX/PNG files or overwrite a validated run to retry.
 - Pin Chrome to `C:/Program Files/Google/Chrome/Application/chrome.exe`.
 
 ## Moderation plots and sensitivity
@@ -91,3 +91,16 @@ gt-errors CSV, a summary-objects RData, and execution logs; and per mediator a
 set of `table_*`, `gt_*` (docx/png), `estimand_*`, `tab_univ_*`, `Evalues_*`, and
 `plot_*` (CDE/rpe) files. Keep `gt_errors` empty as an explicit gate
 (`gt_error_rows=0`).
+
+## Assemble by compound identity
+
+Use mediator/group/mval/effect as result keys. Extract a scalar estimate, p-value
+and interval from the same named effect before constructing a row; assigning the
+whole p-vector to a one-row `data.frame` can silently expand it. Validate the
+complete key set and value mapping against the retained full objects. Expected
+effect counts come from the current specification and engine version.
+
+Postprocessing, successful saved bootstrap draws and replicate convergence are
+different claims. Matching cached outputs from two entrypoints does not re-run
+the bootstrap. Report CI method, requested/saved/valid draws, and paired-index
+evidence separately; two marginal significance labels do not test their contrast.
