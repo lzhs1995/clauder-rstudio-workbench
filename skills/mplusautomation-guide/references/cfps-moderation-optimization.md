@@ -78,3 +78,10 @@ intervals; use continuous moderator information and show data density; and write
 observational, conditional-prediction language. It explicitly rejects changing
 cut points, dropping controls, choosing an imputation member, averaging p-values,
 or selecting the smallest p-value to make the hypothesis appear supported.
+
+The reusable implementation is `scripts/cfps_moderation_readback.R`. Call
+`run_cfps_moderation_readback(csv_path, out_dir)` from the live RStudio session
+with an isolated output directory. It verifies the required columns, preserves
+the recorded within-output corrections, computes the declared all-row
+sensitivity, and writes row-level/family CSVs, a zero-line PNG, and a short
+conclusion memo. It never calls Mplus or overwrites the source CSV.
