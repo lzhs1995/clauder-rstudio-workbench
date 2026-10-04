@@ -172,6 +172,9 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-moderation-readback.md](references/cfps-moderation-readback.md):
   read-only inventory of existing moderation `.out` files, interpretation
   boundaries, and pre-specified paths for future checks.
+- [cfps-moderation-optimization.md](references/cfps-moderation-optimization.md):
+  theory-led ways to improve information and power while prohibiting
+  post-hoc significance selection.
 - [cfps-manuscript-provenance.md](references/cfps-manuscript-provenance.md):
   combined table/figure/source/runtime checkpoint that keeps historical draft
   reproduction separate from scientific release and downstream CHARLS/NLM gates.
