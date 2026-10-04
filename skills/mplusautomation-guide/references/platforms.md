@@ -57,6 +57,24 @@ are dependency maintenance, not evidence of an operating-system defect.
 Convert `/mnt/c/...` into `C:/...` at the R submission boundary. Preserve the
 Windows service's user home, package library, executable and discovery files.
 
+The same normalization is required when a portable JSON receipt is read by
+both WSL Python and native Windows Python. A receipt may store `/mnt/c/...` so
+that it remains readable by the Linux controller; before a Windows byte/hash
+check, translate the drive prefix to `C:\\...` (or use `Path('C:/...')`). Do
+not treat an unconverted WSL path as a missing source. Record the original
+portable spelling and the resolved runtime path in the check result. This
+small adapter prevents a false source-mutation or missing-file alarm while
+keeping the Windows hash calculation authoritative.
+
+```python
+from pathlib import Path
+
+def for_windows_runtime(raw: str) -> Path:
+    if raw.startswith('/mnt/') and len(raw) > 6 and raw[5].isalpha() and raw[6] == '/':
+        return Path(raw[5].upper() + ':/' + raw[7:])
+    return Path(raw)
+```
+
 Run Windows diagnostics with native Windows Python/PowerShell. These prove the
 Windows configuration; they do not automatically establish the Linux agent
 process identity required by strict `ensure-ready --require-native`. Retain
