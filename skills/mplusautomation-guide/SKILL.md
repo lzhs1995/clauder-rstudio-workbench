@@ -133,6 +133,9 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-lrt-disposition.md](references/cfps-lrt-disposition.md):
   preserve historical LRT displays while withholding formal p-value release
   until exact pair, nesting and pooling contracts are complete.
+- [cfps-lrt-data-identity.md](references/cfps-lrt-data-identity.md):
+  verify real `.dat` hashes and the second-layer primary-MI crosswalk before
+  releasing D2 or pooled LRT results.
 - [cfps-mi-v3-hold.md](references/cfps-mi-v3-hold.md):
   separate successful MI data readback from income-definition and convergence
   acceptance before submitting downstream consumers.
