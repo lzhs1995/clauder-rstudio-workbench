@@ -73,6 +73,12 @@ The source audit receipt is:
 
 `reports/cfps_deferred_recovery_queue_20261004/cfps_deferred_output_error_audit_v1.{csv,json,md}`
 
+The native ClaudeR/MplusAutomation spot-check receipt is
+`reports/cfps_deferred_recovery_queue_20261004/cfps_deferred_mplusautomation_readback_v1.md`.
+It demonstrates that `readModels()` can parse a non-normal file (134 parameter
+rows and 17 warning blocks) while preserving the separate MI completion and
+standard-error validity gate.
+
 It records `new_mplus_submission=0` and `source_mutation=false`. The report is
 an evidence boundary for historical reconciliation; it is not a scientific
 release and does not authorize downstream CHARLS adoption or final PDF review.
