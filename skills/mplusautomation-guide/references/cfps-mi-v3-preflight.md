@@ -24,3 +24,6 @@ MI v3 当前只能读回，不能物化下游 producer/consumer。新估计必�
 `work/cfps_mi_v3_source_contract_audit_20261004.py`，回执为
 `reports/cfps_mi_v3_hold_20261004/cfps_mi_v3_source_contract_audit_v1.{md,json}`。
 这解释了为什么负插补值必须进入插补尺度/支持范围修复，而不能用截零或取绝对值代替。
+候选修复路径（原始尺度有界、变换/反变换、零值两部分）及各自放行条件见
+`reports/cfps_mi_v3_hold_20261004/cfps_mi_v3_repair_options_v1.md`；在方法裁决和
+资源门同时满足前，不物化任何下游模型。
