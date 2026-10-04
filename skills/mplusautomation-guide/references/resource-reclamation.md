@@ -60,3 +60,10 @@ explicit cancellation, failure evidence and no duplicate submissions. Report
 Validation must include actual reclaimed identities, protected-session survival,
 monitor heartbeat and an estimate or explicit current hold. Record acceptance
 separately for resource recovery, model execution and manuscript conclusions.
+
+On Windows hosts coordinated from WSL, pass
+`--windows-profile <fresh-profile.json>` to `resource_admission.py` and set the
+same path as `windows_memory_profile` for `mplus_queue.py`. The profile must be
+regenerated before a claim and is rejected after five minutes by default. If it
+cannot be read, the result is an explicit `host_memory_unverified` hold; falling
+back to WSL's optimistic available-memory number would make the scheduler unsafe.

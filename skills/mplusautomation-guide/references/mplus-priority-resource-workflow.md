@@ -90,3 +90,14 @@ WSL 容器，不能靠重复 `gc()` 获得持续释放。随后执行限定清�
 页面文件。RStudio 的异步接口只负责提交和轮询，模型数据留在 durable 文件，
 避免完整 MI 数据在多个 R worker 中重复 marshal。只有资源门控和输入/科学合同
 同时通过时，才允许下一批 Mplus。
+
+### WSL 调度器的主机内存边界
+
+本机实测还暴露了一个容易误判的边界：WSL 侧 `psutil.virtual_memory()` 曾显示
+约 3.4 GiB available，但 Windows 侧同一时刻只有约 1.15 GiB free physical。
+如果队列直接使用 WSL 数字，会错误放行 Mplus。当前 guide 已让
+`mplus_queue.py` 和 `resource_admission.py` 支持带 `generated_at` 的
+Windows profile；在 WSL 中没有新鲜 profile 时，准入理由固定为
+`host_memory_unverified`，而不是用 WSL 数字猜测。profile 默认五分钟过期，
+每次 claim/tick 都重新读取。该机制只收紧准入，不会杀死 RStudio、WSL、MCP
+或其他会话；确认可恢复检查点后再由会话所有者清理外部协调进程。

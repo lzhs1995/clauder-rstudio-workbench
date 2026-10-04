@@ -58,12 +58,71 @@ def sha256(path):
     return h.hexdigest()
 
 
-def resource_snapshot():
+def _is_wsl():
+    """Return True when the queue is running inside WSL.
+
+    ``psutil.virtual_memory()`` reports the WSL VM's view in this case.  That
+    view can show several GiB available while Windows has less than one GiB of
+    physical headroom, which is unsafe for admitting Mplus.
+    """
+    if os.name == "nt":
+        return False
+    try:
+        return "microsoft" in Path("/proc/version").read_text(encoding="utf-8", errors="ignore").lower()
+    except OSError:
+        return False
+
+
+def _read_windows_profile(path, max_age=300):
+    path = Path(path).expanduser().resolve()
+    payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    stamp = payload.get("generated_at")
+    if not isinstance(stamp, str):
+        raise ValueError("Windows memory profile has no generated_at")
+    generated = dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=dt.timezone.utc)
+    age = max(0.0, (dt.datetime.now(dt.timezone.utc) - generated).total_seconds())
+    if age > max_age:
+        raise ValueError(f"Windows memory profile is stale ({age:.1f}s > {max_age:.1f}s)")
+    system = payload.get("profile", {}).get("system", {})
+    required = ("free_phys_gib", "total_phys_gib", "free_virtual_gib", "commit_limit_gib", "committed_gib")
+    if any(not isinstance(system.get(key), (int, float)) for key in required):
+        raise ValueError("Windows memory profile is missing numeric system fields")
+    if system["total_phys_gib"] <= 0 or system["commit_limit_gib"] <= 0:
+        raise ValueError("Windows memory profile has invalid capacity")
+    return {
+        "available_gib": float(system["free_phys_gib"]),
+        "total_gib": float(system["total_phys_gib"]),
+        "free_virtual_gib": float(system["free_virtual_gib"]),
+        "committed_gib": float(system["committed_gib"]),
+        "commit_limit_gib": float(system["commit_limit_gib"]),
+        "profile_age_sec": age,
+        "profile_path": str(path),
+    }
+
+
+def resource_snapshot(windows_profile=None, max_profile_age_sec=300):
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage(Path.cwd().anchor or "/")
-    return dict(at=time.time(), memory_percent=memory.percent,
-                available_gib=memory.available / 2**30, total_gib=memory.total / 2**30,
-                cpu_percent=psutil.cpu_percent(interval=0.1), disk_free_gib=disk.free / 2**30)
+    snapshot = dict(at=time.time(), memory_percent=memory.percent,
+                    available_gib=memory.available / 2**30, total_gib=memory.total / 2**30,
+                    cpu_percent=psutil.cpu_percent(interval=0.1), disk_free_gib=disk.free / 2**30,
+                    source="psutil", host_memory_unverified=False)
+    if windows_profile:
+        try:
+            host = _read_windows_profile(windows_profile, max_profile_age_sec)
+            snapshot.update(host, source="windows_profile")
+            snapshot["memory_percent"] = 100 * (1 - snapshot["available_gib"] / snapshot["total_gib"])
+            snapshot["commit_percent"] = 100 * snapshot["committed_gib"] / snapshot["commit_limit_gib"]
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            snapshot.update(source="windows_profile_error", host_memory_unverified=True,
+                            resource_error=str(exc), profile_path=str(Path(windows_profile)))
+    elif _is_wsl():
+        # Never use WSL's optimistic memory view for a new Windows Mplus claim.
+        snapshot.update(source="wsl_psutil_unverified", host_memory_unverified=True,
+                        resource_error="Windows host memory profile was not supplied")
+    return snapshot
 
 
 def complete_input_manifest(payload):
@@ -107,6 +166,8 @@ DEFAULT_POLICY = dict(memory_hold_percent=90, memory_resume_percent=85,
 
 def admission_reason(snapshot, running, candidate, limit, policy=None):
     policy = {**DEFAULT_POLICY, **(policy or {})}
+    if snapshot.get("host_memory_unverified"):
+        return "host_memory_unverified"
     if len(running) >= limit:
         return "parallel_limit"
     # 作业类别限制只控制准入，不改统计输入或终止已运行的模型。
@@ -212,6 +273,13 @@ class Queue:
         config = self.root / "config.json"
         settings = json.loads(config.read_text(encoding="utf-8-sig")) if config.exists() else {}
         self.policy = {**DEFAULT_POLICY, **settings.get("resource_policy", {})}
+        self.windows_memory_profile = settings.get("windows_memory_profile")
+        if self.windows_memory_profile:
+            profile = Path(self.windows_memory_profile)
+            if not profile.is_absolute():
+                profile = self.root / profile
+            self.windows_memory_profile = str(profile)
+        self.profile_max_age_sec = float(self.policy.get("windows_profile_max_age_sec", 300))
         self.producer_state_files = settings.get("producer_state_files", [])
         self.mplus_command = settings.get("mplus")
         # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
@@ -416,7 +484,7 @@ class Queue:
         return running
 
     def claim(self, worker, snapshot=None):
-        snapshot = snapshot or resource_snapshot()
+        snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
         with self.transaction():
             if not self.get("enabled"):
                 return dict(status="waiting", reason="disabled")
@@ -590,7 +658,7 @@ class Queue:
             return result
 
     def tick(self, snapshot=None):
-        snapshot = snapshot or resource_snapshot()
+        snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
         with self.transaction():
             if snapshot["at"] - self.get("last_sample") < 30:
                 return

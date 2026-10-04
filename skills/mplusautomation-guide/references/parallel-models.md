@@ -99,6 +99,16 @@ Override the numerical thresholds with `resource_policy` in the queue root's
 reservations as well as the next task's budget. This deliberately conservative
 rule protects against simultaneous claims before Mplus has allocated its memory.
 
+When the queue runs under WSL on a Windows host, configure
+`windows_memory_profile` in `config.json` to a fresh JSON snapshot produced by
+the Windows-side profiler. The queue then uses Windows free physical memory and
+commit data, and rejects a claim with `host_memory_unverified` when the profile
+is missing or older than `windows_profile_max_age_sec` (default 300 seconds).
+WSL's own `psutil.virtual_memory()` view is never accepted as a Windows
+admission signal. This prevents an apparently healthy WSL VM from launching an
+Mplus job while the Windows host is already paging. A profile is evidence for
+admission only; it does not terminate or reprioritize unrelated processes.
+
 Optional task `dispatch_priority` overrides `priority`; `execution_class` and
 `resource_policy.max_running_by_class` limit how many members of a costly class
 can run simultaneously. Dependencies and resource budgets are checked after
