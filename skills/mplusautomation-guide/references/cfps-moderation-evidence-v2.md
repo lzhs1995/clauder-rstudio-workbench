@@ -28,3 +28,9 @@ NotebookLM 的 follow-up 进一步把顺序固定为：先完成参数/协方差
 不得平均 MI p 值或只画/只报告显著简单斜率。
 
 完整审计图和结论见任务目录同名 `reports/cfps_moderation_evidence_v2_20261004/`。
+
+本轮 ClaudeR/RStudio v3 只读回执为
+`reports/cfps_moderation_evidence_v2_20261004/cfps_moderation_clauder_readback_v3.md`，并生成
+`cfps_moderation_pvalue_family_clauder_v3.png`。v3 按 `type × moderator` 汇总名义、BH
+和 Bonferroni 命中数，修正了分组汇总时的排序风险；总数仍为 12、5、5。它明确保留
+“无 VCOV 不释放联合调节显著性”的门控，不会因图表中出现信号而改写研究结论。
