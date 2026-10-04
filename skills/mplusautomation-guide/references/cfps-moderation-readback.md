@@ -36,3 +36,10 @@ covariance tables, which are not a VCOV for the interaction regression
 coefficients. The reproducible read-only entry point is
 `work/cfps_moderation_raw_tech3_scan_20261004.py`, with receipt
 `reports/cfps_moderation_evidence_v2_20261004/cfps_moderation_raw_tech3_scan_v1.{md,json}`.
+
+The corresponding 56 historical `.inp` files all contain `MODEL CONSTRAINT`
+and `XWITH`, but request `TECH3` in 0/56 inputs (TECH8 is requested in 52/56).
+This confirms that missing interaction-parameter VCOV is an input-contract
+limitation. The input-side scan is reproducible from
+`work/cfps_moderation_input_output_contract_scan_20261004.py`; its receipt is
+`reports/cfps_moderation_evidence_v2_20261004/cfps_moderation_input_output_contract_scan_v1.{md,json}`.
