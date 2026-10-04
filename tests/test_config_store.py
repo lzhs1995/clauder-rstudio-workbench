@@ -31,11 +31,14 @@ tool_timeout_sec=600
 [mcp_servers."r-studio".env]
 CUSTOM="unchanged"
 NO_PROXY="internal.example"
-'''
+        '''
         self.path.write_text(text, encoding='utf-8')
+        original_bytes = self.path.read_bytes()
         result = store.update_config(self.path, **self.kw)
-        self.assertEqual(Path(result['backup']).read_text(), text)
-        updated = self.path.read_text()
+        # Path.read_text() uses the Windows ANSI code page when no encoding is
+        # supplied; configuration backups are UTF-8 bytes on every platform.
+        self.assertEqual(Path(result['backup']).read_bytes(), original_bytes)
+        updated = self.path.read_text(encoding='utf-8')
         self.assertIn('# user comment', updated)
         doc = tomlkit.parse(updated)
         entry = doc['mcp_servers']['r-studio']

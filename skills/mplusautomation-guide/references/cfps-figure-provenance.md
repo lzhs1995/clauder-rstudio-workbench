@@ -68,6 +68,25 @@ sample-selection 生成证据为 0/6、结构路径图生成证据为 0/6，也�
 原作者生产软件的推断；只有找到图形原始源文件、真实生产脚本或带生成路径的历史
 receipt，才可关闭该门。
 
+### 2026-10-04 v2 纠偏：语义 producer 与图形 receipt 分开
+
+逐行复核 `relative.R` 后，两个 Figure 3.1 图形的模型/样本语义 producer 已经定位，
+不能再表述为“没有 R 来源”：
+
+- 样本流程图的输入、失访/分析/插补合并、计数、标签和描述性表在
+  `relative.R:7400-7458`、`:7506-7544`；
+- 结构路径图中的 `i1/s1`、`i5/s5` 和 `i5 on i4 i1`、`s5 on i4 s4 i5 i1 s1`
+  在 `relative.R:10763-10799`，调节扩展的 `XWITH` 路径在 `:11522-11529`。
+
+因此应使用两层状态：
+
+`SEMANTIC_SOURCE_CONFIRMED; GRAPHIC_GENERATOR_RECEIPT_OPEN`。
+
+脚本没有发现将这两个图形排版为当前 SVG 布局的 `ggsave`、`DiagrammeR`、
+`semPlot` 或 `grid::arrow` receipt；这只限制逐字节重生成，不否定 R→Mplus 对图形
+所表达样本流程和结构语义的来源。只读证据见
+`reports/cfps_figure_provenance_20261004/cfps_figure31_source_boundary_v2.md`。
+
 ## 可复用规则
 
 1. 先按 `target_file` 区分正文与 Appendix；`figure_links.json` 同时记录多个 DOCX，
