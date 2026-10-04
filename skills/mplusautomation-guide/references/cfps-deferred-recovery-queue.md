@@ -30,6 +30,8 @@ names under the recorded result root, and all 669 deferred rows had a lineage
 script, source line, block ID, output name, deferred category and next action.
 This closes a file-location/source-traceability question; it does not close
 the dependency, sidecar, estimator or scientific-adoption gates.
+The reproducible project-side entry point is
+`work/cfps_deferred_lineage_reference_audit_20261004.py`.
 
 ## Reopening a deferred cell
 
