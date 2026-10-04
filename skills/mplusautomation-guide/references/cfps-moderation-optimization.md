@@ -53,3 +53,28 @@ ClaudeR/RStudio 又对上述 56 个文件做了只读文本边界读回。56/56 
 `cfps_boundary_readback_20261004/cfps_s5_boundary_file_readback_v3.csv`。
 可复现入口为 `work/cfps_boundary_readback_20261004.R`，已在当前 8787 RStudio 会话
 执行并返回 `B3_READBACK_V3_DONE`。
+
+## 2026-10-04 dual multiplicity readback
+
+ClaudeR/RStudio then ran a read-only empirical check over the existing 168-row
+parameter CSV. The original `p_bh` and `p_bonf` columns are adjusted within each
+output file (the recorded contract, five hits under each adjustment), whereas
+recomputing BH and Bonferroni over all 168 rows gives zero hits under both. Keep
+both columns with explicit family labels; never present the within-output result
+as a global correction. The check also writes estimate/SE/95% interval rows,
+family summaries, and a zero-line plot without submitting Mplus.
+
+Use the same distinction when an NLM or another reviewer proposes a testing
+family: define the family from the theory and analysis plan before looking at
+the results, report raw and adjusted values, and retain the global 168-row
+sensitivity calculation. A local adjusted hit is descriptive evidence only
+until the same model supplies parameter VCOV and a pre-specified joint Wald or
+D2 result.
+
+The independent NLM review confirms the operational order: freeze the primary
+estimand and testing families; request TECH3/VCOV in isolated copies; validate
+all MI members; run joint Wald before conditional slopes or Johnson–Neyman
+intervals; use continuous moderator information and show data density; and write
+observational, conditional-prediction language. It explicitly rejects changing
+cut points, dropping controls, choosing an imputation member, averaging p-values,
+or selecting the smallest p-value to make the hypothesis appear supported.

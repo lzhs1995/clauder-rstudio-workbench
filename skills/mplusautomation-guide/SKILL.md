@@ -190,7 +190,8 @@ tools. An offline Rscript run does not establish that chain.
   boundaries, and pre-specified paths for future checks.
 - [cfps-moderation-optimization.md](references/cfps-moderation-optimization.md):
   theory-led ways to improve information and power while prohibiting
-  post-hoc significance selection.
+  post-hoc significance selection, including the dual within-output/global
+  multiplicity readback and NLM review boundary.
 - [cfps-b1-b2-boundary.md](references/cfps-b1-b2-boundary.md):
   evidence limits for MI D2/LRT release and conditional-slope Wald testing.
 - [cfps-moderation-conclusion.md](references/cfps-moderation-conclusion.md):
