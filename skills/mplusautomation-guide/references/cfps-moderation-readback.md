@@ -29,3 +29,10 @@ The isolated CFPS audit under
 168 interaction rows. It is diagnostic evidence only; it does not release a
 moderation claim or authorize new Mplus submissions while scientific or memory
 gates are closed.
+
+A raw-text scan of the same 56 files found no `TECH3` section and no explicit
+parameter-estimate covariance matrix. Four files contain latent-variable
+covariance tables, which are not a VCOV for the interaction regression
+coefficients. The reproducible read-only entry point is
+`work/cfps_moderation_raw_tech3_scan_20261004.py`, with receipt
+`reports/cfps_moderation_evidence_v2_20261004/cfps_moderation_raw_tech3_scan_v1.{md,json}`.
