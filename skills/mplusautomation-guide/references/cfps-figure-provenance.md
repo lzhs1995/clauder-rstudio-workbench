@@ -64,9 +64,8 @@ sample-selection 生成证据为 0/6、结构路径图生成证据为 0/6，也�
 不能把它们升级为图3.1。六份脚本里出现的 `process1 = Means` 等普通区段标签已单独
 记录，不能作为路径图证据。
 
-因此两个图3.1逻辑媒体继续保持 `SOURCE_BOUNDARY_OPEN`。这是可复现性边界，不是对
-原作者生产软件的推断；只有找到图形原始源文件、真实生产脚本或带生成路径的历史
-receipt，才可关闭该门。
+当时的 v1 审计曾将两个图3.1逻辑媒体保持为 `SOURCE_BOUNDARY_OPEN`；该状态已由
+下面的 v3 原始 SVG 配对证据取代。历史 v1 报告仍保留，避免覆盖审计轨迹。
 
 ### 2026-10-04 v2 纠偏：语义 producer 与图形 receipt 分开
 
@@ -86,6 +85,20 @@ receipt，才可关闭该门。
 `semPlot` 或 `grid::arrow` receipt；这只限制逐字节重生成，不否定 R→Mplus 对图形
 所表达样本流程和结构语义的来源。只读证据见
 `reports/cfps_figure_provenance_20261004/cfps_figure31_source_boundary_v2.md`。
+
+### 2026-10-04 v3：原始 SVG 已找到
+
+在 OneDrive 中找到：
+
+- `图3.1 Details of sample selection.svg`；
+- `图3.1平行过程潜在增长曲线模型的结构路径图.svg`。
+
+两份文件分别与 DOCX 嵌入的 `image2.svg`、`image4.svg` 的 `<text>` 元素序列
+101/101 和 34/34 完全一致。Word 重写导致 SHA-256 不同，但内容级配对已确认。
+因此 Figure 3.1 的 provenance 状态升级为
+`SOURCE_FILE_CONFIRMED_SEMANTIC_SOURCE_CONFIRMED`，不再阻塞逐格核验或科学采用；
+仅保留“六份 R script 没有一键生成当前 Office SVG 的 receipt”这一可复现性说明。
+证据见 `reports/cfps_figure_provenance_20261004/cfps_figure31_source_boundary_v3.{md,json}`。
 
 ## 可复用规则
 
