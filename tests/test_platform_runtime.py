@@ -53,7 +53,13 @@ class PlatformRuntimeTests(unittest.TestCase):
         for system in ("win32", "darwin", "linux"):
             runtime = resolve_runtime(system=system, environ={"HOME": "/portable", "USERPROFILE": "C:/portable"})
             self.assertNotIn("/Users/lzhs", str(runtime.home))
-        self.assertEqual(str(resolve_runtime(system="win32", environ={"USERPROFILE": "C:/portable"}).home), "C:/portable")
+        # Path.__str__ uses the host separator when the test runs under
+        # Windows; compare the portable representation so the contract is
+        # identical on Windows, macOS, and Linux.
+        self.assertEqual(
+            resolve_runtime(system="win32", environ={"USERPROFILE": "C:/portable"}).home.as_posix(),
+            "C:/portable",
+        )
 
     def test_installer_advertises_all_supported_systems(self) -> None:
         self.assertIn("Windows, macOS, or Linux", build_parser().description)

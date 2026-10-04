@@ -1,0 +1,203 @@
+{
+  "status": "WINDOWS_ZOTERO_REPAIRED_CORE_FULLTEXT_VERIFIED_WITH_EXPLICIT_LIMITS",
+  "scope": "Chapter 7 LPA/LCA, LTA, MS-LTA and three-step/logistic decisions",
+  "zotero_probe": {
+    "transport": "native_mcp_zotero_after_windows_local_api_repair",
+    "api": "http://127.0.0.1:23119",
+    "api_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_windows_repair_20261001.json",
+    "method_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json",
+    "stale_lock": "parent.lock renamed reversibly after no zotero.exe process; Zotero restarted; connector/ping and /api/users/9676737/items returned HTTP 200",
+    "Vermunt2004": {
+      "item_key": "46A2NJNG",
+      "metadata": "verified",
+      "attachment_read": false,
+      "status": "METADATA_ONLY_NO_CHILD_ATTACHMENT"
+    },
+    "QiuHaoZheng2023": {
+      "item_key": "R9M77Y5K",
+      "metadata": "verified",
+      "attachment_read": false,
+      "status": "METADATA_ONLY_NO_CHILD_ATTACHMENT"
+    }
+  },
+  "sources": [
+    {
+      "key": "Nylund-Gibson2023",
+      "family": "LTA",
+      "doi": "10.1037/met0000486",
+      "claim": "10 questions, workflow, measurement invariance, reporting",
+      "status": "MCP_FULLTEXT_VERIFIED_QE7VLHVL",
+      "item_key": "ZQ8ANJ3F",
+      "attachment_keys": [
+        "QE7VLHVL"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Asparouhov2014",
+      "family": "LPA/LTA",
+      "doi": "10.1080/10705511.2014.915181",
+      "claim": "three-step auxiliary-variable methods",
+      "status": "MCP_FULLTEXT_VERIFIED",
+      "item_key": "M39L8CCQ",
+      "attachment_keys": [
+        "M2K3ZGFK"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Asparouhov2021b",
+      "family": "LPA/LTA",
+      "claim": "BCH and secondary models",
+      "status": "KEY_OR_METADATA_ONLY_NOT_REPRODUCED_IN_THIS_RUN",
+      "attachment_keys": [],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Muthen2022",
+      "family": "LTA/MS-LTA",
+      "doi": "10.1037/met0000370",
+      "claim": "RI-LTA, MS-LTA and measurement invariance extensions",
+      "status": "MCP_FULLTEXT_VERIFIED",
+      "item_key": "KQSDYF6M",
+      "attachment_keys": [
+        "7V5EG6FV"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Moore2025",
+      "family": "LTA",
+      "doi": "10.1002/ijop.70021",
+      "claim": "applied LTA tutorial, syntax and reporting",
+      "status": "MCP_FULLTEXT_VERIFIED",
+      "item_key": "WP5NS2HE",
+      "attachment_keys": [
+        "D876IM8T"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Nylund2007",
+      "family": "LTA",
+      "claim": "longitudinal transition workflow",
+      "status": "MCP_FULLTEXT_VERIFIED_L4ZMHFHZ",
+      "item_key": "6SR5F7YL",
+      "attachment_keys": [
+        "L4ZMHFHZ",
+        "JFL2HY3A"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Lanza2010",
+      "family": "LCA/LTA",
+      "claim": "multiple-group LTA and covariates",
+      "status": "MCP_FULLTEXT_VERIFIED",
+      "item_key": "KLN8BWIG",
+      "attachment_keys": [
+        "R6G46WR5"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Collins2009",
+      "family": "LCA/LTA",
+      "claim": "latent class and transition analysis foundations",
+      "status": "MCP_FULLTEXT_VERIFIED",
+      "item_key": "PX29XBI4",
+      "attachment_keys": [
+        "3Y2BJW35"
+      ],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "Vermunt2004",
+      "family": "MS-LTA",
+      "uri": "http://zotero.org/users/9676737/items/46A2NJNG",
+      "claim": "mover-stayer model",
+      "status": "METADATA_ONLY_NO_CHILD_ATTACHMENT",
+      "item_key": "46A2NJNG",
+      "attachment_keys": [],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    },
+    {
+      "key": "QiuHaoZheng2023",
+      "family": "LPA/LTA/MS-LTA",
+      "uri": "http://zotero.org/users/9676737/items/R9M77Y5K",
+      "claim": "Chinese Mplus latent-structure guide",
+      "status": "METADATA_ONLY_NO_CHILD_ATTACHMENT",
+      "item_key": "R9M77Y5K",
+      "attachment_keys": [],
+      "verification_receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_method_evidence_20261001.json"
+    }
+  ],
+  "source_policy": "A citation key or URI is not evidence that a Zotero attachment was read. Promote a source to MCP_FULLTEXT_VERIFIED only after a native MCP fulltext response is non-empty; if the local attachment path is not exposed, do not invent a local SHA-256.",
+  "implementation_audit": {
+    "entropy_boundary": "Entropy summarizes posterior classification uncertainty; it is not individual classification accuracy and does not correct hard-classification measurement error.",
+    "lta_invariance_boundary": "Full measurement invariance is a tested modeling choice, not a universal prerequisite; partial invariance and the actual constrained parameters must be reported.",
+    "ms_lta_boundary": "The Chapter 7 replay has four waves. A two-wave MS-LTA should be treated as an explicitly justified extension or constraint, not silently presented as canonical multi-wave evidence.",
+    "finite_stayer_constraint": "Finite logit values such as -10/+20 approximate 0/1 transition probabilities; they are not mathematically identical to fixed probabilities.",
+    "estimand_contract": "The replay separates MplusAutomation template generation, licensed Mplus estimation, readModels parsing, and R-side glm/HC0 estimation. Each stage must retain input/output hashes and state whether the estimand is latent-probability, most-likely-class descriptive, or hard-classification logistic.",
+    "syntax_correction": "q1604 uses c1(4) and c3(4), yielding 16 joint combinations; q1629 uses G(2) with c1(4) and c3(4), yielding 32 joint combinations. These are not eight- or ten-class single latent variables."
+  },
+  "primary_accessible_evidence": [
+    {
+      "source": "MplusAutomation vignette",
+      "url": "https://cran.r-project.org/web/packages/MplusAutomation/vignettes/vignette.html",
+      "claims": [
+        "[[init]] iterators",
+        "filename/outputDirectory",
+        "createModels template tags"
+      ],
+      "status": "web_primary_accessible"
+    },
+    {
+      "source": "MplusAutomation CRAN reference",
+      "url": "https://stat.ethz.ch/CRAN/web/packages/MplusAutomation/refman/MplusAutomation.html",
+      "claims": [
+        "createModels function contract"
+      ],
+      "status": "web_primary_accessible"
+    },
+    {
+      "source": "Mplus mixture modeling resources",
+      "url": "https://www.statmodel.com/MixtureModeling.shtml",
+      "claims": [
+        "Mplus LCA/LPA/LTA and auxiliary-variable resources"
+      ],
+      "status": "official_vendor_accessible"
+    },
+    {
+      "source": "Mplus RI-LTA resources",
+      "url": "https://www.statmodel.com/RI-LTA.shtml",
+      "claims": [
+        "RI-LTA, mover-stayer and measurement-invariance extensions"
+      ],
+      "status": "official_vendor_accessible"
+    },
+    {
+      "source": "Nylund-Gibson et al. 2023 supplement",
+      "url": "https://supp.apa.org/psycarticles/supplemental/met0000486/met0000486_supp.html",
+      "claims": [
+        "LTA workflow, modeling steps, invariance, auxiliary variables and reporting"
+      ],
+      "status": "publisher_supplement_accessible"
+    },
+    {
+      "source": "Asparouhov and Muthen 2014",
+      "url": "https://www.statmodel.com/download/3stepOct28.pdf",
+      "claims": [
+        "three-step auxiliary-variable approach"
+      ],
+      "status": "official_author_copy_accessible"
+    }
+  ],
+  "windows_validation": {
+    "receipt": "<WINDOWS_USERPROFILE>/Desktop/20260108 毕业论文code/Chapter 7/mplusautomation_replay/20260923_solo_takeover/continuation_20260930/final_delivery_20260930/zotero_windows_repair_20261001.json",
+    "status": "PASS",
+    "zotero_mcp_server": "0.3.0",
+    "semantic_db_documents": 2476,
+    "scope": "core Chapter 7 method sources only"
+  }
+}

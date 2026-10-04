@@ -33,6 +33,10 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
 - **`comparegroups-guide`** — descriptive-statistics skill: contract-driven
   `compareGroups` computation, labelled-data audit, panel-safe dual output,
   true three-line DOCX rendering, numeric reconciliation, validation, and hashes.
+- **`mplusautomation-guide`** — MplusAutomation/Mplus 9 reproduction skill:
+  isolated Windows/macOS/WSL execution, ClaudeR/RStudio async polling,
+  resource-gated parallel model batches, readModels diagnostics, MI/LRT
+  acceptance, CFPS/CHARLS provenance, and manuscript/NLM release boundaries.
 
 ## What This Installs
 
