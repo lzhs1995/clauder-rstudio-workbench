@@ -13,8 +13,8 @@ test as skipped on Windows; keep the assertion active on hosts where symlink
 creation is available.
 
 The isolated Windows Python 3.14 verification on 2026-10-04 ran 282 tests:
-267 passed and 15 were skipped only because Rscript is not installed in the
-isolated test environment. The run used the repository's uv-managed
+267 passed and 15 were skipped because the isolated environment lacks Rscript
+and, for one capability check, Windows symlink privilege. The run used the repository's uv-managed
 environment and inserted the current checkout first on `sys.path`, avoiding
 an older globally installed workbench package. The symlink-capability test was
 the only platform-privilege skip among the Windows-specific checks.
