@@ -141,6 +141,9 @@ tools. An offline Rscript run does not establish that chain.
 - [charls-boundary-readback.md](references/charls-boundary-readback.md):
   independently read existing CHARLS registries and distinguish summary rows,
   process closures, timeout cases and method-review rows.
+- [windows-skill-compatibility.md](references/windows-skill-compatibility.md):
+  Windows-specific atomic-write and symlink-capability lessons from the full
+  repository test run.
 - [cfps-rounding-contract.md](references/cfps-rounding-contract.md):
   reproduce the historical AIC/BIC display precision from existing outputs and
   the observed R rounding behavior without rerunning models.

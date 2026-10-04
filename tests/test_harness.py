@@ -863,7 +863,12 @@ class HarnessUnitTests(unittest.TestCase):
             agents = root / "agents"
             agents.mkdir()
             link = agents / "demo"
-            link.symlink_to(target, target_is_directory=True)
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except OSError as exc:
+                if os.name == "nt":
+                    self.skipTest(f"Windows symlink privilege is unavailable: {exc}")
+                raise
 
             installed = _install_skill(source, agents)
 
