@@ -50,3 +50,10 @@ only `TECH3` added to the staged `OUTPUT:` block. Its manifest records original
 and staged hashes and reports `PREPARED_NOT_SUBMITTED`, `mplus_submissions=0`.
 The stage is a reusable input package, not a result and not permission to run
 all 56 models; a family and resource/VCOV contract must be frozen first.
+
+The staged files are grouped into a reproducible family schedule at
+`work/cfps_moderation_tech3_repair_20261004/schedule_manifest_v1.json`:
+24 process-by-moderator batches and 56 members. The schedule starts with one
+worker, permits two only at a documented memory threshold and excludes any
+unclassified external Mplus process. It records `PREPARED_NOT_SUBMITTED` until
+the manuscript-table target and scientific contract are fixed.
