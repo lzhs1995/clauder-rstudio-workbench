@@ -139,6 +139,9 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-mi-v3-hold.md](references/cfps-mi-v3-hold.md):
   separate successful MI data readback from income-definition and convergence
   acceptance before submitting downstream consumers.
+- [cfps-mi-v3-preflight.md](references/cfps-mi-v3-preflight.md):
+  isolated Windows repair admission, bounded income support, final MI diagnostics,
+  and downstream producer/consumer release gates.
 - [cfps-rank-source-disposition.md](references/cfps-rank-source-disposition.md):
   bind score sources before consumers and keep four rebuild-required sources
   outside the estimation queue.
