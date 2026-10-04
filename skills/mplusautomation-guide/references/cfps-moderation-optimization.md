@@ -42,3 +42,12 @@ type1 的教育和收入调节行在变体审计中各有 3/9 行 p<.05；type1 
 Windows 可用物理内存约 1.23 GiB，低于新 CFPS/CHARLS worker 准入门槛；因此不提交
 新 Mplus。只有 CFPS 的 LRT/MI/rank/derived 合同闭合、资源恢复且新规格预注册后，
 才可进行隔离敏感性估计。
+
+## B3 既有输出读回结果
+
+ClaudeR/RStudio 又对上述 56 个文件做了只读文本边界读回。56/56 个文件都有可
+解析的 S5 残差方差行；0 个文件实际启用了 `s5@0`，56 个文件仅出现被 `!` 注释
+的可选语句；56 个文件都没有检出 negative/boundary 警告文字。这个结果不能替代
+完整直接效应模型的 MI/LRT/死亡截断诊断，但它排除了“本次调节输出因把 S5 固定为
+0 才获得显著性”的简单解释。逐文件证据在
+`cfps_boundary_readback_20261004/cfps_s5_boundary_file_readback_v3.csv`。
