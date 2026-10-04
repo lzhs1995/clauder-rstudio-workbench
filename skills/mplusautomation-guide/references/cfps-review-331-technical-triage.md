@@ -10,6 +10,15 @@ The Windows read-only implementation is
 `work/pp_lgcm_reconciliation_20261001/build_cfps_review_331_technical_triage_20261004.py`, with evidence in
 `reports/cfps_review_331_technical_triage_20261004/cfps_review_331_technical_triage_v1.{json,md}`.
 
+The current-state supersession is
+`reports/cfps_review_331_current_triage_20261004/cfps_review_331_current_triage_v2.{json,md}`.
+It joins the later shape-factor, alias/spanner and current-v42 manuscript receipts:
+all 81 technical producer groups are closed, while scientific adoption remains
+open for MI/LRT/rank contracts, historical-versus-sensitivity choice, deferred
+limitations and final PDF/NLM review. The older v1 remains as an immutable
+historical audit and must not be read as evidence that those sources are still
+missing.
+
 Use the report to route work: decide historical display versus current sensitivity for fit changes and adjudicate the twelve derived alias groups. Do not describe the queue as “331 models missing,” and do not re-estimate a group merely because its scientific decision is still open.
 
 The 12-group technical closure is recorded in
