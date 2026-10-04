@@ -43,3 +43,10 @@ This confirms that missing interaction-parameter VCOV is an input-contract
 limitation. The input-side scan is reproducible from
 `work/cfps_moderation_input_output_contract_scan_20261004.py`; its receipt is
 `reports/cfps_moderation_evidence_v2_20261004/cfps_moderation_input_output_contract_scan_v1.{md,json}`.
+
+An isolated preparation script,
+`work/prepare_cfps_moderation_tech3_repair_20261004.py`, creates 56 copies with
+only `TECH3` added to the staged `OUTPUT:` block. Its manifest records original
+and staged hashes and reports `PREPARED_NOT_SUBMITTED`, `mplus_submissions=0`.
+The stage is a reusable input package, not a result and not permission to run
+all 56 models; a family and resource/VCOV contract must be frozen first.
