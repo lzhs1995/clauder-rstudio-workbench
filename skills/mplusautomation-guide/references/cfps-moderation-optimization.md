@@ -51,3 +51,5 @@ ClaudeR/RStudio 又对上述 56 个文件做了只读文本边界读回。56/56 
 完整直接效应模型的 MI/LRT/死亡截断诊断，但它排除了“本次调节输出因把 S5 固定为
 0 才获得显著性”的简单解释。逐文件证据在
 `cfps_boundary_readback_20261004/cfps_s5_boundary_file_readback_v3.csv`。
+可复现入口为 `work/cfps_boundary_readback_20261004.R`，已在当前 8787 RStudio 会话
+执行并返回 `B3_READBACK_V3_DONE`。
