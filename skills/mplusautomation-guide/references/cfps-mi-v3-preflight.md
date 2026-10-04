@@ -17,3 +17,10 @@ MI v3 当前只能读回，不能物化下游 producer/consumer。新估计必�
 验收报告至少保存：source/input/DAT/OUT SHA-256、成员映射表、范围违规计数、PSR/最终停止规则、MplusAutomation `readModels()` 回读、失败/超时清单和 `new_mplus` 计数。结果目录必须与原始目录隔离，并能从单一 manifest 重放。
 
 当前证据：`reports/cfps_mi_v3_hold_20261004/cfps_mi_v3_hold_contract_v1.{md,json}`、`reports/cfps_mi_v3_hold_20261004/cfps_income_scale_readback_v1.md`。在这些合同关闭前，所有 51 个 MI producer 与 384 个 rank/score consumer 的提交开关保持关闭。
+
+源码合同也已独立复核：`absolutive.R:7086-7108` 和
+`absolutive.R:7236-7258` 的 `VALUES` 行明确约束 `cdar12`、`pinc12`、
+`sat12`、`adl12`，但没有为 `finc12` 或 `pinc212` 写支持范围。复核入口为
+`work/cfps_mi_v3_source_contract_audit_20261004.py`，回执为
+`reports/cfps_mi_v3_hold_20261004/cfps_mi_v3_source_contract_audit_v1.{md,json}`。
+这解释了为什么负插补值必须进入插补尺度/支持范围修复，而不能用截零或取绝对值代替。
