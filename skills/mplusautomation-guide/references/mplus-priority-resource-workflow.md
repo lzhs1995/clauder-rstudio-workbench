@@ -60,3 +60,26 @@ Windows Python调用 `scripts/mplus_priority_watch.py --owner-pid <已核实R_PI
 - WSL一度无法启动Windows程序，错误`UtilAcceptVsock ... 110`；实际WSL_INTEROP指向已消失的socket。检查`/run/WSL`后，仅对子命令指定仍存在的`/run/WSL/2_interop`，Windows Python重新启动成功，最终5秒监控完成。未重启WSL/RStudio、未改持久环境。原生R拒绝system2的安全规则保留，不通过动态调用绕过。
 
 本任务证据位于 `<WINDOWS_USERPROFILE>/pp_lgcm_runs/20260908_parallel/recovery/20261001_pp_lgcm_reconciliation/10_resume_verified_20261001/scientific_followup/measurement_audit/`：`mplus_priority_watch_20261002.jsonl`、`mplus_priority_apply_20261002.jsonl`、`resource_import_benchmark_1790918899970416400.json`、`windows_memory_priority_20261002.json`。长期指南不能用这些日期化数值代替当前机器的实测。
+
+## 2026-10-04 Windows 资源剖析与受限回收
+
+本机 16 GiB RAM 的只读剖析记录在 `reports/windows_memory_profile_latest.json`。
+在目标 PP-LGCM 没有 Mplus 进程时，`vmmemWSL` 的 private commit 约 6.3 GiB，
+三个 RStudio `rsession-utf8.exe` 分别约 1.1–1.6 GiB private；系统 commit
+约 39.4/46.1 GiB，可用物理内存约 1.9 GiB。这个证据说明准入瓶颈是主机
+物理内存与 commit 余量的组合，不能归因于 Mplus 算法本身，也不能由一个小
+Mplus 试跑的 RSS 推断复杂 MI/LMS 峰值。
+
+三个 RStudio 会话均执行了一次 `gc(full=TRUE)`；全局对象只有约十几 MiB，
+而 R private/WSL 工作集没有相应下降，说明主要占用来自会话/包/渲染状态和
+WSL 容器，不能靠重复 `gc()` 获得持续释放。随后执行限定清单的
+`scripts/windows_memory.py --apply`：没有发现可关闭的 Task Manager/设置/小
+组件，系统文件缓存回收返回 `NO_PRIVILEGE/1300`，可用内存短时变化约 -25 MiB。
+证据保存在 `reports/windows_memory_reclaim_20261004.json`。
+
+因此，调度器应在同一主机上合并所有队列的内存占位，先串行启动一个预先指定
+的研究模型，记录 Mplus RSS/private、系统 commit、输出增长和耗时，再决定是否
+增加第二个 worker；不要反复清 working set、停止 WSL、关闭未知 MCP 或改变
+页面文件。RStudio 的异步接口只负责提交和轮询，模型数据留在 durable 文件，
+避免完整 MI 数据在多个 R worker 中重复 marshal。只有资源门控和输入/科学合同
+同时通过时，才允许下一批 Mplus。
