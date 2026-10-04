@@ -195,6 +195,9 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-manuscript-provenance.md](references/cfps-manuscript-provenance.md):
   combined table/figure/source/runtime checkpoint that keeps historical draft
   reproduction separate from scientific release and downstream CHARLS/NLM gates.
+- [cfps-six-script-lineage.md](references/cfps-six-script-lineage.md):
+  six-script role map, exact line/hash audit, MI support-range boundary, and
+  source-to-table/figure gating rules for the PP-LGCM draft.
 - [acceptance_contracts.py](scripts/acceptance_contracts.py): portable comparison
   counting, printed-number rounding boundaries and minimum LRT evidence gates.
 - [cross-tool-handoff.md](references/cross-tool-handoff.md): Windows routing
