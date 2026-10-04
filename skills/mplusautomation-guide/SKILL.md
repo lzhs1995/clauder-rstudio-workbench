@@ -138,6 +138,9 @@ tools. An offline Rscript run does not establish that chain.
 - [charls-scientific-gate.md](references/charls-scientific-gate.md):
   reuse existing CHARLS artifacts while keeping timeout, boundary and formal
   adoption states separate.
+- [charls-boundary-readback.md](references/charls-boundary-readback.md):
+  independently read existing CHARLS registries and distinguish summary rows,
+  process closures, timeout cases and method-review rows.
 - [cfps-rounding-contract.md](references/cfps-rounding-contract.md):
   reproduce the historical AIC/BIC display precision from existing outputs and
   the observed R rounding behavior without rerunning models.
