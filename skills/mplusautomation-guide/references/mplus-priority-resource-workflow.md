@@ -70,6 +70,13 @@ Windows Python调用 `scripts/mplus_priority_watch.py --owner-pid <已核实R_PI
 物理内存与 commit 余量的组合，不能归因于 Mplus 算法本身，也不能由一个小
 Mplus 试跑的 RSS 推断复杂 MI/LMS 峰值。
 
+同一时段的 WSL 侧 `free/ps` 快照显示，WSL 可用内存还被多个 Codex/Claude
+进程和 tmux server 占用；这些 agent 可能对应其他活跃会话。它们必须作为
+“外部协调开销”计入主机准入，却不能因为 Mplus 优先而被盲目终止。协调器应
+分别记录 Windows `vmmemWSL`、RStudio、Mplus 和 agent 负载，只有确认会话已
+完成并有可恢复检查点时，才可按会话所有者清理；未知父链、MCP 或 WSL VM 不
+属于自动回收清单。
+
 三个 RStudio 会话均执行了一次 `gc(full=TRUE)`；全局对象只有约十几 MiB，
 而 R private/WSL 工作集没有相应下降，说明主要占用来自会话/包/渲染状态和
 WSL 容器，不能靠重复 `gc()` 获得持续释放。随后执行限定清单的
