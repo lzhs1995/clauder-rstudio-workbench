@@ -177,6 +177,8 @@ tools. An offline Rscript run does not establish that chain.
   post-hoc significance selection.
 - [cfps-b1-b2-boundary.md](references/cfps-b1-b2-boundary.md):
   evidence limits for MI D2/LRT release and conditional-slope Wald testing.
+- [cfps-moderation-conclusion.md](references/cfps-moderation-conclusion.md):
+  evidence-constrained reporting language for moderation results.
 - [cfps-manuscript-provenance.md](references/cfps-manuscript-provenance.md):
   combined table/figure/source/runtime checkpoint that keeps historical draft
   reproduction separate from scientific release and downstream CHARLS/NLM gates.
