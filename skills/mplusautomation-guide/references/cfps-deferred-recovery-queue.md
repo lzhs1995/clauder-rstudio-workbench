@@ -25,6 +25,12 @@ turn them into success, failure, or a new estimate. A normal `.out` already
 validated in another namespace is reusable; an unresolved author adoption
 decision alone is not a reason to rerun it.
 
+The accompanying Windows read-only lineage audit found all 51 unique `.out`
+names under the recorded result root, and all 669 deferred rows had a lineage
+script, source line, block ID, output name, deferred category and next action.
+This closes a file-location/source-traceability question; it does not close
+the dependency, sidecar, estimator or scientific-adoption gates.
+
 ## Reopening a deferred cell
 
 Reopen a cell only when all of the following are recorded in a new isolated
