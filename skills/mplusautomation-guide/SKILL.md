@@ -123,6 +123,10 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-deferred-recovery-queue.md](references/cfps-deferred-recovery-queue.md):
   classify the 669 deferred cells into dependency-blocked, failed, unprepared
   and historical-sidecar limits; reopen them only with a new evidence contract.
+- [cfps-deferred-output-audit.md](references/cfps-deferred-output-audit.md):
+  read existing `.out` files without rerunning Mplus, separate ordinary
+  warnings and ignored auxiliary exports from incomplete MI replications, and
+  preserve the moderation/VCOV inference boundary.
 - [cfps-scientific-boundary-audit.md](references/cfps-scientific-boundary-audit.md):
   keep version choice, LRT evidence, MI acceptance, and derived-score source
   rules separate while reusing historical outputs.
