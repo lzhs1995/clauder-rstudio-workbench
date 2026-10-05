@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import json
+import math
 import os
 from pathlib import Path
 import psutil
@@ -13,6 +14,18 @@ def assess(samples, available, budget, reserve, cpu_limit):
         raise ValueError('Invalid measured budget or resource limit')
     return bool(len(samples) >= 3 and all(0 <= x < cpu_limit for x in samples)
                 and available >= budget + reserve)
+
+
+def paging_io_pressure(paging):
+    """Return true only for output paging combined with elevated disk latency."""
+    if not isinstance(paging, dict):
+        return False
+    page_out = paging.get('pages_output_sec')
+    read_latency = paging.get('disk_read_latency_sec')
+    write_latency = paging.get('disk_write_latency_sec')
+    return (isinstance(page_out, (int, float)) and math.isfinite(page_out) and page_out > 0
+            and ((isinstance(read_latency, (int, float)) and math.isfinite(read_latency) and read_latency >= 0.01)
+                 or (isinstance(write_latency, (int, float)) and math.isfinite(write_latency) and write_latency >= 0.01)))
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -70,6 +83,10 @@ def main():
         reasons.append('host_disk_unverified')
     elif snapshot['disk_free_gib'] < args.disk_reserve_gib:
         reasons.append('disk_reserve')
+    # A single Pages Input/sec value is not a gate.  Hold only when output
+    # paging and materially elevated disk latency occur together.
+    if paging_io_pressure(paging):
+        reasons.append('paging_io_pressure')
     commit=snapshot.get('free_virtual_gib')
     if commit is None:
         reasons.append('host_commit_unverified')
