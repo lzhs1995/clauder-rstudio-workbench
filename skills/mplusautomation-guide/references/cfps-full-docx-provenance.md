@@ -80,3 +80,8 @@ project, most such rows had a unique `producer` field; a smaller group exposed
 an absolute/relative historical candidate conflict. The correct status for the
 latter is a version/standardization contract review, with both candidates
 preserved, rather than a new Mplus submission.
+For the CFPS ledger specifically, the 100 remaining conflicts were the
+absolute/relative duplicate candidates for正文 and Appendix Table 4.2.2. The
+manuscript standardization labels and the assembly block select `relative.R`;
+the `absolutive.R` files remain documented alternatives and must not replace
+that producer merely because their displayed values also match.
