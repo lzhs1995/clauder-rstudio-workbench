@@ -57,6 +57,13 @@ use a single owned, bounded callback/dispatcher with durable stage and model ID,
 explicit cancellation, failure evidence and no duplicate submissions. Report
 `resource_wait` honestly; preparing input does not count as an estimated model.
 
+Preserve paging telemetry but do not reject work from `Pages Input/sec` alone:
+normal mapped-file demand reads can raise it. A current Windows profile,
+measured incremental resident/private budgets, commit headroom and actual model
+progress are more useful than a blanket threshold. Distinguish a queue that
+never launches from a launched model that is slow. Generic new-worker reserves
+must not silently replace a separately validated existing-session pilot policy.
+
 Validation must include actual reclaimed identities, protected-session survival,
 monitor heartbeat and an estimate or explicit current hold. Record acceptance
 separately for resource recovery, model execution and manuscript conclusions.

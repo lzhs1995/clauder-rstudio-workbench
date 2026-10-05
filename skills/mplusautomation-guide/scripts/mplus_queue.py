@@ -7,6 +7,7 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -82,24 +83,39 @@ def _read_windows_profile(path, max_age=300):
     generated = dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
     if generated.tzinfo is None:
         generated = generated.replace(tzinfo=dt.timezone.utc)
-    age = max(0.0, (dt.datetime.now(dt.timezone.utc) - generated).total_seconds())
+    age = (dt.datetime.now(dt.timezone.utc) - generated).total_seconds()
+    if age < -5:
+        raise ValueError("Windows memory profile is future-dated")
     if age > max_age:
         raise ValueError(f"Windows memory profile is stale ({age:.1f}s > {max_age:.1f}s)")
     system = payload.get("profile", {}).get("system", {})
     required = ("free_phys_gib", "total_phys_gib", "free_virtual_gib", "commit_limit_gib", "committed_gib")
-    if any(not isinstance(system.get(key), (int, float)) for key in required):
+    if any(not isinstance(system.get(key), (int, float)) or not math.isfinite(system[key]) or system[key] < 0 for key in required):
         raise ValueError("Windows memory profile is missing numeric system fields")
     if system["total_phys_gib"] <= 0 or system["commit_limit_gib"] <= 0:
         raise ValueError("Windows memory profile has invalid capacity")
-    return {
+    result = {
         "available_gib": float(system["free_phys_gib"]),
         "total_gib": float(system["total_phys_gib"]),
         "free_virtual_gib": float(system["free_virtual_gib"]),
         "committed_gib": float(system["committed_gib"]),
         "commit_limit_gib": float(system["commit_limit_gib"]),
+        # Optional Windows PDH measurements.  An absent field is retained as
+        # unknown; it must never be interpreted as zero paging.
+        "paging": payload.get("profile", {}).get("paging", {}),
         "profile_age_sec": age,
         "profile_path": str(path),
     }
+    cpu = system.get("cpu_percent_samples", [])
+    if len(cpu) >= 3 and all(isinstance(x, (int, float)) and math.isfinite(x) and 0 <= x <= 100 for x in cpu):
+        result.update(cpu_percent_samples=cpu, cpu_percent=sum(cpu)/len(cpu))
+    else:
+        result["host_cpu_unverified"] = True
+    if isinstance(system.get("disk_free_gib"), (int, float)) and math.isfinite(system["disk_free_gib"]):
+        result["disk_free_gib"] = system["disk_free_gib"]
+    else:
+        result["host_disk_unverified"] = True
+    return result
 
 
 def resource_snapshot(windows_profile=None, max_profile_age_sec=300):
@@ -122,6 +138,13 @@ def resource_snapshot(windows_profile=None, max_profile_age_sec=300):
         # Never use WSL's optimistic memory view for a new Windows Mplus claim.
         snapshot.update(source="wsl_psutil_unverified", host_memory_unverified=True,
                         resource_error="Windows host memory profile was not supplied")
+    elif os.name == 'nt':
+        from windows_memory import snapshot as native_memory
+        perf = native_memory()['performance_bytes']
+        if perf:
+            snapshot.update(committed_gib=perf['CommitTotal']/2**30,
+                            commit_limit_gib=perf['CommitLimit']/2**30,
+                            free_virtual_gib=(perf['CommitLimit']-perf['CommitTotal'])/2**30)
     return snapshot
 
 
@@ -168,6 +191,10 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     policy = {**DEFAULT_POLICY, **(policy or {})}
     if snapshot.get("host_memory_unverified"):
         return "host_memory_unverified"
+    if snapshot.get("host_cpu_unverified"):
+        return "host_cpu_unverified"
+    if snapshot.get("host_disk_unverified"):
+        return "host_disk_unverified"
     if len(running) >= limit:
         return "parallel_limit"
     # 作业类别限制只控制准入，不改统计输入或终止已运行的模型。
@@ -187,6 +214,13 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     memory = float(candidate.get("memory_gib", 0.5))
     # Conservative reservation also covers workers claimed before Mplus allocates RAM.
     reserved = sum(float(x.get("memory_gib", 0.5)) for x in running)
+    commit_reserve = policy.get('commit_reserve_gib')
+    if commit_reserve is not None:
+        headroom = snapshot.get('free_virtual_gib')
+        if headroom is None:
+            return 'host_commit_unverified'
+        if headroom - memory - reserved < commit_reserve:
+            return 'predicted_commit'
     remaining = snapshot["available_gib"] - memory - reserved
     if remaining < policy["reserve_gib"] or 100 * (1 - remaining / snapshot["total_gib"]) >= policy["memory_hold_percent"]:
         return "predicted_memory"

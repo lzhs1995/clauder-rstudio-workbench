@@ -141,6 +141,16 @@ Do not reclaim an unknown running task or use `killOnFail=TRUE`; on Windows its
 cleanup may kill other Mplus processes. A replacement worker must not adopt a
 still-running task. Investigate original PID ownership and output first.
 
+### Windows paging telemetry
+
+Collect Windows `Pages Input/sec`, `Pages Output/sec`, disk latency and model
+CPU together. Page input includes mapped-file reads; a nonzero rate, or an
+uncalibrated threshold of 100 pages/sec, does not prove thrashing and must not
+become an extra permanent admission gate. Keep raw values and mark missing
+counters unknown. Compare progress/elapsed time for equivalent model settings
+before attributing slow estimates to paging. Physical and commit headroom still
+need separate budgets. See Microsoft's [memory guidance](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/ram-virtual-memory-pagefile-management).
+
 A dead worker's `running` row can retain its declared memory reservation and
 make the queue appear resource-starved. Prove that the worker PID and every
 child are gone, back up SQLite with its WAL/SHM context, then use the queue's

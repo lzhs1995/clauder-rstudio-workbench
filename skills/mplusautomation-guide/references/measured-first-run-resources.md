@@ -11,3 +11,20 @@
 - 十份保存数据逐PID/列序/原观测/缺失一致性通过仍不足以科学放行。新MI出现14/40个人负收入、184/900家庭负收入和1/40派生不一致，已保留科学门；最后打印PSR不是完整的链诊断。八增长模型中四项PSI非正定，全部运行结束不是全部验收。
 
 真实证据：<WINDOWS_USERPROFILE>/pp_lgcm_runs/20260908_parallel/recovery/20261001_pp_lgcm_reconciliation/10_resume_verified_20261001/scientific_followup/measurement_audit/first_corrected_estimations_checkpoint.json 。代码及备份位于work/pp_lgcm_reconciliation_20261001。
+
+## 2026-10-05 TECH3-only calibration (one CFPS base model)
+
+The isolated `type1::edu` base model used the historical successful input plus a
+TECH3 output request. It ran through the native ClaudeR/RStudio async chain and
+MplusAutomation 1.3 in about 619 seconds. The observed Mplus private-memory
+sample peak was about 204 MiB and the process used about one CPU core. The
+staged output terminated normally and its 112 unstandardized parameter rows
+matched the historical output exactly (maximum estimate and SE differences
+zero). These numbers are a local calibration for this model only; they do not
+authorize MI, LMS, Bayes, bootstrap, or concurrent workers.
+
+The first wrapper error also supplies a reusable contract: `runModels()` takes
+the exact `.inp` target, while `readModels()` must receive the resulting `.out`
+path. A successful Mplus process followed by a wrong readback target is an
+integration failure, not a model failure, and must be recovered with a separate
+readback job while retaining the original error in the receipt.

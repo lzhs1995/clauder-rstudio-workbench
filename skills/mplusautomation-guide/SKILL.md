@@ -17,7 +17,7 @@ tools. An offline Rscript run does not establish that chain.
 
 ## Windows Mplus优先资源执行
 
-启动模型或处理内存/速度问题时，先读 [Mplus优先资源流程](references/mplus-priority-resource-workflow.md)。使用轻量监控、已授权回收、按进程限制诊断BLAS线程和证据约束的并发调度；区分启动阻塞、CPU瓶颈与换页，保留模型规格和原有准入合同。
+启动模型或处理内存/速度问题时，先读 [Mplus优先资源流程](references/mplus-priority-resource-workflow.md)。使用轻量监控、已授权回收、按进程限制诊断BLAS线程和证据约束的并发调度；区分启动阻塞、CPU瓶颈与换页，保留模型规格和原有准入合同。Windows paging 计数只作诊断，不能用单项计数新增任意硬门槛；用实测增量、commit 和 Windows 可用内存决定并发。
 
 ## Workflow
 
@@ -157,6 +157,12 @@ tools. An offline Rscript run does not establish that chain.
 - [cfps-rounding-contract.md](references/cfps-rounding-contract.md):
   reproduce the historical AIC/BIC display precision from existing outputs and
   the observed R rounding behavior without rerunning models.
+- [windows_host_profile.py](scripts/windows_host_profile.py): lightweight Windows-native
+  admission profile with physical/commit/disk headroom, native CPU samples and
+  paging telemetry; the full process census is optional.
+- [windows-performance-admission.md](references/windows-performance-admission.md):
+  measured Windows resource admission, parent-chain ownership, MplusAutomation
+  run contract, and the rule that paging counters require joint interpretation.
 - [external-mplus-classification.md](references/external-mplus-classification.md):
   classify Windows Mplus processes by parent chain and working directory so
   external chapter audits do not get counted as CFPS/CHARLS estimates.

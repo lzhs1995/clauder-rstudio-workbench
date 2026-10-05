@@ -61,6 +61,15 @@ Windows Python调用 `scripts/mplus_priority_watch.py --owner-pid <已核实R_PI
 
 本任务证据位于 `<WINDOWS_USERPROFILE>/pp_lgcm_runs/20260908_parallel/recovery/20261001_pp_lgcm_reconciliation/10_resume_verified_20261001/scientific_followup/measurement_audit/`：`mplus_priority_watch_20261002.jsonl`、`mplus_priority_apply_20261002.jsonl`、`resource_import_benchmark_1790918899970416400.json`、`windows_memory_priority_20261002.json`。长期指南不能用这些日期化数值代替当前机器的实测。
 
+## 2026-10-05 隔离 TECH3 校准试跑
+
+- 先排除了一个由 `default1@8789` 驱动的外部 `candidate.inp`；它完成前没有提交新的 PP-LGCM Mplus。外部任务未附着、未终止。
+- 外部任务结束后，`default@8787` 通过 ClaudeR `execute_r_async` 调用 `MplusAutomation::runModels()`，只提交一个已有正常 `.out` 的 `type1::edu` 基础模型的隔离 TECH3 副本。物理可用约 1.39 GiB、commit 余量约 7.06 GiB、CPU 72.3/71.0/68.7%，Pages Output/sec=0，单槽位准入通过。
+- Mplus 估计约 619 秒；运行中观察到的 Mplus private 采样峰值约 204 MiB，约一个 CPU 核。该峰值只校准本模型，不外推到 MI/LMS/Bayes。
+- 原始 Mplus 估计正常结束。历史和 TECH3 副本的 112 个未标准化参数行完全一致（最大 estimate/SE 差均为 0）；`readModels(target=<staged .out>)` 保存了 88×88 TECH3 协方差矩阵。
+- 首个 wrapper 在估计成功后误把 `.inp` 传给 `readModels()`，因此记录为读回集成错误；随后以原 job 终态之外的独立 ClaudeR async 读回任务改用 `.out` 完成恢复。此经验已固定为：`runModels(target=<exact .inp>)`，但 `readModels(target=<exact .out>)`，并保存两者哈希。
+- 结果和完整 receipt 位于 `work/cfps_moderation_tech3_repair_20261004/output/type1_edu_base/`。该试跑只解决 VCOV/TECH3 证据缺口，不改变模型规格，也不允许按显著性筛选后续模型。
+
 ## 2026-10-04 Windows 资源剖析与受限回收
 
 本机 16 GiB RAM 的只读剖析记录在 `reports/windows_memory_profile_latest.json`。
