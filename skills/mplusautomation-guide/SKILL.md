@@ -77,6 +77,11 @@ tools. An offline Rscript run does not establish that chain.
 
 ## Resources
 
+- [cfps-review-scale-and-sensitivity.md](references/cfps-review-scale-and-sensitivity.md):
+  follow-up manuscript review after completed reproduction, actual CESD scale
+  identity, common-sample sensitivity, Mplus line/label repairs, wrapped
+  diagnostics and the boundary before adding more interactions.
+
 - [figure-and-lrt-scientific-audit.md](references/figure-and-lrt-scientific-audit.md):
   SVG rendering limits, conditional curve equations, syntax-based axes,
   imputation permutations and comparable-likelihood repairs.
