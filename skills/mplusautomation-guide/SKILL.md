@@ -163,6 +163,9 @@ tools. An offline Rscript run does not establish that chain.
 - [windows-performance-admission.md](references/windows-performance-admission.md):
   measured Windows resource admission, parent-chain ownership, MplusAutomation
   run contract, and the rule that paging counters require joint interpretation.
+- [type1-tech3-calibration.md](references/type1-tech3-calibration.md):
+  measured single-slot TECH3 calibration, parameter-identity checks, and stale
+  ClaudeR async-record recovery after durable completion.
 - [external-mplus-classification.md](references/external-mplus-classification.md):
   classify Windows Mplus processes by parent chain and working directory so
   external chapter audits do not get counted as CFPS/CHARLS estimates.
