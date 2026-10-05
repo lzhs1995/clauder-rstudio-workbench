@@ -72,3 +72,20 @@ For audit delivery, allowlist complete input/output text, source scripts,
 aggregate tables and documentation. Keep individual score files, analysis data,
 MI RDS objects and ID mappings local. Make unresolved covariance, MI pairing,
 failure-history and reference-code items explicit in the package.
+
+## Adjudicate PDF review against the actual document
+
+The NLM runner's `PASS` means that transport, JSON and source validation passed;
+inspect `new_issues_count` and each finding separately. A response citing only
+the appendix cannot establish a two-document review even when it describes the
+main paper convincingly. Keep failed-source responses as diagnostics, and bind
+new reviews to the final PDF hashes after any document edit.
+
+Before adopting an apparent mismatch, check the table caption and source scale.
+Raw-score and baseline-standardized AIC/BIC values must not be overwritten to
+make them equal. Check the full cross-reference context before widening a
+range: A.1–A.32 and A.33–A.64 may already index separate model families. A `1`
+after a standard error can be a valid superscript note; confirm `w:vertAlign`
+and the rendered PDF before deleting it. Conversely, a clean NLM response does
+not override a local inconsistency, such as confusing variable-level missing
+counts with model-level all-indicator exclusions in a limitations paragraph.
