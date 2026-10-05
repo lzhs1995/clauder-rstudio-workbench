@@ -19,3 +19,9 @@ CHARLS 的 registry 中可能记录历史运行曾经产生的估计，但这不
 5. 合同关闭后才在隔离 run root 中按资源门逐步提交 CHARLS Mplus。
 
 这一区分是长耗时项目的进度监控核心：`90/90 paths inventoried` 表示资产盘点完成，不表示 CHARLS 已正式完成。
+
+Windows 续接回执应同时记录当前 RStudio/Mplus 资源状态；本项目的只读模板为
+`reports/charls_continuation_readiness_20261005/REPORT.md`。当 CFPS scientific
+gate 尚未关闭时，CHARLS 只能进入 reuse-readback 阶段；即使 8787/8789 在线且
+内存准入可用，也不能跳过 estimand、MI pooling、class/reference label 和
+timeout 合同。
