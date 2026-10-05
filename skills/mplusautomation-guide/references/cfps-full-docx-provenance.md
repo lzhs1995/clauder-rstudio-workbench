@@ -70,3 +70,6 @@ reports/cfps_full_docx_provenance_20261005/manifest.json
 The validator must report `new_mplus_submissions=0` when it is only reading
 historical and already verified outputs. This prevents a provenance audit from
 re-running expensive models or contaminating the source result directory.
+It should also check that every recorded R line range is within the current
+script length and that any explicitly named external SVG exists; a plausible
+line number or a stale Windows path is not sufficient evidence.
