@@ -166,6 +166,9 @@ tools. An offline Rscript run does not establish that chain.
 - [type1-tech3-calibration.md](references/type1-tech3-calibration.md):
   measured single-slot TECH3 calibration, parameter-identity checks, and stale
   ClaudeR async-record recovery after durable completion.
+- [windows-memory-census.md](references/windows-memory-census.md):
+  RSS/private-byte interpretation, MCP/RStudio process attribution, and safe
+  reclamation boundaries on a 16 GiB Windows host.
 - [external-mplus-classification.md](references/external-mplus-classification.md):
   classify Windows Mplus processes by parent chain and working directory so
   external chapter audits do not get counted as CFPS/CHARLS estimates.
