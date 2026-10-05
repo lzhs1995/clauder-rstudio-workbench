@@ -15,12 +15,13 @@ slot:
 | `type1::edu` | 619 s | 112 rows, max estimate/SE difference 0 | normal |
 | `type1::pinc` | 1049 s | 114 rows, max estimate/SE difference 0 | normal |
 | `type1::sex` | 688 s | 112 rows, max estimate/SE difference 0 | normal |
+| `type1::urban` | 1240 s | 112 rows, max estimate/SE difference 0 | normal |
 
 The `pinc` worker's sampled Mplus private peak was about 324 MiB; the `edu`
-sample was about 204 MiB. The `sex` run completed normally but had no reliable
-private-memory sample, so its peak must remain unknown. These are calibration
-observations, not universal Windows requirements and not evidence for model
-selection.
+sample was about 204 MiB. The `sex` and `urban` runs completed normally but had
+no reliable private-memory sample, so their peaks must remain unknown. These
+are calibration observations, not universal Windows requirements and not
+evidence for model selection.
 
 Before each submission, take a fresh Windows profile and apply the composite
 admission gate: physical-memory increment plus reserve, commit headroom, disk
