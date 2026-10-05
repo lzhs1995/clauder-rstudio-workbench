@@ -73,3 +73,10 @@ re-running expensive models or contaminating the source result directory.
 It should also check that every recorded R line range is within the current
 script length and that any explicitly named external SVG exists; a plausible
 line number or a stale Windows path is not sufficient evidence.
+
+When an older cell ledger has an empty `source_script`, do not classify the
+cell as source-free before joining it to the new table manifest. In this
+project, most such rows had a unique `producer` field; a smaller group exposed
+an absolute/relative historical candidate conflict. The correct status for the
+latter is a version/standardization contract review, with both candidates
+preserved, rather than a new Mplus submission.
