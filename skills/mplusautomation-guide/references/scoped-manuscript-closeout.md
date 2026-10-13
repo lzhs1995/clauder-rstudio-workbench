@@ -86,6 +86,16 @@ payload uniqueness and the manifest before publication. Download from an
 immutable commit anonymously, then repeat package and numerical verification.
 Keep the post-download proof separate from the immutable payload it verifies.
 
+Bind the release gate to the ordered complete review ledger and parse the issue
+count/end marker from each hashed raw response. A verified raw hash alone does
+not prevent contradictory summary metadata or omission of an intervening failed
+round. Freeze a reviewed per-file path/hash/role allowlist before packaging;
+directory extensions and known identifier blacklists cannot identify every
+per-person table. Reject unlisted or changed files, then run identifier and
+credential scans as an additional check. The independent executor found both
+gaps using isolated negative cases; the corrected release gate rejected them
+without changing the manuscript or repeating NLM/statistical work.
+
 Completion is scoped: evidence accepted, manuscript checked, review resolved,
 release independently downloaded. It does not mean every original hypothesis
 was estimated or supported. Stop routine model work at the agreed endpoint.
