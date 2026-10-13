@@ -56,7 +56,7 @@ class CompareGroupsGuideTests(unittest.TestCase):
         self.assertNotIn("/Users/", skill)
         self.assertNotIn("C:/Users/", skill)
 
-    def test_collection_installer_discovers_all_three_skills(self) -> None:
+    def test_collection_installer_discovers_all_four_skills(self) -> None:
         sys.path.insert(0, str(WORKBENCH_PACKAGE))
         try:
             from clauder_workbench.installer import _skill_sources
@@ -66,7 +66,7 @@ class CompareGroupsGuideTests(unittest.TestCase):
             sys.path.pop(0)
         self.assertEqual(
             names,
-            ["clauder-rstudio-workbench", "cmaverse-paired-mval", "comparegroups-guide"],
+            ["clauder-rstudio-workbench", "cmaverse-paired-mval", "comparegroups-guide", "mplusautomation-guide"],
         )
 
     def test_schema_core_and_templates(self) -> None:

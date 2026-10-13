@@ -74,6 +74,7 @@ def main() -> int:
         ("skill_workbench", [sys.executable, ".github/scripts/quick_validate.py", "skills/clauder-rstudio-workbench"]),
         ("skill_cmaverse", [sys.executable, ".github/scripts/quick_validate.py", "skills/cmaverse-paired-mval"]),
         ("skill_comparegroups", [sys.executable, ".github/scripts/quick_validate.py", "skills/comparegroups-guide"]),
+        ("skill_mplusautomation", [sys.executable, ".github/scripts/quick_validate.py", "skills/mplusautomation-guide"]),
         ("privacy", [sys.executable, "-m", "unittest", "tests.test_discovery_redaction_v044", "-v"]),
     ]
     results = [run(name, command, env) for name, command in commands]
