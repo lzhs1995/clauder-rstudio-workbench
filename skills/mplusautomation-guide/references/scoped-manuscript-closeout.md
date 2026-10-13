@@ -105,3 +105,29 @@ not authenticated notebook access or a successful source-grounded review.
 Provider-specific collaboration adapters must pass their actual client's
 identity/input gates; a Codex pane is not a Claude callback. Preserve a rejected
 dispatch and use an already authorized solo route without disabling guards.
+
+## Delegate bounded review without duplicating computation
+
+An existing visible executor is useful for an independent artifact/code audit
+while the supervisor serializes NLM source changes and owns publication. Assign
+an explicit read set, one report path, permitted writes, exclusions and a stop
+condition. Do not run duplicate NLM queries, statistical engines or full test
+suites in both panes merely to demonstrate activity.
+
+Pane title, readiness and task completion are different observations. In the
+Windows/WSL case, the actual Codex process ancestry and session identity proved
+readiness; a separate input delivery and executor tool activity proved that the
+audit started. The formal collaboration preflight rejected the Codex footer as
+occupied input. Preserve that failure and do not label a directly authorized
+ordinary audit as a validated V2 round or consensus. Do not disable global hooks
+or clear unknown user input to make an adapter pass.
+
+Write the report before notifying the supervisor. Detect supported bridge
+commands once: the observed tmux-bridge 2.0 had no `notify` command. A scoped tmux
+status message plus a task-specific wait-for signal can announce a report
+without typing into a busy supervisor; neither substitutes for a formal callback
+when the chosen protocol requires one. The supervisor must read the report,
+record its verdict and check actual artifacts before claiming participation or
+acceptance. Preserve a stable report path as recovery evidence if a notification
+is lost. Reuse the measured client/model and do not start replacement sessions
+solely because a title or historical registry suggests another executor.
