@@ -21,6 +21,11 @@ tools. An offline Rscript run does not establish that chain.
 
 ## Workflow
 
+When the author has chosen to stop estimation and narrow the manuscript, use
+[scoped-manuscript-closeout.md](references/scoped-manuscript-closeout.md).
+Resume existing candidate artifacts at the first missing acceptance gate;
+do not execute the estimation steps below merely to close an editorial issue.
+
 1. Inventory scripts, data, generated inputs, output readers and manuscript
    tables. Hash the originals. Distinguish current R specifications from
    historical `.inp` specifications before calling either a replication.
