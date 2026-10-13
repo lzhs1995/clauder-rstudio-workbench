@@ -1,0 +1,87 @@
+# CFPS PP-LGCM 调节效应：可审计的优化方案
+
+## 当前证据
+
+本报告只使用已经存在的 Mplus `.out`。ClaudeR/RStudio 通过
+`MplusAutomation::readModels()` 成功读回 56 个文件、168 行交互参数，并生成
+`cfps_moderation_summary_v1.csv`、参数表和两张诊断图。没有重新估计 Mplus，因而不
+会把历史规格变体误当成新的证据。
+
+type1 的教育和收入调节行在变体审计中各有 3/9 行 p<.05；type1 性别有 1/9，
+城乡为 0/9。type2 只有教育为 3/9；type3 城乡为 1/9；type4 城乡为 1/15。
+这些比例是审计计数，不是显著性筛选规则。type3/4 的区间更宽，提示精度和样本
+信息量需要优先核查；城乡没有稳定的低 p 值聚集。
+
+## 能够提高信息量、但不能保证显著的路径
+
+1. **先固定 estimand 和尺度。** 对每个调节变量建立唯一的模型身份证：绝对值或
+   均值标准化、基期标准化与否、中心化规则、控制变量、增长形态、MI 成员和样本
+   范围必须一致。只有同一身份证下的交互系数才可比较。
+2. **核查交互的功效来源。** 从同一已验收模型报告 moderator 的分布、有效样本、
+   缺失比例、交互项的标准误和置信区间；对 type3/4 先确认宽区间来自样本损失、
+   非线性/边界或模型复杂度，而不是只看 p 值。
+3. **使用联合检验。** 组间斜率差必须用同一模型中的 Wald/joint test；一组简单
+   斜率显著而另一组不显著，不能推出调节效应显著。B1 的 D2/LRT 只有在所有成员
+   的配对似然、自由参数数、嵌套关系和 pooling 证据齐全时才可计算。
+4. **预注册理论敏感性。** 如果理论允许，可在新数据/新分析计划中预先指定完整
+   三过程 LMS、时变协变量敏感性或年龄轴队列序贯模型；每项必须在隔离目录、资源
+   准入、MI 诊断和收敛门都通过后运行，并保留所有失败尝试。
+5. **提高测量与设计质量。** 预先定义可靠性、范围限制、成员配对和权重处理；必要
+   时扩大样本或增加波次。敏感性结果应并列报告，不替换原始主分析。
+
+## 明确禁止
+
+禁止按最小 p 值挑增长形态或文件变体、事后二分连续调节变量、删除削弱结果的控制
+变量、只报告显著简单斜率、平均多重插补 p 值、使用不可比 LRT、隐藏不收敛/边界
+警告或把诊断计数写成正式发现。研究假设必须由可复现的 estimand 和完整证据支撑，
+不能以“尽可能显著”为分析目标。
+
+## 下一步顺序
+
+先完成 B1/B2/B3 的既有输出边界读回，再决定是否有证据支持预注册新估计。当前
+Windows 可用物理内存约 1.23 GiB，低于新 CFPS/CHARLS worker 准入门槛；因此不提交
+新 Mplus。只有 CFPS 的 LRT/MI/rank/derived 合同闭合、资源恢复且新规格预注册后，
+才可进行隔离敏感性估计。
+
+## B3 既有输出读回结果
+
+ClaudeR/RStudio 又对上述 56 个文件做了只读文本边界读回。56/56 个文件都有可
+解析的 S5 残差方差行；0 个文件实际启用了 `s5@0`，56 个文件仅出现被 `!` 注释
+的可选语句；56 个文件都没有检出 negative/boundary 警告文字。这个结果不能替代
+完整直接效应模型的 MI/LRT/死亡截断诊断，但它排除了“本次调节输出因把 S5 固定为
+0 才获得显著性”的简单解释。逐文件证据在
+`cfps_boundary_readback_20261004/cfps_s5_boundary_file_readback_v3.csv`。
+可复现入口为 `work/cfps_boundary_readback_20261004.R`，已在当前 8787 RStudio 会话
+执行并返回 `B3_READBACK_V3_DONE`。
+
+## 2026-10-04 dual multiplicity readback
+
+ClaudeR/RStudio then ran a read-only empirical check over the existing 168-row
+parameter CSV. The original `p_bh` and `p_bonf` columns are adjusted within each
+output file (the recorded contract, five hits under each adjustment), whereas
+recomputing BH and Bonferroni over all 168 rows gives zero hits under both. Keep
+both columns with explicit family labels; never present the within-output result
+as a global correction. The check also writes estimate/SE/95% interval rows,
+family summaries, and a zero-line plot without submitting Mplus.
+
+Use the same distinction when an NLM or another reviewer proposes a testing
+family: define the family from the theory and analysis plan before looking at
+the results, report raw and adjusted values, and retain the global 168-row
+sensitivity calculation. A local adjusted hit is descriptive evidence only
+until the same model supplies parameter VCOV and a pre-specified joint Wald or
+D2 result.
+
+The independent NLM review confirms the operational order: freeze the primary
+estimand and testing families; request TECH3/VCOV in isolated copies; validate
+all MI members; run joint Wald before conditional slopes or Johnson–Neyman
+intervals; use continuous moderator information and show data density; and write
+observational, conditional-prediction language. It explicitly rejects changing
+cut points, dropping controls, choosing an imputation member, averaging p-values,
+or selecting the smallest p-value to make the hypothesis appear supported.
+
+The reusable implementation is `scripts/cfps_moderation_readback.R`. Call
+`run_cfps_moderation_readback(csv_path, out_dir)` from the live RStudio session
+with an isolated output directory. It verifies the required columns, preserves
+the recorded within-output corrections, computes the declared all-row
+sensitivity, and writes row-level/family CSVs, a zero-line PNG, and a short
+conclusion memo. It never calls Mplus or overwrites the source CSV.

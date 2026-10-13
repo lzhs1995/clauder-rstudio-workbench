@@ -33,7 +33,14 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
-    directory = os.open(path.parent, os.O_RDONLY)
+    # POSIX permits opening a directory and fsyncing the rename. Windows does
+    # not expose directory handles through os.open in the same way; the file
+    # itself was flushed above and os.replace remains the atomic publication
+    # step there.
+    try:
+        directory = os.open(path.parent, os.O_RDONLY)
+    except (OSError, PermissionError):
+        return
     try:
         os.fsync(directory)
     finally:

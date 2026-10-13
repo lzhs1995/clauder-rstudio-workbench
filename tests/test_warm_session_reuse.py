@@ -29,7 +29,9 @@ class WarmSessionReuseTests(unittest.TestCase):
 
 
     def test_warm_session_reference_contains_real_reuse_contract(self):
-        text = (SKILL_ROOT / "references" / "warm-session-reuse.md").read_text()
+        # The reference is committed as UTF-8; do not depend on the Windows
+        # process locale (often GBK) for a cross-platform compatibility test.
+        text = (SKILL_ROOT / "references" / "warm-session-reuse.md").read_text(encoding="utf-8")
         for marker in (
             "chapter4-mac",
             "port 8788 / pid 19087",
