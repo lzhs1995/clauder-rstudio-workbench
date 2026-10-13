@@ -1,5 +1,14 @@
 # Completion Evidence
 
+The October 2026 Windows closeout ran the repository unittest suite through
+native Python: 282 cases, zero failures/errors, 15 explicit skips. Eleven
+additional resource-admission/queue regression functions passed, and 71
+links from the guide entrypoint resolved. These are software/documentation
+checks, not additional Mplus estimates or licensed macOS validation. Test
+invocations must use the repository working directory and its declared
+dependencies; a missing `tomlkit` import is an environment error, not a model
+failure. Raw results and scope boundaries belong in the project release.
+
 Check the levels independently:
 
 1. Transport: actual session identity and native sync/async/poll records.

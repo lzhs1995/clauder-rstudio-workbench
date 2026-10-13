@@ -68,6 +68,16 @@ consecutive no-new-issue rounds with fresh uploads OR three consecutive same
 location/type findings with evidence-based supervisor adjudication. NLM opinions
 cannot replace local arithmetic, model provenance or visual inspection.
 
+Adjudicate the proposed fix as well as the reported defect. In the Windows
+closeout, NLM correctly found a missing Raudenbush/Chan (1992) reference but
+proposed a different title and incorrect bibliographic details. The publisher
+record identified *Growth Curve Analysis in Accelerated Longitudinal Designs*,
+DOI `10.1177/0022427892029004001`. Preserve the raw suggestion and record the
+verified replacement. Do not copy an AI-supplied reference without checking it.
+For a minimal citation correction, preserve Word's editable citation
+instructions and footnotes, verify table XML is unchanged, and export/review
+the revised PDF pair. Earlier-hash reviews remain historical evidence.
+
 Package an explicit aggregate-only whitelist. Retain all dispositions, exact
 file hashes and runnable saved-output validators; exclude participant records,
 raw DAT, MI objects, per-person scores, credentials and literature fulltexts.
@@ -87,6 +97,11 @@ WSL-controlled session. Keep native Windows paths at executable boundaries and
 UTF-8 in captured output. Inspect only the requesting host's NotebookLM proxy;
 the Windows rule is `DOMAIN-SUFFIX,notebooklm.google.com,链式代理-Gemini`.
 This experience does not establish licensed Mplus or Word automation on macOS.
+An installed configuration can name a stale controller pipe while the live
+Clash production core uses another one. Inspect the live local controller
+read-only; do not rewrite the proxy or launch repeated login merely because a
+network request failed. A successful cookie-free HTTPS probe proves egress,
+not authenticated notebook access or a successful source-grounded review.
 Provider-specific collaboration adapters must pass their actual client's
 identity/input gates; a Codex pane is not a Claude callback. Preserve a rejected
 dispatch and use an already authorized solo route without disabling guards.

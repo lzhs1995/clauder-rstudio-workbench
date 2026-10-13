@@ -11,6 +11,10 @@ participant data, licensed Mplus files, or machine-specific result trees.
 Project-specific receipts belong in an external run directory and should be
 linked by a manifest rather than copied into this skill.
 
-The skill remains a draft until each requested model family and manuscript cell
-has an explicit disposition. A successful Mplus process or `readModels()` call
-is not by itself a scientific or manuscript acceptance decision.
+This v1 guide keeps project acceptance separate from software execution.
+Every requested model family and manuscript cell must have an explicit
+disposition; not estimated, deferred and rejected are distinct from a valid
+null result. A successful Mplus process or `readModels()` call is not by itself
+a scientific or manuscript acceptance decision. See the
+[scoped closeout workflow](references/scoped-manuscript-closeout.md) for
+author-approved stopping rules and evidence-bound manuscript delivery.

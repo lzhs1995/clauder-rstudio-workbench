@@ -5,10 +5,11 @@ description: Use when running or reproducing Mplus models from R with MplusAutom
 
 # MplusAutomation Guide
 
-Status: draft. Infrastructure checks and Windows runs do not establish complete
-manuscript reproduction or licensed macOS runtime validation. The guide is
-being extended with a cross-tool handoff contract; it becomes final only after
-the requested model families and manuscript cells have explicit dispositions.
+Status: v1 operational guide. Windows execution, recovery, resource admission
+and manuscript reconciliation are documented from the PP-LGCM workflow.
+Project acceptance still requires explicit dispositions for every requested
+model family and manuscript cell. A guide release does not establish that all
+original hypotheses were tested or that licensed macOS Mplus was validated.
 
 Use MplusAutomation as the R interface and licensed Mplus as the estimation
 engine. For a requested ClaudeR workflow, first use the sibling
