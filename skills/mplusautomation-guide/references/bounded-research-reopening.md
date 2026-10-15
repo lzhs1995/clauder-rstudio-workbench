@@ -95,3 +95,39 @@ scores and identifiers local. Split archives at the agreed size limit. Separate
 failed attempts, adopted pilots and unrun registered models in the report.
 No new NLM rounds are required merely to release a diagnostic report; a new
 manuscript candidate still follows the manuscript review workflow.
+# Completing an authorized MI family after a usable pilot
+
+When the author authorizes the next family, retain the earlier pilot and
+freeze a new batch contract. Check its input/data/output identities and reuse
+the usable first imputation. A second-start check is a diagnostic duplicate,
+not another imputation. Fill only missing member numbers; never replace a
+failed member with a favorable start or call a partial family complete.
+
+Pool the coefficient vector and full within-imputation covariance. For a
+two-path group-difference hypothesis, use a documented pooled Wald/D1 test,
+and form group contrasts with the cross-covariance terms. Do not average
+P values or compare group stars. If only one of twelve registered tests is
+available, an interim Bonferroni bound with denominator twelve can be
+reported; it is not the completed family's Holm result. State the original
+FCS compatibility limitations even when all members are legal and FMI is
+small. Completion of one H4.1 specification does not complete H4.2 or all
+dynamic moderation branches.
+
+Measure preparation, admission, engine runtime and output validation
+separately. In the Windows follow-up, ten engine/launcher calls used about
+378 seconds with roughly 193 MiB peak process-tree RSS, but end-to-end work
+took longer. Neither the smaller engine total nor an uninstrumented
+inter-call delay establishes total duration or a memory bottleneck. Avoid
+restarting fast valid models to address overhead outside the engine.
+
+For external-cohort baseline controls, compare raw same-wave responses with
+harmonized fields before silently substituting them. A source may be
+complete yet disagree with the baseline response. Recover documented
+same-wave fallbacks (for example reported age when birth year is missing),
+retain actual missing values and record disagreements. Do not assume
+reported valid-child count equals total living-child count. Keep genuine
+negative household income, distinguish earnings from total income, and
+separate core adjustment from resource sensitivity sets. Preserve original
+trajectory missing masks for FIML; structural absence of a sex/rank contrast
+is not an ordinary missing covariate. An additive-model imputation plan must
+not silently become the plan for latent interactions.
