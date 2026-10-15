@@ -16,6 +16,7 @@ def main():
     ap.add_argument('--owner-created',type=float,required=True)
     ap.add_argument('--receipt',type=Path,required=True)
     ap.add_argument('--max-seconds',type=int,default=7200)
+    ap.add_argument('--stop-file',type=Path)
     a=ap.parse_args()
     if os.name!='nt': raise RuntimeError('Windows runtime required')
     if a.max_seconds<=0 or a.max_seconds>14400: raise ValueError('Bounded1..14400 second lifetime required')
@@ -30,7 +31,7 @@ def main():
         tmp=a.receipt.with_suffix('.tmp');tmp.write_text(json.dumps(d,indent=2),encoding='utf-8');os.replace(tmp,a.receipt)
     try:
         receipt('ACTIVE',previous_state=previous)
-        while same_owner(a.owner_pid,a.owner_created) and time.monotonic()-start<a.max_seconds:
+        while same_owner(a.owner_pid,a.owner_created) and time.monotonic()-start<a.max_seconds and not (a.stop_file and a.stop_file.exists()):
             time.sleep(10)
             receipt('ACTIVE')
     finally:
