@@ -131,3 +131,59 @@ separate core adjustment from resource sensitivity sets. Preserve original
 trajectory missing masks for FIML; structural absence of a sex/rank contrast
 is not an ordinary missing covariate. An additive-model imputation plan must
 not silently become the plan for latent interactions.
+
+## Diagnose MI cost before increasing engine concurrency
+
+Separate time spent imputing covariates from Mplus estimation. A live R process
+with several GiB available can be compute-bound; do not call this memory
+exhaustion or close unrelated applications. Log individual conditional fits,
+not only the first iteration of a twenty-chain batch. A first checkpoint after
+all chains can leave a long computation opaque and costly to recover.
+
+Before fitting a complex model for a sparse missing covariate, check legitimate
+source recovery. In the CHARLS extension, one missing baseline sex value had
+concordant responses in two later raw interviews and the harmonized source.
+The analysis copy records this as longitudinal source recovery, retains the
+original baseline missing mask and hashes, and leaves genuinely observed cells
+untouched. This is not a general license to fill a time-varying baseline
+covariate from follow-up, or to assume a harmonized field is always correct.
+
+If conditional-fit inputs are identical across MI draws, cache **only** the
+deterministic fit. Hash every fit argument; redraw parameters, conditional random
+effects and PMM donors on every invocation. Never cache the completed values or
+reuse one draw as multiple imputations. In an isolated worker, function copies
+can wrap the fit without modifying the installed package. Verify uncached,
+cold-cache and warm-cache outputs and final RNG states under the same seed.
+The tested ADL case made 400 fresh imputation calls with one fit and 399 cache
+hits; this optimization does not prove MAR or substantive-model compatibility.
+Check convergence, observed-cell preservation, donor support and actual model
+pooling MCSE separately. Retain failed or deliberately ended diagnostics.
+
+## Windows recovery details from the extension
+
+- A transient `PermissionError` during heartbeat publication must not kill a
+  healthy model. Retry atomic replacement within a bounded interval; preserve
+  the prior state and log deferred noncritical heartbeats. Critical receipts
+  must still fail visibly if publication remains impossible. Save a traceback,
+  because a bare error number does not identify the failing operation.
+- Keep the infrastructure-interrupted attempt. Resume in a distinct attempt
+  directory after verifying no owned engine remains. This is different from
+  retrying an inadmissible statistical specification without a new rationale.
+- Persist PID plus creation time. `ps::ps_handle(pid, time)` requires POSIXt,
+  not a JSON numeric timestamp. Alternatively obtain a live handle and compare
+  creation times with a documented tolerance for JSON precision. Do not treat
+  a type error as proof that the coordinator has died.
+- A waiting coordinator must check the other coordinator's lifetime, not only
+  the gap between two engine processes. Engine locks prevent duplicate starts
+  but a lock refusal is not an estimated model or a scientific failure.
+- Reconcile a never-claimed receipt separately from a completed engine receipt.
+  If no reservation, engine receipt or output exists, preserve the earlier
+  scheduling receipt and allow first execution after ownership is clear. Do
+  not cache `NOT_RUN` forever, and do not overwrite a genuine attempted model.
+- Use absolute batch paths for every receipt. Move an accidentally generated
+  receipt back to the isolated batch only after verifying ownership; never
+  clean an unrelated directory by pattern.
+- A vanilla `Rscript` does not inherit the foreground `.libPaths()`. Set the
+  isolated package library explicitly and record the actual worker package
+  version. Do not rerun valid estimates solely to make historical version
+  metadata match a later worker configuration.
