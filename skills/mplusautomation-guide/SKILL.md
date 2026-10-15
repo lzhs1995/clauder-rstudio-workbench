@@ -83,6 +83,11 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [bounded-research-reopening.md](references/bounded-research-reopening.md):
+  resume author-approved mechanism research after scoped closeout, reuse prior
+  failed attempts, bound pilot cost, distinguish H4 feasibility from complete MI,
+  and rebuild adjacent-construct external-study inputs before fitting.
+
 - [cfps-review-scale-and-sensitivity.md](references/cfps-review-scale-and-sensitivity.md):
   follow-up manuscript review after completed reproduction, actual CESD scale
   identity, common-sample sensitivity, Mplus line/label repairs, wrapped
