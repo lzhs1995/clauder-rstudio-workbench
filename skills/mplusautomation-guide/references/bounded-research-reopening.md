@@ -187,3 +187,69 @@ pooling MCSE separately. Retain failed or deliberately ended diagnostics.
   isolated package library explicitly and record the actual worker package
   version. Do not rerun valid estimates solely to make historical version
   metadata match a later worker configuration.
+
+## Multi-variable MI and conditional-model follow-up
+
+Do not carry an all-fit cache from a one-missing-variable experiment into
+multivariable FCS. Other imputed predictors change between iterations, so the
+conditional-fit inputs change. Reusing an old fit would change the statistical
+procedure; keeping every fit can grow memory without useful cache hits. In the
+CHARLS resource extension, two independent twenty-chain workers completed
+twenty iterations each, with 2,400 explicitly timed, uncached conditional fits.
+They produced forty actual imputations. Separate seeds, checkpoints, original
+data identities and convergence diagnostics were verified before combining.
+
+Parallel MI workers and parallel Mplus engines are different resource decisions.
+The second MI worker was admitted using current Windows physical and commit
+headroom; the model engine retained one owner and waited for the other
+coordinator's true terminal state. Log each conditional fit and checkpoint each
+iteration. A completed worker is not permission to pool before every required
+worker and the combined diagnostics pass. Do not confuse the sum of engine
+seconds with end-to-end imputation, waiting and readback time.
+
+For skewed money variables, distinguish numeric conditioning from changing the
+estimand. This extension linearly rescaled raw household amounts for PMM,
+matched each imputed score back to an observed raw donor, and only then derived
+the prespecified analysis transforms. It retained real negative income and zero
+consumption. Preserve observed values and original outcome missing masks, and
+report additive-FCS compatibility separately from future interaction models.
+Forty chains and favorable PSRF do not prove MAR or substantive compatibility.
+
+A new conditional H4.1 specification can differ scientifically from an earlier
+failed E0/E1 model: record the exact added interaction and retained main effects.
+Use legal initial values without transferring inference from their source
+population. Keep the original admissibility gates and stop a family at the first
+unusable imputation. In the follow-up, two new families had usable first members
+and second-start checks but failed at member two. Neither a successful pilot
+nor nine adjudicated families became a complete MI result. Retain the failed
+outputs; do not replace members, fix variances solely to force completion, or
+interpret failure as evidence of no association.
+
+## Distinguish idle standby from slow estimation
+
+When an engine finishes quickly but the next receipt appears much later, check
+the Windows System log before blaming Mplus, R, memory or the network. In this
+extension, Kernel-Power event 506 recorded Modern Standby due to Idle Timeout
+at 13:43:39 UTC; event 507 recorded keyboard wake at 14:10:39 UTC. This interval
+matched the approximately 1,622-second post-engine gap. The same model's
+engine/launcher ran for about 23 seconds and the queue resumed without rerunning
+it. Earlier unexplained gaps remain unexplained unless their own logs are checked.
+
+Protect the entire authorized coordinator lifetime, including preparation,
+readback and pooling, rather than only the Mplus child. The companion
+[`windows-coordinator-awake.py`](../scripts/windows-coordinator-awake.py) uses a
+temporary Windows execution-state request, verifies owner PID plus creation
+time, enforces a bounded lifetime, and clears the request when the owner exits.
+It requests system and display availability to cover idle transitions; it does
+not change the global power plan or override intentional lid-close/sleep actions.
+Record API success, the active receipt and the final released receipt. Do not
+claim that a successful call guarantees survival of explicit sleep, power loss,
+or every battery/Modern Standby policy.
+
+Microsoft documents the [execution-state flags and user-sleep
+boundary](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate)
+and [Modern Standby/DC request
+limitations](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-powersetrequest).
+An administrator-only `powercfg /requests` failure is not proof that the API
+request failed; retain the API return and bounded guard evidence without asking
+for elevation merely to print that diagnostic.
