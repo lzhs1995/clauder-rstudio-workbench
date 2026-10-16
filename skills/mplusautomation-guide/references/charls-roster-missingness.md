@@ -155,3 +155,49 @@ See the official [PREDICTOR option](https://www.statmodel.com/HTML_UG/chapter16V
 [imputation documentation](https://www.statmodel.com/HTML_UG/chapter11V8.htm) and
 [version history](https://www.statmodel.com/verhistory.shtml). The retained raw
 Mplus output establishes which exact combination was rejected in this test.
+
+## Observed resource interactions and complete MI families
+
+An observed baseline contrast multiplied by observed education or urban status
+is a different estimand from a latent slope interaction. Bind it to the original
+hypothesis before estimating. The CHARLS H4.1 follow-up covers baseline contrast
+paths by education and residence; it does not complete income heterogeneity,
+contrast-trajectory associations, CFPS replication, or H4.2.
+
+Generate imputation inputs for the actual analysis scope and include its observed
+contrast and resource products. In this follow-up, four separate 20-member ADL
+families retained `Z0`, `Z0*education` and `Z0*urban`. Original values, donor
+support and outcome missing masks were checked independently. This is an
+interaction-aware FCS working approximation, not proof of substantive-model
+compatibility or MAR, and not evidence for reusing it in a latent interaction.
+
+Retain lower-order terms and the chosen indicator direct paths in all members.
+If `x1/y1 ON Z0 Z0*G` are included, latent-intercept contrasts are conditional
+on those paths. Report group 0, group 1 and their difference using the full
+parameter covariance, and test the group differences directly with a pooled
+joint test. Its rejection alone does not establish “stronger” or “weaker”
+association: inspect group-specific direction, scale and uncertainty. Signed
+child contrasts and nonnegative SD do not share one direction of disharmony.
+
+## Save preparation time without duplicating engines
+
+Profile preparation, engine/launcher and readback separately. In the first 64
+calls of the H4.1 batch, median engine/launcher time was about 16.7 seconds,
+readback 6.7 seconds and preparation gap 6.8 seconds. These are observations
+from retained receipts, not a randomized benchmark or proof of a memory limit.
+
+The existing coordinator accepted immutable prepared jobs. A separate native R
+task prepared 88 still-unclaimed future inputs in about 58 seconds, caching four
+deterministic parent-start calculations with 84 hits. The key included the full
+target specification, parent-output hash and perturbation choice; the original
+input builder and actual per-member data were retained. No engine or new model
+specification was launched. This saved repeated source parsing while preserving
+the one-engine memory limit. Only use this approach when ownership of future
+inputs is unambiguous; do not race an active writer or mutate a running job.
+
+An input-ready receipt must say **not estimated**. Continue recording each real
+Mplus result, and distinguish a second start from an imputation. Cache
+deterministic calculations only, never completed random draws or another MI
+member's data. A light watcher can bind to the coordinator PID plus creation
+time, then pool and independently verify complete families after terminal exit;
+it must not restart engines or convert partial families into pooled results.
