@@ -1,6 +1,6 @@
 ---
 name: mplusautomation-guide
-description: Use when running or reproducing Mplus models from R with MplusAutomation, including ClaudeR/RStudio execution, multiple imputation, isolated batch runs, output diagnostics, and tracing results into manuscript tables.
+description: Use when running or reproducing Mplus models from R with MplusAutomation, including APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
 ---
 
 # MplusAutomation Guide
@@ -15,6 +15,21 @@ Use MplusAutomation as the R interface and licensed Mplus as the estimation
 engine. For a requested ClaudeR workflow, first use the sibling
 `clauder-rstudio-workbench` skill to bind RStudio and prove the actual agent
 tools. An offline Rscript run does not establish that chain.
+
+## APIM, mediation and moderation
+
+For distinguishable-dyad APIM, APIMeM, APIMoM and b-path conditional mediation,
+start with [the APIM operating guide](APIM.md). It routes new data through
+`workflow.R` and complete existing `[[init]]` templates through the template
+preserving compiler. Keep each route's inference and supported-scope contract.
+
+The [native synthetic acceptance](references/synthetic-acceptance.md) covers
+18 functional Mplus fits and four scheduling comparisons, with independent
+effect, plot-data, Word-table, migration and recovery checks. A missing
+historical thesis source does not block these independent skill operations;
+manuscript adoption and historical reproduction retain their own requirements.
+The [APIM reference map](references/reference-map.md) indexes Chapter 4 lessons.
+Use the general workflows below for the other supported model families.
 
 ## Windows Mplus优先资源执行
 

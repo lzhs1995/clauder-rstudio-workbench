@@ -1,0 +1,61 @@
+{
+  "acceptance_date": "2026-10-15",
+  "status": "PASS_SYNTHETIC_SUPPORTED_SCOPE",
+  "engine": "Mplus VERSION 9",
+  "R": "4.5.2",
+  "MplusAutomation": "1.2",
+  "ClaudeR": "0.2.0",
+  "configured_models": 16,
+  "template_models": 2,
+  "performance_models": 4,
+  "effects_checked": 336,
+  "word_cells_checked": 3360,
+  "inference_modes": [
+    "COMPLEX_MLR",
+    "ML_row_BC_1000"
+  ],
+  "datasets": "Two independent synthetic datasets with changed values, names, IDs and member order",
+  "code_sha256": {
+    "scripts/workflow.R": "123540e251da0f2a751274bf0185dedd3096227568733c37d212cfe9cd7af71b",
+    "scripts/results.R": "33f96662f064fc76c446e1a2356b87fd4efc8de57fa53e4a9b5c9efc26d38eee",
+    "scripts/compile_template_bundle.R": "5d81b4a97f68f3eae231eb2074db1e1bd5500618527dd24d0ad37c4efbba248e",
+    "scripts/windows_coordinator.py": "89cd226ad4232324e83e8c172b89be0ff14dc5ee7e180f8b3f1b81dfec5b91a2",
+    "scripts/test_native_acceptance.R": "0754d03becdbce60cb7871377614d1213a7dc6a660a6cbd1c15f8acd0e35a9c7",
+    "scripts/validate_workflow_outputs.py": "d4fc2f5113a1d6bea8a669c6d38b8466056e948dcb0785df0bf5ff92136f4cc8"
+  },
+  "recovery": {
+    "compile_checkpoint_cancel_resume": true,
+    "negative_cases": 6,
+    "live_Mplus_priority_restored": true
+  },
+  "benchmark": {
+    "default_seconds": [
+      34.5351,
+      31.773
+    ],
+    "coordinated_seconds": [
+      18.6825,
+      19.6021
+    ],
+    "observed_mean_reduction": 0.42262559174520153,
+    "same_input_and_data": true,
+    "causal_speedup_proven": false,
+    "limits": "Two alternating pairs on a shared host; native bootstrap RNG not controlled; scheduling and background load not isolated."
+  },
+  "resource_observations": {
+    "mplus_private_peak_gib": 0.27442169189453125,
+    "minimum_available_gib": 1.9003639221191406,
+    "minimum_commit_headroom_gib": 6.931732177734375,
+    "max_sampled_cpu_cores": 0.9982350814052552,
+    "limits": "Sampled owned Mplus private memory, not combined worker peak; 1-second sampling can miss short peaks."
+  },
+  "limits": [
+    "Not Chapter 4 historical-source reproduction",
+    "Not a scientific adoption decision",
+    "Configuration runner excludes categorical outcomes, latent interactions and general equality constraints",
+    "Original-template route requires explicit effect mappings for custom postprocessing",
+    "No generic mid-estimation cancellation/recovery claim",
+    "Visual review is sampled across formats and model families"
+  ],
+  "publication": "Local reviewable package; no GitHub push or managed installation"
+}
