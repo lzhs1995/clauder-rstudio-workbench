@@ -1,0 +1,104 @@
+{
+  "generated_on": "2026-10-04",
+  "skill": "mplusautomation-guide",
+  "file_count": 19,
+  "files": [
+    {
+      "path": "INSTALL.md",
+      "sha256": "ca487d4b989a9a95a72458e1958b7174bacd6eae296056a4136730897caf0bd2",
+      "bytes": 578
+    },
+    {
+      "path": "references/apim-paths.md",
+      "sha256": "30baded57cb0afc3a875b6a4c33503918832df3fecf114412e42d0c9d40c500c",
+      "bytes": 1906
+    },
+    {
+      "path": "references/candidate-compilation-and-precision.md",
+      "sha256": "4dd27c680d9549d5c9e9cee8e4a9f7bb71421a7a6f5d9157d9bc6759b35441f4",
+      "bytes": 14270
+    },
+    {
+      "path": "references/chapter4-apim-workflow.md",
+      "sha256": "4d637ed91b1579c1623f214fa30f802aca7e4dc2848bbfaabbf72081c18b1413",
+      "bytes": 12574
+    },
+    {
+      "path": "references/effect-extraction-and-testing-families.md",
+      "sha256": "ef515b2a2258926035446ec8c5d9478358694870184250040a36faf6fb2e6046",
+      "bytes": 23513
+    },
+    {
+      "path": "references/execution-and-validation.md",
+      "sha256": "9bf804d6c441be3f8b384c8a88d867a4bce131f596596f1ab60783b8fc634181",
+      "bytes": 10241
+    },
+    {
+      "path": "references/external-cluster-bootstrap.md",
+      "sha256": "c1806917b04de3ab762a9db624eeb34369e335f096c1bfb6900dd45a4bc85ca2",
+      "bytes": 8321
+    },
+    {
+      "path": "references/finite-cluster-and-bootstrap-contracts.md",
+      "sha256": "ba21b52e1696fbb3fd3999d02980df515ca883b840e235e7be5f18e4f8c82c10",
+      "bytes": 4123
+    },
+    {
+      "path": "references/full-scope-review-and-adoption.md",
+      "sha256": "4e2a37f632f961a506ea027dc2eb7c2ffd12011c5e325d29e562a6ac78f152e2",
+      "bytes": 8785
+    },
+    {
+      "path": "references/low-memory-verification.md",
+      "sha256": "5310ab91bb373b49a533f17fc649fabd555dcf2a04b6a0c2e65749b219beaed2",
+      "bytes": 4163
+    },
+    {
+      "path": "references/recursive-kernel-scope-and-calibration.md",
+      "sha256": "f18cc7f7f937a59c5d278890aad7c9c8f8bb2ec10745c4dc360bb836a5d5e6ff",
+      "bytes": 11778
+    },
+    {
+      "path": "references/resumable-reproduction.md",
+      "sha256": "041a852f4eb4998f0c5e63ba51eb73fe5b642ead34f7ee3aeaeb2f8df73e9f33",
+      "bytes": 10373
+    },
+    {
+      "path": "references/scientific-reliability-audit.md",
+      "sha256": "f9c21e99fb6c77b6d6ffbdaa31c507785b0dfebebeba3d9e559c9678519b8e6b",
+      "bytes": 14541
+    },
+    {
+      "path": "references/source-data-and-bootstrap-precision.md",
+      "sha256": "17f1a06e3b9ad255465108702a81974e08b10bfcdcc3d055843cf216f6fb9812",
+      "bytes": 11600
+    },
+    {
+      "path": "references/templates-and-data.md",
+      "sha256": "8bc0565e470d2df3f43aa3112866dbb8a59e53e3e4a023f8d76298cfbfd8ae16",
+      "bytes": 2295
+    },
+    {
+      "path": "references/version-upgrade-assessment.md",
+      "sha256": "a917a089ee7d3d5c02e25bc2da5954cb952d22b9aad1b78defdeb0db3980c9f4",
+      "bytes": 1574
+    },
+    {
+      "path": "references/windows-resource-coordination.md",
+      "sha256": "71e9e37674717e109c36eac75253f7312e2442cbc75c3d15f250fed556c99926",
+      "bytes": 29247
+    },
+    {
+      "path": "scripts/inspect_output.R",
+      "sha256": "6ea811761e2055c56572451a93b13070308949dca5e4544e17a7fcaca24bb52f",
+      "bytes": 1521
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "16600bac4a9a0de67874e96be960fd8978671ba85eea29ff324dad7323648119",
+      "bytes": 11518
+    }
+  ],
+  "validation": "quick_validate.py: Skill is valid!",
+  "remote_push_performed": false
+}
