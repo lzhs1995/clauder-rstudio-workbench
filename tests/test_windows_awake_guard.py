@@ -1,5 +1,6 @@
 """Exercise actual Windows request acquisition/release and owner identity."""
 import json
+import ctypes
 from pathlib import Path
 import subprocess
 import sys
@@ -37,8 +38,31 @@ def real_windows_lifecycle(tmp_path, finish):
         started = wait_json(output / "identity.json", guard)
         assert started["owner"] == identity
         assert not started["display_required"] and not started["away_mode_required"]
-        wait_json(output / "heartbeat.json", guard)
-        if finish == "stop":
+        heartbeat = wait_json(output / "heartbeat.json", guard)
+        if finish == "reader_lock":
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            create = kernel.CreateFileW
+            create.argtypes = [ctypes.c_wchar_p, ctypes.c_uint, ctypes.c_uint,
+                               ctypes.c_void_p, ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p]
+            create.restype = ctypes.c_void_p
+            kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+            kernel.CloseHandle.restype = ctypes.c_int
+            handle = create(str(output / "heartbeat.json"), 0x80000000, 3, None, 3, 0, None)
+            assert handle not in (None, ctypes.c_void_p(-1).value)
+            try:
+                time.sleep(0.35)
+                assert guard.poll() is None, "transient reader lock must not end awake request"
+            finally:
+                assert kernel.CloseHandle(handle)
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                fresh = wait_json(output / "heartbeat.json", guard)
+                if fresh["at"] != heartbeat["at"]:
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError("heartbeat did not resume after reader released lock")
+        if finish in ("stop", "reader_lock"):
             (output / "stop.request").touch()
         else:
             owner.stdin.close()
@@ -47,8 +71,8 @@ def real_windows_lifecycle(tmp_path, finish):
         assert guard.returncode == 0, (stdout, stderr)
         receipt = json.loads((output / "completion.json").read_text(encoding="utf-8"))
         assert receipt["released"] is True
-        assert receipt["reason"] == ("stop_requested" if finish == "stop" else "owner_ended_or_replaced")
-        if finish == "stop":
+        assert receipt["reason"] == ("owner_ended_or_replaced" if finish == "owner_exit" else "stop_requested")
+        if finish in ("stop", "reader_lock"):
             assert owner.poll() is None, "guard must not terminate owner"
     finally:
         if guard is not None and guard.poll() is None:
@@ -84,6 +108,10 @@ class WindowsAwakeGuardTests(unittest.TestCase):
     def test_stale_identity_never_acquires_request(self):
         with tempfile.TemporaryDirectory() as root:
             rejects_stale_identity_before_power_request(Path(root))
+
+    def test_transient_reader_lock_keeps_request_alive(self):
+        with tempfile.TemporaryDirectory() as root:
+            real_windows_lifecycle(Path(root), "reader_lock")
 
 
 if __name__ == "__main__":

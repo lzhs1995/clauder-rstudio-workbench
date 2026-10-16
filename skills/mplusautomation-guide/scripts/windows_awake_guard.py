@@ -15,6 +15,7 @@ import sys
 import time
 
 import psutil
+from mplus_queue import atomic_replace
 
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
@@ -27,7 +28,8 @@ def now() -> str:
 def write_json(path: Path, value: dict) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    # A monitoring reader may briefly hold a Windows handle without delete sharing.
+    atomic_replace(temporary, path)
 
 
 def owner_alive(owner: dict) -> bool:

@@ -56,7 +56,9 @@ subprocess.Popen([sys.executable, "windows_awake_guard.py",
 `worker` is a verified `psutil.Process`; `owner_path` and `new_guard_dir` belong
 to the isolated batch. Use native Windows Python with `psutil` installed.
 Capture stdout/stderr and verify `identity.json` before relying on the guard;
-retain `completion.json` and its `released` result. A stopped owner cannot be
+retain `completion.json` and its `released` result. Keep the helper beside the
+bundled `mplus_queue.py`: its bounded atomic-replace retry tolerates transient
+Windows reader locks without dropping the awake request. A stopped owner cannot be
 replaced by another process with the same PID. For R `ps`, `ps_handle(time=)`
 requires POSIXt; alternatively obtain a fresh handle and explicitly compare
 `as.numeric(ps_create_time(handle))` with the recorded epoch seconds.
