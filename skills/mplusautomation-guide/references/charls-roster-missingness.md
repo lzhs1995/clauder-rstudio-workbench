@@ -179,6 +179,18 @@ joint test. Its rejection alone does not establish “stronger” or “weaker�
 association: inspect group-specific direction, scale and uncertainty. Signed
 child contrasts and nonnegative SD do not share one direction of disharmony.
 
+The registered follow-up completed all eight education/residence families, each
+with 20 usable imputations, a complete-case comparison and a second-start check:
+176 calls in total. Independent raw-parameter/TECH3 calculations reproduced all
+eight pooled families. Joint group-difference P values ranged from 0.204 to
+0.883; this is inconclusive evidence, not proof of equal associations. Complete
+conditional families do not resolve the stated FCS compatibility limitation or
+the unestimated income and dynamic branches. Engine/launcher time totaled about
+50 minutes; coordinator process wall time including preparation and readback
+was about 90 minutes. Report both timing scopes.
+The [fixed-commit evidence package](https://github.com/lzhs1995/PP-lcgm-paper/tree/950a01ea8599e0782cc3685563c98265c4fc924f/charls_h41_mi_20261016)
+contains aggregate outputs and an independent verifier, with no participant data.
+
 ## Save preparation time without duplicating engines
 
 Profile preparation, engine/launcher and readback separately. In the first 64
