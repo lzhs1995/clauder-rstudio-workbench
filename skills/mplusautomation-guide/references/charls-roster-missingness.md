@@ -107,3 +107,51 @@ individual records. A blanket extension allowlist or CSV-row-count heuristic
 cannot distinguish them. Keep the per-file role, hash and original-source hash,
 redact local user paths, and independently replay the downloaded public package.
 Do not duplicate the raw participant data to make the public verifier runnable.
+
+## Audit the control's item definition before choosing MI
+
+A nonmissing harmonized score need not mean every item was observed. The local
+2011 CHARLS ADL construction sums available items when at least one is observed.
+Raw db010–db015, including the documented skip rule, reproduced its item coding.
+Of 3,006 participants, 2 had partial-item totals and 20 had all six items missing;
+none of those 20 totals could be recovered from the same-wave raw items. Retain
+the official definition and item-completeness flags. Do not silently turn partial
+totals into complete totals, fill all-missing scores with zero, or call an official
+partial-sum definition a coding error without a scientific reason.
+
+In the four verified moderator scopes, residual missing core controls were only
+ADL (18, 15, 18 and 18 participants). Small counts do not establish ignorability
+or compatibility with an interaction model. Existing additive MI does not become
+interaction-compatible because its diagnostics are favorable.
+
+Test exact software combinations on synthetic data before expanding a queue:
+
+- In Mplus 9, the tested single-level Bayes interaction with an ordinal control
+  and `PREDICTOR=OBSERVED` was accepted, but its short chains did not converge
+  and produced no usable imputations. Syntax acceptance is not MI validation.
+- The tested two-level version explicitly rejected `PREDICTOR=OBSERVED`.
+  This is a restriction on that combination, not a claim that all two-level
+  Bayes interactions are unsupported. Removing the option can change an
+  observed category predictor into its underlying latent-response predictor.
+- Joint ordinal-control MLR reproduced the conditional model's complete-data
+  structural paths to about 0.000004 reference SE. Adding missing ADL required
+  Monte Carlo integration. Two fixed-seed 5,000-point synthetic runs reached
+  their four-minute limits; neither yielded usable missing-control inference.
+  Preserve both outputs. Do not turn a concrete interface correction into
+  unlimited point/iteration escalation or automatically admit real data.
+
+Record the exact error, estimator, predictor treatment, clustering, actual job ID
+and runtime. A model with small RSS and increasing CPU time need not be memory
+bound. Timeout accounting includes polling and process cleanup; report the
+observed overhead instead of silently enlarging the original budget.
+
+When inspecting synthetic cluster-robust covariance, its score rank is at most
+the number of clusters minus one. A 50-parameter model with 40 clusters cannot
+have a full-rank robust covariance. Do not misclassify this algebraic limit as
+structural nonidentification or relax the real-data inference checks. A synthetic
+interface test is not a scientific acceptance result.
+
+See the official [PREDICTOR option](https://www.statmodel.com/HTML_UG/chapter16V8.htm),
+[imputation documentation](https://www.statmodel.com/HTML_UG/chapter11V8.htm) and
+[version history](https://www.statmodel.com/verhistory.shtml). The retained raw
+Mplus output establishes which exact combination was rejected in this test.
