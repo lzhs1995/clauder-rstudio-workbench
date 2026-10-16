@@ -438,3 +438,48 @@ bounded owned-process scheduling to final verification and compression too;
 record PID creation time, prior mask and priority, and keep private data out of
 published logs. Do not restart a slow packager or rebuild an already verified
 archive merely to collect another benchmark.
+
+## Diagnose a failed conditional entry before reopening its family
+
+A timeout records an attempted failure; it does not, by itself, distinguish
+an optimizer problem from scheduling, serialization or another elapsed-time
+cost. If the original log lacks input identity and phase/CPU timers, state that
+limitation. Do not relabel the old attempt as successful after a later probe.
+
+For the oldest-son income failure, a separate diagnostic used the pinned MICE
+sampler to assemble the next iteration's conditional inputs from the last
+complete MIDS/RNG checkpoint. Capture-only imputation functions returned the
+previous missing values without fitting or drawing; every completed chain was
+checked unchanged and this artificial MIDS was never saved or adopted. Five
+captured inputs exactly matched hashes of the five preceding historical binary
+calls. Only then was the sixth entry identified as the failed conditional input.
+This depends on verified visit order and chain independence; it is not a generic
+shortcut for imputers whose preceding draws alter the target's inputs.
+
+Two bounded fits of that entry, using the prior valid optimizer start and a
+cold start, both passed the unchanged numerical checks in about 5.12 and 7.23
+seconds. They supplied evidence for one isolated checkpoint continuation, not
+a unique diagnosis of the old 128-second timeout or proof of complete MI.
+Keep the diagnostic fits outside the imputation-member count and preserve the
+old terminal batch. Resume all original chains from the complete checkpoint
+and saved RNG; replaying an incomplete iteration is not replacing a failed
+member or selecting successful chains. Record deterministic-fit hashes before
+fitting, CPU and wall times, and the current process identity so a future failure
+can be localized. Reuse already completed families and complete-case estimates.
+
+The isolated continuation subsequently passed the original mixing rule at
+iteration 10 for all 40 chains. Forty Mplus members plus one second-start check
+completed; the previous complete-case estimate and eleven other CHARLS families
+were reused. Independent raw-parameter/TECH3 and input checks closed this
+conditional H4.1 family. Twelve completed baseline-resource families still do
+not complete dynamic moderation or H4.2, and a nominal joint P value must retain
+its fixed-family multiplicity corrections.
+
+Terminal progress schemas may legitimately omit elapsed time. An R wrapper
+called `round(NULL)` after the analysis and pooling had completed, producing
+`Async job error: non-numeric argument ...`; the tool response nevertheless had
+`isError=false`. Inspect terminal content and durable receipts, not that flag
+alone. Guard nullable fields before formatting and test the actual terminal
+shape. Archive the wrapper error; validate saved outputs in a distinct zero-fit
+readback job instead of restarting the analysis or relabeling the failed wrapper
+as successful. Record which job estimated and which only reconciled completion.
