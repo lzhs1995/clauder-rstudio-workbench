@@ -305,3 +305,40 @@ deterministic calculations only, never completed random draws or another MI
 member's data. A light watcher can bind to the coordinator PID plus creation
 time, then pool and independently verify complete families after terminal exit;
 it must not restart engines or convert partial families into pooled results.
+
+## Resource deferral and ambiguous async submission
+
+A one-engine limit for this batch must not silently become a ban on every
+external Mplus process. In the income follow-up, the original supervisor closed
+the first SD member after a 120-second wait solely because another task had an
+engine. No Mplus call or budget reservation had occurred. Its label
+`INCOMPLETE_STOPPED` incorrectly mixed resource deferral with estimation failure.
+The four same-specification complete-case runs had a measured launcher/engine
+tree peak of about 179 MiB. Retain a separate `RESOURCE_DEFERRED` state, actual
+host memory/commit/CPU gates, and a bounded later retry for never-started members.
+Apply the same distinction to second-start checks. Reuse every already valid
+member; do not retry a scientific failure under this rule.
+
+Revise admission at a safe checkpoint with the original contract and code
+archived. Verify PID creation times, ensure no owned engine is active, preserve
+completed MI/RNG states, and reconcile the budget database before recovery.
+The observed repair retained one owned engine and allowed at most one observed
+external engine at admission, with the existing 1 GiB physical/2 GiB commit
+headroom gates. This is a host-snapshot policy, not an atomic shared lease over
+unrelated queues, and is not a universal safe threshold. Preserve external
+processes and keep an absolute batch deadline across coordinator restarts.
+Interrupted partial iterations remain in cost logs; only completed checkpoints
+are restored and only the final complete imputations count as MI members.
+
+An async submission can return a communication error after RStudio has accepted
+it. Before resubmitting, check durable ownership, session history and the
+server's real background-job registry. Here that recovered an actual job ID;
+`get_async_result` then confirmed progress and the async guard registered that
+same ID. Never invent a replacement ID or start another coordinator because the
+client did not receive the acknowledgement.
+
+For WSL `UtilAcceptVsock ... accept4 failed 110`, check the active interop socket
+and use a verified working socket for a bounded child-command probe. Socket-file
+existence alone does not prove liveness. Preserve Windows Python and USERPROFILE;
+do not restart WSL/RStudio or bypass native R's system-command restriction.
+Record command-launch delays separately from MI and Mplus computation.
