@@ -205,6 +205,56 @@ proposed MI budget must remain labeled **not imputed / not estimated**.
 The [income source supplement](https://github.com/lzhs1995/PP-lcgm-paper/tree/4f1fee8662bd8ea34e52ac699feac19d64d18f60/charls_income_scope_20261016)
 records the observed scope and zero additional Mplus/MI calls.
 
+### Test the binary imputer before scaling its family
+
+The income pilot pinned the maintainer's development `mice 3.19.10` build in an
+isolated library. Label that provenance explicitly; do not call it a stable CRAN
+release or mix its namespace with an older foreground-session version. Test in
+a fresh child process. Global `mice` options can travel through `...` into a
+conditional fitting function: filter arguments rather than assuming every
+imputer accepts them. The inspected binary imputer catches a failed GLMM and can
+return the current missing-cell values. A binary range check alone therefore
+cannot establish that imputation ran. Require a recorded successful conditional
+fit as well as fresh draws, preserved observed cells, passive identities and
+the actual predictor matrix.
+
+If a high-dimensional GLMM is slow, benchmark the same formula before changing
+the scientific specification. In the retained SD benchmark, TMB and warm-start
+lme4 estimates agreed within about 0.00006 reference SE, but their reported SEs
+differed by up to 6%. The installed lme4 fit had no finite-difference Hessian and
+used its RX approximation. A finite-difference check of the TMB likelihood
+gradient reproduced its full fixed-parameter covariance to within 0.000001 in
+relative SE. Point-estimate agreement alone would not have established this.
+
+Also inspect random-effect uncertainty, not just fixed-effect covariance. For
+this unit-weight binary-logit **random-intercept-only** model, the conditional
+Laplace variance at fitted parameters is
+`1 / (sum_j p_j * (1-p_j) + 1 / psi)` within each community. The saved TMB
+`ranef(..., condVar=TRUE)` variance differed from this conditional curvature by
+up to 16.5%, whereas lme4's saved `postVar` agreed to about 0.002%. Renaming the
+attribute was not an equivalent backend substitution. The local adapter now
+calculates the conditional curvature explicitly, rejects unsupported random
+slopes/weights/families, and retains the original stochastic draw sequence.
+This remains a disclosed FCS approximation, not an official unchanged imputer
+or proof of congeniality. Keep the pre-correction pilot as such; do not promote
+its completed draws into the formal family.
+
+Use observed timing to budget the next family. Here the four two-chain,
+two-iteration interface pilots took about 348 seconds, with 11 fresh binary
+fits, five exact fit-cache hits and 16 ADL fits. A full income family is materially
+more costly than the previous ADL-only family: other imputed predictors change
+the fitting data. Never reuse a fit for changed data. Save immutable iteration
+checkpoints with source and artifact hashes; resume the saved MIDS/RNG state,
+not a new seed. Admit complete families only after the declared mixing and
+cell-level checks, then estimate and pool them with their own resource group.
+
+For native ClaudeR async scripts, use `source(path, local=TRUE)` so the script
+can see the job's injected `clauder_progress` callback. An otherwise healthy
+job may stay at `started` when a default global source loses that environment.
+Repair the progress connection without resubmitting the estimator: verify the
+job owner/PID, then relay its actual durable progress through ClaudeR's progress
+API. Preserve the source timestamp so a stale heartbeat cannot look current.
+
 The registered follow-up completed all eight education/residence families, each
 with 20 usable imputations, a complete-case comparison and a second-start check:
 176 calls in total. Independent raw-parameter/TECH3 calculations reproduced all
