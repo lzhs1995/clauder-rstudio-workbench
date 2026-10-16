@@ -83,6 +83,11 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [charls-roster-missingness.md](references/charls-roster-missingness.md):
+  verify child/household crosswalks before within-family contrasts, distinguish
+  structural absence from missing responses, and prepare scoped moderation inputs
+  without treating additive MI or a complete-case pilot as full inference.
+
 - [bounded-research-reopening.md](references/bounded-research-reopening.md):
   resume author-approved mechanism research after scoped closeout, reuse prior
   failed attempts, bound pilot cost, distinguish H4 feasibility from complete MI,
