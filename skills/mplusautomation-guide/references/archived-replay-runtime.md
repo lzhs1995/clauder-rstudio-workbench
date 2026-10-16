@@ -86,6 +86,36 @@ does not establish an equivalent Windows capacity gain; repeated purges can
 cause cold reads and paging. Retain other sessions, unsaved documents and
 unknown services. See [Windows resource coordination](windows-resource-coordination.md).
 
+## Make admission failures recoverable
+
+Keep a short shared admission transaction separate from a coordinator's
+single-watcher lifetime lock. A second watcher for the same output directory
+should be refused; independent workers requesting a shared model slot need a
+bounded contention policy.
+
+On Windows, reading a byte locked by another process can itself fail. Do not
+use `read(1)` to inspect a shared lock file before entering the acquisition
+loop. Initialize its lock byte before workers start, or inspect file size
+without reading the locked range. Keep broad process queries outside the
+critical section; check names and parents first, then query only the process
+identities needed for admission. Bound lock acquisition and atomic-replace
+retries, and preserve the final error.
+
+Record each acquire/release subprocess's status, full stdout/stderr, attempt
+number and elapsed time. `processx::run(error_on_status = FALSE)` requires an
+explicit status check. Confirm release, or a verified already-absent claim,
+before advancing to the next model. A duplicate claim is an ownership error,
+not a transient lock failure to suppress. Preserve the original exception and
+any callr error artifact before cleaning an async job's registry entry.
+
+Test real Windows contention in separate processes, including a reader that
+temporarily prevents replacement. Also exercise the R caller's failure path:
+a temporary sharing failure may retry, while an ownership error must stop.
+Only switch a frozen driver at a completed-model boundary. Retain completed
+OUT/readback/comparison receipts and resume unfinished identities without
+refitting successful models. Distinguish a recovered original error from a
+newly reproduced mechanism when the earlier subprocess stderr was lost.
+
 ## Recover consumers without refitting producers
 
 Before skipping a model, verify input/data/executable bindings, completed OUT,
@@ -111,3 +141,27 @@ strictness of comparisons and quantile type. Independently recalculate plot
 data from raw OUT/GH5 before rendering complete figure groups. Keep corrected
 figures isolated until manuscript adoption is authorized and scientifically
 supported. See [display producer contracts](display-producer-contracts.md).
+
+## Count actual delivered artifacts
+
+Use the complete manuscript object index alongside any repair queue. A repair
+subset is not the full figure/table scope; PNG figure entries must not become
+tables merely because their IDs do not end in `.svg`. Keep model dependency
+coverage, available display rows, complete groups and delivered artifacts as
+separate counts.
+
+For each complete figure, require the frozen expected row identities and all
+promised export formats with nonempty files and matching hashes. A full data
+group with only SVG exported is still missing artifacts. Conversely, three
+formats of a partial preview do not complete the group. Check the actual SVG
+coordinates and labels and visually inspect the raster and rendered PDF.
+Resolve inherited SVG styles: svglite may omit an inline black stroke because
+its stylesheet already supplies it. Negative controls should alter a point,
+color or bootstrap contract and update the artifact hash, so semantic checks
+must detect the fault independently of hash mismatch.
+
+Rendering can outlast a synchronous HTTP request. Save per-format start/error/
+completion receipts, inspect output growth and the bound session's execution
+history, and confirm the original call's terminal state before resubmitting.
+Resume only missing exports from the saved plot object. Neither a timeout nor
+a temporarily zero-byte SVG justifies rerunning Mplus.
