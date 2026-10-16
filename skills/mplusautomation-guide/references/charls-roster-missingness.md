@@ -194,6 +194,17 @@ reused as a complete income-interaction family. Preserve negative net income and
 derive each product from its own member. A passive transformation enforces an
 identity; it does not prove substantive-model compatibility.
 
+Before imputing a household resource on person rows, join the actual participant
+keys back to the official household identifier and count respondents per household
+within each analysis scope. A unique temporary analysis ID is not that check.
+The retained CHARLS cohort had 3,006 respondents from 3,006 official households;
+all four scopes also had one respondent per household. Consequently there was no
+within-household duplicate income-group draw to reconcile in this particular
+batch. Do not generalize that sampling fact to another CHARLS cohort. With
+multiple respondents per household, household resources require shared draws or
+a justified household-level imputation design; a community random intercept does
+not enforce equality of household values.
+
 Check the installed imputer's code as well as current online documentation.
 The inspected `mice 3.19.0` binary two-level function lacked the newer
 `random.effects` argument and did not implement the documented current default
@@ -342,3 +353,65 @@ and use a verified working socket for a bounded child-command probe. Socket-file
 existence alone does not prove liveness. Preserve Windows Python and USERPROFILE;
 do not restart WSL/RStudio or bypass native R's system-command restriction.
 Record command-launch delays separately from MI and Mplus computation.
+
+## Keep optional fit caches out of the recovery critical path
+
+A complete MIDS/RNG checkpoint does not guarantee that a separately written
+warm-start cache is complete. In this follow-up, an identity-verified stop
+preserved iteration 1 but interrupted a non-atomic `saveRDS(fit, ...)`. The
+next worker failed in `readRDS(lastfit)` before resuming any imputation. The
+16.8 MB truncated cache was archived; the immutable MIDS hash, 40 chains,
+saved RNG and 151 valid conditional-fit records remained intact. Classify this
+as a recovery I/O failure, not statistical nonconvergence or failed mixing.
+
+Preserve complete fit diagnostics separately, but avoid serializing a whole
+fitted object after every draw merely to recover its optimizer starting values.
+Such objects can retain large environments. Prefer a small, optional beta/theta
+sidecar beside a complete iteration checkpoint, written by temporary file plus
+same-directory rename. Validate its shape and finite values on reading. An
+absent or unreadable optional sidecar can use a cold optimizer start; invalid
+MIDS, changed input hashes, or missing RNG state must still block recovery.
+Do not change the stochastic draw rule or optimizer acceptance criteria under
+the label of cache repair, and do not count replayed partial-iteration work as
+additional completed imputations.
+
+The repaired continuation restored the original checkpoint hash and produced
+new complete iterations. Its first observed lightweight warm-start sidecar was
+902 bytes, beside a roughly 241 KiB MIDS checkpoint, instead of writing the
+16.8 MB full fitted object after each binary draw. This validates the new storage
+path, not a claim that the entire statistical family is already complete.
+
+Distinguish conditional-fit timings from total imputation time. One retained
+snapshot had 508 conditional fits totaling about 1,174 logged fit-seconds,
+against about 2,204 stage wall-seconds. Serialization, draws, diagnostics and
+other overhead were outside that fit timer; the difference alone does not
+identify their individual costs. A smaller cache is a concrete overhead repair,
+not evidence of a measured speedup until the continuation has been observed.
+
+Bind phase-specific watchdogs to the current worker's PID and creation identity.
+A later recovery reused a progress file from a dead worker and applied the
+150-second conditional-fit watchdog while the new R process was still loading
+packages. It killed that new process before any additional conditional fit.
+Treat old-PID progress as `WORKER_BOOTSTRAP`, preserve the old source timestamp,
+use a separately bounded startup limit, and arm the conditional-fit timer only
+after the current worker emits that phase. Do not raise the model's fit limit
+to hide a stale-heartbeat classification bug.
+
+CPU masks also belong to a process instance, not permanently to its task label.
+The new coordinator had reverted to all logical CPUs; eight were saturated
+while others were lightly loaded. An owned pooling worker accumulated only about
+six CPU seconds over 140 wall seconds. Re-evaluate host load before each new
+stage, select currently available permitted cores, verify the child's inherited
+mask and record previous settings. Above-normal priority, when justified, stays
+restricted to the owned computation worker; never use high/realtime priority.
+Apply the same ownership discipline to a slow verification child. Restarting a
+coordinator without restoring its operational policy can undo an earlier speed
+repair even when every statistical option remains identical.
+
+Keep real fitting failures distinct. The oldest-son income imputer reached its
+120-second elapsed-time limit at iteration 6, conditional call 411, without a
+valid fit. Its earlier five-iteration checkpoint was below the declared minimum
+and was not promoted to a completed family. Preserve that timeout and its
+underlying backend log; the inherited warning mentioning `glmer` does not prove
+that the fitted backend was lme4. The zero-fit bootstrap recovery is not a reason
+to retry this genuinely attempted conditional fit or silently relax its budget.
