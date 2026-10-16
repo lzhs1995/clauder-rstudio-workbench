@@ -179,6 +179,32 @@ joint test. Its rejection alone does not establish “stronger” or “weaker�
 association: inspect group-specific direction, scale and uncertainty. Signed
 child contrasts and nonnegative SD do not share one direction of disharmony.
 
+Before reopening an income family, resolve the original grouping in the actual
+data. The CFPS source code used personal income above its median. In its original
+export, corrected pre-MI input and all ten frozen members, that median was zero;
+the stored grouping agreed with both `income > median` and `income > 0`. Different
+wording was not a numerical discrepancy and did not justify another engine run.
+Retain the substantive interpretation: above a zero median need not mean affluent.
+
+Do not substitute CHARLS household income or respondent earnings for that
+personal-income construct without labeling the new estimand. The local household
+total had 734 missing values among 3,006 participants; the four roster scopes had
+670, 529, 605 and 568 missing values. An observed-resource ADL-only MI cannot be
+reused as a complete income-interaction family. Preserve negative net income and
+derive each product from its own member. A passive transformation enforces an
+identity; it does not prove substantive-model compatibility.
+
+Check the installed imputer's code as well as current online documentation.
+The inspected `mice 3.19.0` binary two-level function lacked the newer
+`random.effects` argument and did not implement the documented current default
+in the same way. A new option supplied through `...` is not evidence it took
+effect. If that binary route is chosen, pin and test the intended implementation
+in a separate library. This finding does not invalidate previous `miceadds`
+continuous PMM families, which used a different function. A source audit and
+proposed MI budget must remain labeled **not imputed / not estimated**.
+The [income source supplement](https://github.com/lzhs1995/PP-lcgm-paper/tree/4f1fee8662bd8ea34e52ac699feac19d64d18f60/charls_income_scope_20261016)
+records the observed scope and zero additional Mplus/MI calls.
+
 The registered follow-up completed all eight education/residence families, each
 with 20 usable imputations, a complete-case comparison and a second-start check:
 176 calls in total. Independent raw-parameter/TECH3 calculations reproduced all
