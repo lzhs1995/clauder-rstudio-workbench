@@ -131,9 +131,15 @@ jobs:
           python .github/scripts/quick_validate.py skills/clauder-rstudio-workbench
           python .github/scripts/quick_validate.py skills/cmaverse-paired-mval
           python .github/scripts/quick_validate.py skills/comparegroups-guide
+          python .github/scripts/quick_validate.py skills/mplusautomation-guide
         shell: bash
         env:
           PYTHONUTF8: "1"
 
       - name: Public-tree privacy scan
         run: python -m unittest tests.test_discovery_redaction_v044 -v
+
+      - name: APIM template and owned-process contracts
+        run: |
+          python skills/mplusautomation-guide/scripts/test_template_contracts.py /tmp/apim-template-contracts.json
+          python skills/mplusautomation-guide/scripts/test_windows_coordinator.py /tmp/apim-process-contracts.json
