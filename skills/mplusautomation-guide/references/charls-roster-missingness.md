@@ -255,6 +255,22 @@ Repair the progress connection without resubmitting the estimator: verify the
 job owner/PID, then relay its actual durable progress through ClaudeR's progress
 API. Preserve the source timestamp so a stale heartbeat cannot look current.
 
+Inspect per-logical-core CPU load before diagnosing slow estimation as a RAM
+problem. During the formal income follow-up, eight logical cores were saturated
+while eight were lightly loaded; the verified MI worker received only about
+0.28 core-seconds per wall second. After a bounded, reversible priority/affinity
+adjustment restricted to that owned worker, a 115-second observation showed about
+1.00 core-second per wall second. This is an observed scheduling improvement,
+not a controlled 3.6-fold model-speed benchmark or proof about CPU topology.
+The one-worker memory limit remained in force. Choose from currently available
+cores, record the previous mask and PID creation time, preserve the statistical
+specification, and recheck load/child affinity. Do not permanently encode CPU
+numbers, change another task's mask, or use high/realtime priority. Any coordinator
+mask adjustment must be checked on the actual later child and restored if load
+conditions change. The observed worker's RSS was about 555 MiB and host free
+memory about 1.31 GiB; global CPU utilization or nominal 16 GiB RAM alone would
+have concealed this scheduling constraint.
+
 The registered follow-up completed all eight education/residence families, each
 with 20 usable imputations, a complete-case comparison and a second-start check:
 176 calls in total. Independent raw-parameter/TECH3 calculations reproduced all
