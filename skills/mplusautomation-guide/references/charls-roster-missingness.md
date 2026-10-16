@@ -288,7 +288,7 @@ with 20 usable imputations, a complete-case comparison and a second-start check:
 eight pooled families. Joint group-difference P values ranged from 0.204 to
 0.883; this is inconclusive evidence, not proof of equal associations. Complete
 conditional families do not resolve the stated FCS compatibility limitation or
-the unestimated income and dynamic branches. Engine/launcher time totaled about
+the income and dynamic branches that were unestimated at that stage. Engine/launcher time totaled about
 50 minutes; coordinator process wall time including preparation and readback
 was about 90 minutes. Report both timing scopes.
 The [fixed-commit evidence package](https://github.com/lzhs1995/PP-lcgm-paper/tree/950a01ea8599e0782cc3685563c98265c4fc924f/charls_h41_mi_20261016)
@@ -415,3 +415,26 @@ and was not promoted to a completed family. Preserve that timeout and its
 underlying backend log; the inherited warning mentioning `glmer` does not prove
 that the fitted backend was lme4. The zero-fit bootstrap recovery is not a reason
 to retry this genuinely attempted conditional fit or silently relax its budget.
+
+## Adjudicate complete families and include postprocessing in scheduling
+
+The income follow-up ultimately retained three complete 40-member families and
+one unadmitted oldest-son family. Its 127 engine calls were 120 MI members,
+three second-start checks and four complete-case comparisons; the latter seven
+must not increase the MI denominator. Raw parameter and TECH3 verification
+reproduced three pools and 18 contrasts. Engine/launcher time was about 18
+minutes, whereas imputation, resource waits and recovery took much longer.
+Measure these stages separately before attributing the whole elapsed time to
+Mplus. Preserve the fixed four-family and combined twelve-family testing
+denominators, with untested P values left missing. Complete conditional H4.1
+families do not complete dynamic moderation or H4.2.
+
+The same host scheduling issue affected packaging: its owned Python process
+accumulated only 14.75 CPU seconds in about 429 wall seconds while cores 8–15
+were saturated. A fresh sample selected six lightly loaded permitted cores and
+the existing packager finished after its recorded adjustment. This is not an
+isolated speed experiment or proof that all waiting was CPU-related. Apply
+bounded owned-process scheduling to final verification and compression too;
+record PID creation time, prior mask and priority, and keep private data out of
+published logs. Do not restart a slow packager or rebuild an already verified
+archive merely to collect another benchmark.
