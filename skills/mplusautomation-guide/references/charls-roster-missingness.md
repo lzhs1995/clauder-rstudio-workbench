@@ -65,3 +65,45 @@ The audit used pandas/Stata and R/haven and matched 42,084 person fields within
 double precision. Private records, IDs, DAT and RDS remain local; publish only
 aggregate checks and code. Do not add an Mplus run to settle a roster identity
 problem or rerun an unchanged failed CFPS specification.
+
+## From verified entries to bounded interaction pilots
+
+Freeze the estimand, data hashes, controls, lower-order terms and runtime limits
+before fitting. In the follow-up, each verified complete-case scope received a
+same-sample parent and one `SX XWITH Z0` interaction. Both models retained the
+baseline indicator paths `x1 y1 ON z0`; consequently the Z0-to-latent-intercept
+coefficient is conditional on those paths, not the total baseline association.
+The observed baseline contrast is not interchangeable with a third latent growth
+intercept. Preserve this distinction in filenames, tables and interpretation.
+
+Use the no-interaction parent as the common source for two separately specified
+interaction starts. Perturb nonvariance parent starts and give the interaction
+opposite signed starts. Do not resume two almost identical interaction endpoints
+and call them independent starts. A second start is a diagnostic call, never a
+second imputation. Predeclare numerical comparison tolerances and retain any
+failure; do not introduce successively tighter checks after the batch ends.
+
+The actual CHARLS follow-up completed four parents and eight interaction calls
+in about 595 seconds of engine/launcher wall time, with one engine slot. All four
+families passed their two-start pilot checks; all four interaction intervals
+crossed zero. This proves neither absence of moderation nor complete MI
+inference. The existing additive 20/40-imputation results remain additive results.
+Their small missing fraction or FMI cannot establish interaction compatibility.
+Do not launch unchanged failed CFPS specifications because a different CHARLS
+sample now yields a legal pilot.
+
+Read saved parameter vectors and TECH3 covariance directly, independently of the
+R table producer. Bind path identities to raw TECH1, reconstruct the triangular
+covariance, and verify standard errors before calculating conditional slopes.
+For `bss + dc*z`, retain the `2*z*Cov(bss,dc)` term. Label plotted intervals as
+pointwise complete-case Wald intervals, not pooled MI or simultaneous bands.
+Check original outcome-missing masks and original baseline control completeness
+when choosing the pilot population; previously recovered values need not redefine
+the original complete-case comparator.
+
+Publish files by explicit statistical role. `estimates.dat` and `tech3.dat` can
+contain aggregate model parameters, while a neighboring `data.dat` contains
+individual records. A blanket extension allowlist or CSV-row-count heuristic
+cannot distinguish them. Keep the per-file role, hash and original-source hash,
+redact local user paths, and independently replay the downloaded public package.
+Do not duplicate the raw participant data to make the public verifier runnable.
