@@ -1,6 +1,7 @@
 """Windows Mplus调度协调器：显式进程归属、持久回滚、只读资源观测。"""
 import argparse
 import ctypes
+import importlib.util
 import json
 import math
 import os
@@ -10,6 +11,11 @@ from ctypes import wintypes
 from datetime import datetime, timezone
 from pathlib import Path
 import psutil
+_ownership_spec=importlib.util.spec_from_file_location('coordinator_ownership',Path(__file__).with_name('process_ownership.py'))
+_ownership=importlib.util.module_from_spec(_ownership_spec)
+_ownership_spec.loader.exec_module(_ownership)
+is_verified_descendant=_ownership.is_verified_descendant
+verified_descendants=_ownership.verified_descendants
 
 
 def utc(): return datetime.now(timezone.utc).isoformat()
@@ -39,7 +45,7 @@ def checked(ref, factory=psutil.Process):
 def owned_mplus(owner, factory=psutil.Process):
     parent=checked(owner,factory)
     children=[]
-    for p in parent.children(recursive=True):
+    for p in verified_descendants(parent,factory,names={'mplus.exe'}):
         try:
             if p.name().lower()=='mplus.exe': children.append(identity(p))
         except (psutil.NoSuchProcess,psutil.AccessDenied): pass
@@ -67,6 +73,8 @@ def apply_owned(owner, targets, state, persist, factory=psutil.Process):
         for prop,change in changes.items():
             try:
                 checked(owner,factory);p=checked(ref,factory)
+                if not is_verified_descendant(p,owner,factory):
+                    raise RuntimeError('Process ancestry no longer verified')
                 setter=p.nice if prop=='priority' else p.cpu_affinity
                 if setter()!=change['prior']:
                     change['status']='skipped_concurrent_change'

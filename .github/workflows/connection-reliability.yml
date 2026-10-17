@@ -23,6 +23,10 @@ jobs:
       - run: python -m unittest tests.test_config_store tests.test_readiness tests.test_runtime_install_defaults tests.test_native_evidence_portability tests.test_connection_diagnostics tests.test_session_bootstrap -v
         env:
           PYTHONUTF8: '1'
+      - name: Process ownership rejects stale intermediate parent PIDs
+        run: python -m unittest tests.test_process_ownership -v
+        env:
+          PYTHONUTF8: '1'
       - name: POSIX installer entrypoint smoke
         if: runner.os != 'Windows'
         run: bash install.sh --help
