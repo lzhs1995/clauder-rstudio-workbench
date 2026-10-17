@@ -651,3 +651,29 @@ an observed successful exit or rerun the model. Bounded JSON retries and
 noncritical progress publication now protect the estimator; its independently
 bounded supervisor survives an R display-layer failure. Preserve a call trace
 on future errors instead of claiming an unobserved root cause.
+
+Dispatch independent admitted families while the next family's imputation is
+running. A barrier requiring every income imputation to finish left an available
+Mplus slot idle. The revised sequence independently verifies a family's actual
+40 datasets, estimates it with the existing single-engine lease, and lets the
+next imputation worker continue. Shared result registries still have one writer.
+If an imputation worker is replaced, consumers must consult its updated PID and
+creation-time lease instead of treating the old worker's exit as a statistical
+rejection. This changes scheduling, not the model or missing-data contract.
+
+Check that a receipt exists before passing its path to `jsonlite::fromJSON()`.
+A missing path can be parsed as literal JSON and produce a misleading lexical
+error. In a Windows startup failure, the R worker exited before either helper
+published its receipt; both helpers later correctly rejected the now-dead owner.
+There were zero conditional fits and zero checkpoints. Recovery preserved the
+logs, increased only the bounded startup wait, and required identity-matched
+`ACTIVE` and `WATCHING` receipts before drawing. The recovered job actually
+advanced into its second iteration. Keep such infrastructure recovery separate
+from retrying a failed statistical fit.
+
+Public path redaction changes bytes even when parameter values are unchanged.
+Retain both the original-source hash and the distributed-file hash. Public
+verification checks the package bytes against the latter and their source
+binding against the former before recomputing parameters and TECH3 contrasts.
+A targeted check accepted correctly redacted text and rejected altered bytes;
+this is not permission to bypass either hash or to claim byte identity.
