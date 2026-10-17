@@ -556,3 +556,34 @@ resubmission. For 64-bit `ctypes` scheduling calls, declare the handle return an
 argument types, check the API's return value and read back affinity. An untyped
 pseudo-handle call silently failed in the diagnostic helper; an intended mask is
 not evidence that the process received it.
+
+## Recover a lost async submission acknowledgement without duplicate work
+
+During the CHARLS H4.2 preparation, native `execute_r_async` returned a
+communication error although the background process had started. A read-only
+lookup of the assigned RStudio session's ClaudeR job registry recovered the
+actual job ID, submitted code and process PID. Polling that same ID returned
+all 24 prepared inputs. Preserve the failed submission response and recovery
+evidence separately; never create a successful submission response by hand.
+The inspected bridge used a 10-second HTTP timeout for its generic async POST,
+so a missing acknowledgement was not evidence of a missing job. The subsequent
+model submission returned its ID normally. Do not restart an active bridge or
+RStudio merely to repair an observation error.
+
+The Windows R `ps` APIs are `ps_get_cpu_affinity()` and
+`ps_set_cpu_affinity()`, with `ps_set_nice(handle, "above_normal")` for priority.
+Validate scheduling in the library-loading phase as well as in the model loop;
+otherwise a worker can spend minutes waiting before it reaches its own scheduler.
+An installed harness also used the cancellation reason in its archive filename.
+A prose reason containing `/` produced a Windows path error; a short ASCII
+reason code archived the record while the detailed explanation stayed in the
+audit log. This is a portability defect to fix in the harness, not a reason to
+discard or fabricate the original tool evidence.
+
+For a three-way `SX × Z0 × G` extension, reuse a successful H4.1 parent only
+after checking identical data bytes, sample size, variable coding and the full
+set of lower-order paths. Add `SX × Z0`, `SX × G` and `SX × (Z0G)` together,
+and directly test the last coefficient. Keep the two group-specific moderation
+contrasts and conditional slopes with their full covariance. A complete-case
+pilot does not complete its MI family; an imputer built for a different
+interaction cannot be relabeled as substantively compatible.
