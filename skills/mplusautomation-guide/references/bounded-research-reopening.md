@@ -236,13 +236,18 @@ engine/launcher ran for about 23 seconds and the queue resumed without rerunning
 it. Earlier unexplained gaps remain unexplained unless their own logs are checked.
 
 Protect the entire authorized coordinator lifetime, including preparation,
-readback and pooling, rather than only the Mplus child. The companion
-[`windows-coordinator-awake.py`](../scripts/windows-coordinator-awake.py) uses a
-temporary Windows execution-state request, verifies owner PID plus creation
-time, enforces a bounded lifetime, and clears the request when the owner exits.
-It requests system and display availability to cover idle transitions; it does
-not change the global power plan or override intentional lid-close/sleep actions.
-Record API success, the active receipt and the final released receipt. Do not
+readback and pooling, rather than only the Mplus child. New workflows should use
+the shared [`windows_awake_guard.py`](../scripts/windows_awake_guard.py), which
+verifies owner PID plus creation time and releases the request when the owner
+exits or its stop request arrives. Bind it to the bounded coordinator lifecycle;
+the awake helper itself is not an estimation timeout. This shared helper requests
+system availability without keeping the display on. The historical PP-LGCM
+helper also requested display availability and had a separate lifetime cap;
+its receipts remain valid historical evidence, but it is not a second reusable
+implementation. Existing running batches retain their frozen local helper.
+Neither approach changes the global power plan or overrides intentional
+lid-close/sleep actions. Record API success, live heartbeat and final released
+receipt. Do not
 claim that a successful call guarantees survival of explicit sleep, power loss,
 or every battery/Modern Standby policy.
 
