@@ -101,6 +101,39 @@ does not establish an equivalent Windows capacity gain; repeated purges can
 cause cold reads and paging. Retain other sessions, unsaved documents and
 unknown services. See [Windows resource coordination](windows-resource-coordination.md).
 
+## Increase concurrency using a bounded original-model trial
+
+When a measured two-slot cap leaves CPU capacity available, a third independent
+model may improve throughput. First measure worker loading, engine allocation,
+whole-host available RAM and commit, and competing workloads. Preserve the
+statistical inputs, executable versions and declared processor settings.
+Partition the remaining manifest into disjoint lanes with the same model IDs;
+do not add specifications or refit accepted models to test scheduling.
+
+Prepare the replacement runtime while existing workers continue. Request their
+supported completed-model boundary, then verify actual job termination, output
+hashes, independent comparisons and released helpers/leases. Freeze the trial
+IDs from the first untouched rows **after that boundary**: an active worker may
+have naturally claimed a provisional candidate during preparation. Selection
+must not depend on fit results. Use exclusive control directories and a
+one-model limit per trial lane before activating the full remaining manifest.
+
+Require actual simultaneous owned-engine observations, all trial comparisons,
+resource samples above the predeclared reserves, and clean technical completion.
+A count of submitted R jobs does not establish concurrent Mplus execution.
+Start the observer before a very short trial model can finish. Retain failures
+and fall back to the previous admission policy for untouched work when the
+trial fails; never overwrite an attempted model. Trial feasibility alone is
+not a speedup estimate: compare equivalent active computation separately from
+loading, readback, resource waits and sleep gaps.
+
+In one Windows archived-APIM run, three original models passed 8,998 printed
+value comparisons and the three engines were observed together. Across 283
+resource samples, physical availability stayed above 1.88 GiB and commit
+headroom above 10.08 GiB. This qualified that run's third slot; these values
+are observations, not portable thresholds or a recommendation for other model
+families. The remaining queue still requires per-model admission.
+
 ## Make admission failures recoverable
 
 Keep a short shared admission transaction separate from a coordinator's
@@ -289,3 +322,6 @@ job, repeat extraction/rendering, or rerun Mplus to make the completion gate
 pass. Keep corrected completion evidence distinguishable from the original
 failure, and count accepted artifacts by unique manuscript identity and
 verified hashes rather than by the number of jobs archived.
+
+For complete conditional tables and delayed browser shutdown, follow
+[table and browser acceptance](complete-table-and-browser-acceptance.md).
