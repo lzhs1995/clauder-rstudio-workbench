@@ -7,6 +7,7 @@ from pathlib import Path
 import time
 import psutil
 from windows_memory import snapshot
+from process_ownership import is_verified_descendant, verified_descendants
 
 
 class VALUE(ctypes.Structure):
@@ -85,7 +86,7 @@ def main():
             time.sleep(min(args.interval, max(0, stop-time.monotonic())))
             if not owner.is_running() or owner.create_time() != identity[1]:
                 emit(dict(event='owner_exited')); break
-            owned = {p.pid for p in owner.children(recursive=True)}
+            owned = {(p.pid,p.create_time()) for p in verified_descendants(owner,names={'mplus.exe'})}
             row = snapshot()
             row.update(event='sample', cpu_percent=psutil.cpu_percent(), paging=paging.read(),
                        disk_free_gib=psutil.disk_usage(str(args.output.parent)).free/2**30, models=[])
@@ -98,12 +99,16 @@ def main():
                     cpu = sum(p.cpu_times()[:2])
                     now = time.monotonic()
                     old = previous.get(key)
-                    model = dict(pid=p.pid, created=key[1], owned=p.pid in owned,
+                    model = dict(pid=p.pid, created=key[1], owned=key in owned,
                                  rss_mib=mem.rss/2**20, private_mib=getattr(mem,'private',0)/2**20,
                                  cpu_core_percent=100*(cpu-old[0])/(now-old[1]) if old else None,
                                  io=p.io_counters()._asdict(), priority=p.nice())
                     previous[key] = (cpu, now)
                     if args.prioritize_owned_mplus and model['owned'] and key not in restored:
+                        if not is_verified_descendant(p,dict(pid=identity[0],created=identity[1])):
+                            model['owned']=False
+                            row['models'].append(model)
+                            continue
                         # 不提高原来已高于AboveNormal的优先级；绝不用Realtime。
                         if p.nice() in {psutil.IDLE_PRIORITY_CLASS, psutil.BELOW_NORMAL_PRIORITY_CLASS, psutil.NORMAL_PRIORITY_CLASS}:
                             restored[key] = p.nice()

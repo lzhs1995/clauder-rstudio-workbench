@@ -10,6 +10,7 @@ import sqlite3
 import statistics
 import time
 import psutil
+from process_ownership import verified_descendants
 
 _spec=importlib.util.spec_from_file_location('mplus_queue',Path(__file__).with_name('mplus_queue.py'))
 mq=importlib.util.module_from_spec(_spec)
@@ -119,12 +120,12 @@ def collect(root, namespace=None, host_processes=False):
             if w.get('created') is None or abs(p.create_time()-w['created'])>.1:
                 identity.append(dict(worker=w['id'],status='identity_mismatch_or_missing'));continue
             live.append(w['id'])
-            for child in p.children(recursive=True):
+            for child in verified_descendants(p,names={'mplus','mplus.exe'}):
                 if child.name().lower() in ('mplus','mplus.exe'):
                     mem=child.memory_info()
                     processes.append(dict(worker=w['id'],pid=child.pid,created=child.create_time(),cpu_seconds=sum(child.cpu_times()[:2]),
                         rss_bytes=mem.rss,private_bytes=getattr(mem,'private',None)))
-        except psutil.Error as e:identity.append(dict(worker=w['id'],status=type(e).__name__))
+        except (psutil.Error,RuntimeError) as e:identity.append(dict(worker=w['id'],status=type(e).__name__))
     config=json.loads((root/'config.json').read_text(encoding='utf-8-sig')) if (root/'config.json').exists() else {}
     resources=mq.resource_snapshot()
     result=analyze(rows,settings,resources,config.get('resource_policy',{}),live)

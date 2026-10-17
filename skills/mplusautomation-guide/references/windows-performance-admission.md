@@ -6,7 +6,7 @@
 
 1. 先复用已正常结束的 `.out`，不要因速度问题重复估计。
 2. 用 `windows_host_profile.py` 做三次原生 Windows 采样。WSL 的 `psutil.virtual_memory()` 不能代替 Windows 物理内存准入。
-3. 用父 PID、创建时间、命令行和工作目录核对所有 Mplus。外部 RStudio/ Mplus 任务必须保留，不能按名称误杀。
+3. 用父 PID、创建时间、命令行和工作目录核对所有 Mplus。父链必须逐层验证；`children(recursive=True)` 仅是候选列表。外部 RStudio/ Mplus 任务必须保留，不能按名称误杀。
 4. 先运行一个已有成功模型的隔离代表性试跑；记录 R worker、Mplus 子树峰值 private/RSS、CPU 秒、磁盘延迟、模型阶段和输出哈希。
 5. 只有单槽位的峰值和稳定余量都通过后，才增加第二个 worker。并行度按测得的增量预算决定，不按 R 脚本数量或“Windows 支持多开”决定。
 
@@ -19,5 +19,15 @@
 - ClaudeR 的 `execute_r_async` 解决 RStudio 前台阻塞和监控轮询问题，不会降低 Mplus 数值估计本身的时间；异步任务仍需 durable progress、原始 job id 和完成合同。
 
 ## 失败处理
+
+Windows 会保留已退出父进程的 PID；该 PID 后来可能被 Mplus 复用。
+因此，一个正常桌面程序可能出现在 R→Mplus 的递归后代列表里，尽管它早于
+Mplus 启动。仅检查最外层 R 的创建时间会漏掉这个错误。
+`process_ownership.py` 校验每条父子边的创建顺序，重新读取整条链的 PID、
+创建时间和父 PID；缺失、访问被拒绝、环或身份变化都不能证明归属。
+协调器在调整优先级/亲和性前再次验证。资源统计、内存抵扣与调度操作必须使用
+同一归属口径；不能凭旧的递归列表回收程序。保留原监控日志并单独记录纠正结果，
+不要把归属修复说成释放了内存或提高了 Mplus 速度。
+参见 [psutil 的 children 实现](https://github.com/giampaolo/psutil/blob/master/psutil/__init__.py)。
 
 资源不足时记录 `HOLD` 及具体原因（外部 Mplus、物理余量、commit、CPU、磁盘或 stale profile），不要把 HOLD 写成 Mplus 失败。模型超时、非正定 Fisher、无 VCOV 或输出不完整必须进入 deferred/limitation 队列，不能为追求显著性放宽规格或增加无合同并发。

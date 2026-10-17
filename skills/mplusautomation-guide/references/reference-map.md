@@ -7,6 +7,7 @@ Read what is relevant to the current task rather than the full historical case.
 | Template syntax and data export | [templates-and-data.md](templates-and-data.md) |
 | Actor/partner paths | [apim-paths.md](apim-paths.md) |
 | Execute and recover | [execution-and-validation.md](execution-and-validation.md), [resumable-reproduction.md](resumable-reproduction.md) |
+| Archived DAT replay, sleep gaps and readback recovery | [archived-replay-runtime.md](archived-replay-runtime.md) |
 | Changed scripts | [source-correction-and-evidence-reuse.md](source-correction-and-evidence-reuse.md) |
 | Changed data and variable redefinitions | [data-contrast-and-variable-redefinition.md](data-contrast-and-variable-redefinition.md) |
 | Effect paths and testing families | [effect-extraction-and-testing-families.md](effect-extraction-and-testing-families.md) |

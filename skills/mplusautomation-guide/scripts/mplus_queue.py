@@ -6,6 +6,7 @@ import contextlib
 import csv
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -16,6 +17,10 @@ import sqlite3
 import time
 
 import psutil
+_ownership_spec = importlib.util.spec_from_file_location('queue_ownership', Path(__file__).with_name('process_ownership.py'))
+_ownership = importlib.util.module_from_spec(_ownership_spec)
+_ownership_spec.loader.exec_module(_ownership)
+verified_descendants = _ownership.verified_descendants
 
 
 def utc():
@@ -500,7 +505,7 @@ class Queue:
                         if abs(process.create_time() - owner["created"]) < .1:
                             expected_dir = Path(payload["input"]).parent.resolve()
                             expected_exe = Path(self.mplus_command).resolve()
-                            matches = [child for child in process.children(recursive=True)
+                            matches = [child for child in verified_descendants(process,names={'mplus.exe'})
                                        if child.name().lower() == "mplus.exe"
                                        and Path(child.exe()).resolve() == expected_exe
                                        and Path(child.cwd()).resolve() == expected_dir
@@ -512,7 +517,7 @@ class Queue:
                                 credit = min(float(payload.get("memory_gib", .5)), max(0.0, used))
                                 booked["memory_gib"] = float(payload.get("memory_gib", .5)) - credit
                                 booked["observed_memory_credit_gib"] = credit
-                except (psutil.Error, OSError, ValueError):
+                except (psutil.Error, OSError, ValueError, RuntimeError):
                     pass
             running.append(booked)
         return running

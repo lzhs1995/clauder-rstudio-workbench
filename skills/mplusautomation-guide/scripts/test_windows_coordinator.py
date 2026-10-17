@@ -12,9 +12,11 @@ class Process:
     def __init__(self,pid,name,created):
         self.pid,self.label,self.created=pid,name,created
         self.priority=32;self.affinity=[0,1,2,3];self.descendants=[];self.mutations=[];self.before_write=None
+        self.parent_pid=0
     def name(self): return self.label
     def create_time(self): return self.created
     def children(self,recursive): assert recursive;return self.descendants
+    def ppid(self): return self.parent_pid
     def nice(self,value=None):
         if value is not None:
             if self.before_write: self.before_write()
@@ -33,6 +35,7 @@ def run(output):
     owner=Process(10,'Rscript.exe',100.0);child=Process(11,'Mplus.exe',101.0)
     foreign=Process(12,'Mplus.exe',102.0);other=Process(13,'rsession-utf8.exe',103.0)
     owner.descendants=[child,other]
+    child.parent_pid=owner.pid;other.parent_pid=owner.pid
     table={p.pid:p for p in [owner,child,foreign,other]}
     ref=w.identity(owner);factory=table.__getitem__;state=dict(processes={});saved=[]
     persist=lambda s:saved.append(copy.deepcopy(s))
