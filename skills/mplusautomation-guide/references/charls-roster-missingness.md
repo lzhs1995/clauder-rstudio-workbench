@@ -635,3 +635,19 @@ across imputations, display slopes only within the groups' common observed
 support. Retain the predeclared multiplicity family, MCSE, and finite-community
 degrees-of-freedom sensitivity. A complete working-MI family does not establish
 exact compatibility with latent interactions or complete the original CFPS H4.
+
+Use a distinct awake receipt for each owner identity. A recovery attempt read a
+previous owner's `RELEASED` receipt before the new helper published `ACTIVE`,
+and correctly stopped before any estimate. The fixed wait checks the new PID,
+creation time and state, rather than merely waiting for a filename to exist.
+
+A later coordinator connection error occurred while Mplus itself finished and
+wrote valid parameters. The engine supervisor had been tied to R's automatic
+process cleanup, leaving no final engine receipt. Recovery retained the
+`CLAIMED` row and old lock, verified all owners had exited, validated the saved
+output and runner-end marker, then recorded `RECOVERED_SAVED_OUTPUT` with an
+unknown exit code and a conservative full-cap time charge. It did not fabricate
+an observed successful exit or rerun the model. Bounded JSON retries and
+noncritical progress publication now protect the estimator; its independently
+bounded supervisor survives an R display-layer failure. Preserve a call trace
+on future errors instead of claiming an unobserved root cause.
