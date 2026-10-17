@@ -538,3 +538,21 @@ check each new child identity once. Prefer the owned heartbeat's PID/create-time
 records to repeated whole-host descendant enumeration. If a scheduling sidecar
 misbehaves, preserve its log, stop only that verified sidecar, restore the owned
 worker's admitted mask and replace the monitor without restarting estimation.
+
+When memory admission fails, count supervisor memory as well as model memory.
+An idle ClaudeR background R wrapper supervising Python, which then starts a
+second R queue worker, can consume the headroom needed by a small Mplus fit.
+After all old process identities and budget reservations close, a distinct native
+async job can source the same queue directly, reusing saved imputations and
+completed receipts. Keep the engine watchdog, hashes and memory/commit limits;
+removing a redundant supervisor is not a reason to weaken admission. Preserve
+the earlier partial terminal and bind the new job to its own terminal artifact.
+
+WSL interop errors are separate from Windows computation. A stale socket can
+report `UtilAcceptVsock ... accept4 failed 110` while native RStudio and an
+already-started Windows worker remain healthy. Verify a current socket with a
+small read-only command; inspect durable PID/create-time records before any
+resubmission. For 64-bit `ctypes` scheduling calls, declare the handle return and
+argument types, check the API's return value and read back affinity. An untyped
+pseudo-handle call silently failed in the diagnostic helper; an intended mask is
+not evidence that the process received it.
