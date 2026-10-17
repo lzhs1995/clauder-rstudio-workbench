@@ -80,6 +80,21 @@ has its own cost before Mplus starts. Gate that loading, then gate model
 launches. Release reservations on verified terminal transitions. An alive
 standby job is waiting, not a reason to submit another worker.
 
+Run the host preflight **before creating a postprocessing R process**, including
+the measured cost of that process in the loading budget. Repeat admission
+inside the worker before loading analysis/graphics packages. Otherwise even
+an idle admission loop consumes memory that the model queues may need. Report
+sampled RSS as samples, not as a continuously observed lifetime peak.
+
+If an authorized secondary worker remains at the pre-package admission stage
+while estimation needs the reserve, verify its PID/creation time, stage and
+absence of analysis outputs. Request its supported cooperative stop, then
+observe the actual terminal response and process exit before archiving its
+guard record. Keep its figures pending and preserve the unsuccessful attempt.
+Check capacity again outside R before a fresh attempt; do not reuse a control
+directory or stop a worker that has already entered analysis merely because an
+earlier observation showed a hold. The model queues and full task remain active.
+
 Reclaim only authorized, verified inactive workloads. Measure the effect on
 Windows available RAM and commit. WSL cache reduction or working-set trimming
 does not establish an equivalent Windows capacity gain; repeated purges can
@@ -115,6 +130,34 @@ Only switch a frozen driver at a completed-model boundary. Retain completed
 OUT/readback/comparison receipts and resume unfinished identities without
 refitting successful models. Distinguish a recovered original error from a
 newly reproduced mechanism when the earlier subprocess stderr was lost.
+
+## Pin running helpers before updating a managed skill
+
+A managed skill directory can be replaced by its installer. A long batch
+should use an isolated, versioned copy of the required helper files and their
+imported local modules, with hashes and source commit recorded separately
+from the native runtime/package versions. Bind postprocessing probes to the
+same fixed dependency set. Updating the installed guide must not silently
+change a running model's coordinator or admission rules.
+
+To change a frozen runtime, validate the replacement files first. Use an
+existing cooperative completed-model boundary, and verify the completed
+OUT/readback/comparison, released reservation, worker exit and owned sidecar
+exit. Then create a new worker/control attempt with the replacement bindings.
+Preserve the previous driver/configuration and failed attempts. Require
+verified output hashes before skipping successful models, and record the new
+real async IDs and native fitting progress. A planned boundary exit is not a
+failed statistical estimate or a reason to pause the overall reproduction.
+
+For a managed update, back up the installed manifest and use the manager's
+supported single-skill operation. Verify the resulting enabled projections
+against the tested source manifest and recheck the pinned runtime hashes.
+Record unrelated skill records and enabled flags without changing them. Do
+not scan or update every installed repository to update one skill, or bypass
+the manager by editing its database. Restore any temporary manager window or
+debug listener to its prior state. A window closing does not prove that its
+WebView children have exited: use verified identities and actual Windows
+capacity, rather than crediting their RSS as already released memory.
 
 ## Reconcile a Windows restart before resuming
 
@@ -227,3 +270,22 @@ completion receipts, inspect output growth and the bound session's execution
 history, and confirm the original call's terminal state before resubmitting.
 Resume only missing exports from the saved plot object. Neither a timeout nor
 a temporarily zero-byte SVG justifies rerunning Mplus.
+
+## Finish acceptance before reserving the next group
+
+A producer's terminal response and a formal deliverable check are separate
+steps. Save the actual terminal response when it arrives, verify durable
+outputs and process exit, then finish the numerical, geometric, visual and
+formal checks. Only afterward reserve the next group under the same workbench
+task key. Alternatively use genuinely independent task keys with the required
+evidence for each; do not change a key merely to evade an active-job guard.
+
+A premature next-group reservation can make the previous group's completion
+check report an active in-flight record even though its data and figures are
+valid. Preserve that refusal. Reconcile only a reservation proven to have no
+assigned job ID, dispatch or attempt artifacts, rerun the formal check on the
+unchanged deliverables, and then reserve the next group. Do not clear a live
+job, repeat extraction/rendering, or rerun Mplus to make the completion gate
+pass. Keep corrected completion evidence distinguishable from the original
+failure, and count accepted artifacts by unique manuscript identity and
+verified hashes rather than by the number of jobs archived.
