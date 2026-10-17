@@ -694,3 +694,50 @@ those conditional working-MI analyses, not a completed original H4, an exact
 latent-interaction imputation method, or a reason to drop the excluded scope
 from the fixed multiplicity family. Preserve the distinction in the report,
 public manifest and next-task handoff.
+
+## Reopen a failed imputation only with new numerical evidence
+
+An unfinished SD-income conditional fit was revisited without rerunning the
+failed CFPS specifications. Capture its exact design before changing the
+optimizer: the saved design hash matched the historical call, with 67 fixed
+effects, full column rank and condition number 30.129. A linear-programming
+check found no fixed-effect complete or quasi-complete separation. These checks
+do not establish mixed-model identification or the missing-at-random assumption.
+
+For this design, `glmmTMBControl(profile=TRUE)` was the sole numerical change.
+The [official control documentation](https://glmmtmb.github.io/glmmTMB/reference/glmmTMBControl.html)
+describes this experimental option for models with many fixed effects. Two
+bounded, separately initialized diagnostic fits used the same data, formula
+and Laplace likelihood. They completed in 11.614 and 11.824 seconds, with
+optimizer code zero, positive-definite Hessians and fixed-effect covariance,
+positive random-effect variance, and a log-likelihood difference of
+2.27e-12. The maximum coefficient difference was 1.24e-10 reference standard
+errors. Retain the reported gradient and all diagnostics rather than hiding
+them behind a success flag. The unfinished historical fit is not a timed
+baseline, so these observations do not establish a controlled speedup ratio.
+
+Numerical feasibility of the first conditional fit is not a completed MI
+analysis. A separate two-chain, two-iteration interface pilot passed; its draws
+were excluded from the fresh 40-chain formal run. That run retained the original
+formula, stochastic rules, seed, data, convergence gates and remaining engine
+budget. Its admission and downstream Mplus results must be read from actual
+terminal artifacts. Do not describe a running family as complete or replace a
+failed member with a successful diagnostic fit.
+
+An external watchdog must exclude its own PID when terminating the worker's
+descendants. Otherwise it can terminate itself before stopping the owner or
+writing a terminal receipt. A disposable Windows root/child test reproduced
+the lifecycle and verified the corrected watchdog stopped both owned processes,
+wrote its receipt and left the caller alive. Bind the owner by PID and creation
+time, and wait for an identity-matched `WATCHING` receipt before starting work.
+No historical watchdog receipt existed for the old SD timeout; the newly found
+defect therefore cannot be asserted as that timeout's proven cause.
+
+## Distinguish a publishing timeout from a failed push
+
+A Git push client timed out after 180 seconds. The remote initially still showed
+the old commit and later showed the intended new commit. Recovery checked the
+remote identity and verified the published bytes before deciding whether to
+retry; no second push was needed. Treat a transport timeout as an unknown
+publication outcome, preserve its transcript and inspect the remote branch.
+Do not attribute success to a buffer or retry option that was never exercised.
