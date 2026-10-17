@@ -483,3 +483,58 @@ alone. Guard nullable fields before formatting and test the actual terminal
 shape. Archive the wrapper error; validate saved outputs in a distinct zero-fit
 readback job instead of restarting the analysis or relabeling the failed wrapper
 as successful. Record which job estimated and which only reconciled completion.
+
+## Check whether chained iteration is actually needed
+
+Before multiplying imputations by iteration counts, inspect the dependency graph.
+In the four observed-baseline CHARLS moderation sensitivity scopes, only ADL was
+incomplete. Every conditional predictor was a fixed, fully populated auxiliary
+representation. The numeric PMM routine fitted only observed ADL and used only
+observed donors; prior imputations did not enter the fit. Twenty independent
+conditional draws therefore required one pass per member, not twenty rounds of
+burn-in. Each scope's deterministic mixed-model fit was identical across the
+twenty calls, while coefficient, random-effect and donor draws remained fresh.
+Cache exact fits only, and record the actual predictor matrix, package versions,
+fit hashes and draw count. Do not apply this shortcut to mutually incomplete
+income/ADL targets, changing passive predictors or latent-variable samplers.
+
+Adding observed Z-by-wave terms and missingness-flag products makes a working
+imputer more responsive to the analysis structure; it does not establish exact
+substantive-model compatibility for a latent interaction. Keep its complete-MI
+sensitivity results separate from complete inference for the original mechanism
+and from H4.2. Fixed auxiliary fills are not actual longitudinal observations:
+restore and verify the original outcome values and FIML masks in every engine
+input. Undefined family contrasts remain outside ordinary imputation.
+
+`mice::complete()` can reset data-frame row names. An `identical()` comparison of
+whole frames then fails even when every non-imputed numeric column is unchanged
+in the original order. Inspect the difference, preserve the error and verify
+column names, order, source binding, values and masks; do not simply disable all
+identity checks. If the complete MIDS was already saved, resume its export and
+validation without drawing another set. In this case all 51 non-ADL columns
+matched and the original twenty SD draws were reused after the metadata-only
+check was repaired.
+
+## Verify scheduling in the actual engine descendants
+
+Raising the coordinator priority does not prove that its Python, Rscript and
+Mplus descendants inherited that priority. The observed Windows process tree
+contained an above-normal coordinator but normal-priority descendants, and its
+allowed CPU mask still included a newly saturated core. Inspect actual PID
+creation times, parent chains, masks and priorities. A lightweight sidecar may
+adjust only verified owned descendants to currently available permitted cores
+and above-normal priority, recording before/after settings for each identity.
+Do not change input files, estimator settings or acceptance thresholds as a
+performance repair. Let the sidecar exit when its verified coordinator exits;
+never follow a recycled PID or alter another task's process. Resource admission
+and a single owned engine slot remain in force. Report CPU, engine/launcher wall
+time and total pipeline time separately; this observation alone is not a
+controlled speed benchmark.
+
+Do not repeatedly remove every currently busy core from an already reduced mask:
+the owned fit itself can make its core busy, producing a shrinking-mask feedback
+loop. Select and record a stage mask, retain its original permitted set, and
+check each new child identity once. Prefer the owned heartbeat's PID/create-time
+records to repeated whole-host descendant enumeration. If a scheduling sidecar
+misbehaves, preserve its log, stop only that verified sidecar, restore the owned
+worker's admitted mask and replace the monitor without restarting estimation.
