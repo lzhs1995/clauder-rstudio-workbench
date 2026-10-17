@@ -98,6 +98,12 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [binary-observed-interaction-computation.md](references/binary-observed-interaction-computation.md):
+  avoid unnecessary integration for an observed binary moderator when the
+  conditional Gaussian model has an equivalent known-class representation;
+  calibrate all parameters and robust covariance before using it, and keep
+  faster computation separate from admissibility and complete MI inference.
+
 - [charls-roster-missingness.md](references/charls-roster-missingness.md):
   verify child/household crosswalks before within-family contrasts, distinguish
   structural absence from missing responses, and prepare scoped moderation inputs
