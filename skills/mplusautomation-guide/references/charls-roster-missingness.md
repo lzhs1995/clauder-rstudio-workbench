@@ -677,3 +677,20 @@ verification checks the package bytes against the latter and their source
 binding against the former before recomputing parameters and TECH3 contrasts.
 A targeted check accepted correctly redacted text and rejected altered bytes;
 this is not permission to bypass either hash or to claim byte identity.
+
+Persist the actual native terminal response on the first completed poll. In this
+ClaudeR installation, returning a completed response retires the background-job
+registry entry; a second poll can return `No job found`. That later response is
+neither the original completion log nor proof of failure. Use one observer per
+job, save the full first response, and only then close its async guard. The last
+income worker and the final modeling coordinator both followed this sequence.
+Do not submit another estimate to reconstruct a lost polling transcript.
+
+Close each registered scope at its evidenced state. This batch pooled all 280
+members of 11 admitted families (eight with 20 imputations, three with 40),
+while retaining the twelfth scope as imputation-not-admitted. Independent raw
+parameter/TECH3 replay passed for the complete families. This is evidence for
+those conditional working-MI analyses, not a completed original H4, an exact
+latent-interaction imputation method, or a reason to drop the excluded scope
+from the fixed multiplicity family. Preserve the distinction in the report,
+public manifest and next-task handoff.
