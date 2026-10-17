@@ -13,6 +13,7 @@ Read what is relevant to the current task rather than the full historical case.
 | Effect paths and testing families | [effect-extraction-and-testing-families.md](effect-extraction-and-testing-families.md) |
 | Precision and candidate inputs | [candidate-compilation-and-precision.md](candidate-compilation-and-precision.md) |
 | Figure points and intervals | [display-producer-contracts.md](display-producer-contracts.md) |
+| Complete tables, browser rendering and Windows exit evidence | [complete-table-and-browser-acceptance.md](complete-table-and-browser-acceptance.md) |
 | Manuscript adoption | [full-scope-review-and-adoption.md](full-scope-review-and-adoption.md) |
 | Scientific diagnostics | [scientific-reliability-audit.md](scientific-reliability-audit.md), [binary-exogenous-identification.md](binary-exogenous-identification.md) |
 | Bootstrap units and precision | [finite-cluster-and-bootstrap-contracts.md](finite-cluster-and-bootstrap-contracts.md), [source-data-and-bootstrap-precision.md](source-data-and-bootstrap-precision.md) |
