@@ -116,6 +116,60 @@ OUT/readback/comparison receipts and resume unfinished identities without
 refitting successful models. Distinguish a recovered original error from a
 newly reproduced mechanism when the earlier subprocess stderr was lost.
 
+## Reconcile a Windows restart before resuming
+
+Bind the assigned RStudio session explicitly before querying old async IDs: a
+new agent may initially route to another live port. A missing job on that port
+does not establish termination. Compare the bound R PID and creation time,
+Windows boot time, old worker identities and current Mplus ownership. When a
+restart is verified, retain the old IDs as history and run the workbench's
+native synchronous/asynchronous smoke on the new session.
+
+Freeze a recovery inventory before changing state. Hash-copy the stopped
+control directory, interrupted attempts and completed outputs awaiting a
+consumer check. Validate a complete OUT/readback rather than repeating its
+estimate. Preserve an incomplete attempt separately before starting a new
+attempt with unchanged input/data/executable bindings. Never overwrite the
+only copy of the interrupted output.
+
+Dead admission leases can block an otherwise healthy worker. Under the same
+admission lock, recheck each recorded owner by PID and creation time, archive
+only the verified dead owner's claim, and append a recovery event. Keep
+unrelated Mplus processes alive and count them against the existing whole-host
+limit. A fresh boot may change the limiting resource: report a slot hold, RAM
+hold and active estimation separately from current measurements. Do not
+attribute post-restart free memory to an earlier cleanup without evidence.
+
+Use fresh worker/control directories and register the new real async IDs.
+Keep the frozen model driver and its resource contract unchanged when only
+the recovery launcher needs repair. The general
+[power-loss recovery guide](power-loss-recovery.md) also covers durable queues
+and checkpoints; a run-specific lease reconciliation must not be presented
+as a generic queue recovery command.
+
+## Preserve the async progress function's environment
+
+ClaudeR makes `clauder_progress()` available in the asynchronous evaluation
+environment. A helper loaded with the default `source(..., local = FALSE)`
+can define its functions in the global environment instead; those functions
+may then fail to find the injected progress callback. In the worker job, load
+helpers into its current environment and check the callback before creating
+attempt directories or starting Mplus:
+
+```r
+# worker_helper_path and config_path are declared durable paths in this job.
+stopifnot(exists("clauder_progress", mode = "function", inherits = TRUE))
+source(worker_helper_path, local = TRUE)
+run_replay_batch(config_path)
+```
+
+Check callback visibility inside the entry function too. If an earlier
+launcher failed, prove its terminal state and inspect whether it wrote an
+attempt or launched Mplus before submitting corrected code. A successful
+standalone progress smoke does not establish the lexical environment of a
+subsequently sourced helper. This loading pattern was exercised by native
+Windows ClaudeR jobs that subsequently reported real fitting progress.
+
 ## Recover consumers without refitting producers
 
 Before skipping a model, verify input/data/executable bindings, completed OUT,
@@ -141,6 +195,14 @@ strictness of comparisons and quantile type. Independently recalculate plot
 data from raw OUT/GH5 before rendering complete figure groups. Keep corrected
 figures isolated until manuscript adoption is authorized and scientifically
 supported. See [display producer contracts](display-producer-contracts.md).
+
+For several complete figures sharing models, read each verified RDS once per
+batch and cache that model's OUT/RDS hashes. Bind every extracted row to the
+same model hashes, then independently check the expected row keys and raw
+OUT/GH5 values before rendering sequentially. A revised extractor must have
+its own accepted filename and hash; preserve the prior version and unchanged
+numerical/role checks. Claim the optimization only after a new complete data
+group has actually passed those checks, not merely after `source()` succeeds.
 
 ## Count actual delivered artifacts
 
