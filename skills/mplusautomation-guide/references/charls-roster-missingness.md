@@ -587,3 +587,51 @@ and directly test the last coefficient. Keep the two group-specific moderation
 contrasts and conditional slopes with their full covariance. A complete-case
 pilot does not complete its MI family; an imputer built for a different
 interaction cannot be relabeled as substantively compatible.
+
+## Resume a rebooted batch before adding statistical work
+
+A Windows reboot invalidates both the RStudio process and its asynchronous job
+registry. Verify PID plus creation time, archive stale ownership/lock records,
+check SQLite integrity and unsettled reservations, and reload saved MIDS and
+input/output hashes before resuming. The H4.2 recovery reused 37 legal outputs
+and all 80 ADL imputations without estimating them again. A null-filled progress
+JSON was retained as evidence; it did not invalidate the intact statistical
+artifacts. Rebind the new native RStudio session and record a fresh native-tool
+smoke rather than reusing the old session's proof.
+
+The local ClaudeR background registry lives in the package namespace,
+`get('.claude_bg_jobs', envir=asNamespace('ClaudeR'))`. An unsuccessful lookup in
+`.GlobalEnv` does not prove no task was submitted. Prefer the public polling
+tool; inspect the namespace only to recover a lost acknowledgement.
+
+Verify an awake helper's supported lifetime before invoking it. A requested
+25,200 seconds exceeded this helper's 14,400-second maximum and caused the
+helper to exit. A process handle alone had not proved protection was active.
+The repaired coordinator checks an actual `ACTIVE` receipt, matching owner PID
+and creation time, and terminates its phase within the helper's lease. This
+prevents idle sleep; it does not prevent power loss, reboot or intentional sleep.
+
+Keep startup timeouts separate from statistical failures. One preserved timeout
+had zero sampled Mplus CPU and no output. A single separately named recovery
+attempt was registered without changing the model or total engine-time budget;
+the old timeout was not overwritten or called nonconvergence. In contrast, an
+incomplete conditional-imputation fit is not an imputed member and cannot be
+replaced silently. R's elapsed-time limit may not interrupt a native optimizer;
+use a Windows watchdog bound to worker identity and a per-fit BEGIN/END record.
+Keep that record for ADL fits as well as binary-income fits.
+
+Record memory admission separately from process-count admission. After reboot,
+two external Mplus processes each used about one core and under 60 MiB RSS,
+while Windows had about 2.95 GiB available and 13 GiB commit headroom. The
+documented revision allowed those two external processes plus one owned engine,
+retaining physical-memory, commit and CPU limits. Those measurements are local
+evidence, not a universal three-engine setting or a claim that unrelated queues
+share a lease. Never terminate another research queue to satisfy a count gate.
+
+For MI contrasts, pool the full selected covariance matrix. Group moderation is
+`dc` and `dc + dcg`; the direct group difference is `dcg`. A conditional slope is
+`bss + dc*z + bxg*g + dcg*z*g`. When missing income changes group membership
+across imputations, display slopes only within the groups' common observed
+support. Retain the predeclared multiplicity family, MCSE, and finite-community
+degrees-of-freedom sensitivity. A complete working-MI family does not establish
+exact compatibility with latent interactions or complete the original CFPS H4.
