@@ -289,3 +289,86 @@ bounded captured payloads and retain the evidence checks; do not disable a
 security or collaboration guard to make the display look healthy. Continue
 using RTK explicitly for supported shell commands while investigating its
 automatic rewriting path.
+
+
+## Foreground preparation can hide a live Addin
+
+In a Windows CHARLS run on 2026-10-18, a synchronous `execute_r` request
+compiled eight model inputs from existing parameter files. The call returned
+`R Error: HTTP error communicating with RStudio`; subsequent native calls
+reported that the Addin was not running. The tool wrapper nevertheless had
+`isError: false`. A direct Windows HTTP health request also reached its ten
+second read timeout. These were failed API checks, not successful execution
+receipts, and the process discovery record alone did not prove HTTP health.
+
+Durable evidence showed a different state at each layer. The foreground PID
+and creation time were unchanged, input `job.json` files advanced from two
+to eight, and two existing background jobs continued to update their model
+and conditional-fit counters. Once preparation finished, native execution
+worked on the same foreground PID; the original Mplus job returned its real
+terminal output and the original imputation job remained running. No service
+restart, statistical resubmission, or data regeneration was needed. The
+foreground request was still executing after its response had been lost.
+This observation does not identify the underlying reason that preparation was
+slow, and does not establish memory pressure as the root cause.
+
+Use these recovery rules:
+
+1. Treat batch input compilation and parameter parsing as potentially long
+   work. Submit them asynchronously with `source(..., local=TRUE)`, emit a
+   stage for each family, and save a distinct `INPUT_ONLY_NOT_ESTIMATED`
+   terminal. Calling a step “preparation” does not make it safe for the
+   foreground HTTP execution window.
+2. Inspect the actual tool text as well as its error flag. Preserve the raw
+   error, expected session/port/PID/creation identity, last original job ID,
+   and timestamped durable stages. Do not turn a health-check timeout into
+   a diagnosis that RStudio has exited.
+3. If a synchronous request has an ambiguous outcome, inspect its scoped
+   outputs and ownership before repeating it. Already-generated input hashes
+   and continuing progress can establish execution without establishing
+   successful completion. Never start a replacement coordinator just because
+   the API cannot poll the original one.
+4. While the foreground is occupied, use the existing lightweight Windows
+   watchdog records for the background estimates. Keep the owned Mplus and
+   imputation workers intact. If durable work is advancing, a restart is
+   not the first recovery step.
+5. After responsiveness returns, bind the intended session explicitly if
+   routing changed, verify the original PID/creation identity, consume the
+   original async terminal, and reconcile the generated files. A new smoke
+   test must not substitute for reading the real job. Missing or inconsistent
+   outputs still require investigation; an HTTP recovery alone is not
+   statistical acceptance.
+
+This case complements the earlier Addin-only restart case in this runbook:
+recovery action depends on the observed state. There is no blanket rule to
+restart on every timeout. The implementation still does not claim a globally
+installed unattended Addin-restart service.
+
+### Admit a new imputation worker without starving Mplus
+
+The same run found that checking only the existing Mplus minimum before
+starting an additional R worker could leave the next model below that minimum.
+Admission was tightened before the new worker started: preserve the original
+Mplus headroom **plus** the measured incremental full imputation-worker peak
+and an explicitly recorded allowance for its expanded design. Historical
+full-worker peaks were used initially, then compared with the live new-worker
+peak before admitting the second independent chain block. The allowance is
+an assumption to calibrate, not a measured footprint or universal constant.
+
+Use Windows available physical memory, commit headroom and CPU samples. Keep
+the snapshot fresh at submission, release completed owned coordinators, and
+do not close other research sessions to satisfy the gate. The two imputation
+blocks retain different frozen seeds, original MIDS/RNG checkpoints, and
+their full-family mixing rule. Parallel scheduling must not reuse random
+draws, replace failed members, or equate successful conditional fits with
+accepted inference.
+
+Evidence for this incident is included in the
+`charls_corrected_dynamic_mi_models_20261018` paper-repository package:
+`recovery/INPUT_PREVIEW_NATIVE_RESPONSE.json`,
+`INPUT_PREVIEW_HTTP_DIAGNOSTIC.json`, `FOREGROUND_DURING_PREVIEW.json`,
+`SYNC_CALL_DURABLE_RECOVERY_PROGRESS.json`, `SYNC_RECOVERY_COMPLETE.json`,
+and `ORIGINAL_INCOME_JOB_RECOVERED.json`. Its independent raw-parameter
+verification covers 88 calls and four 20-member observed-baseline working-MI
+families. This does not complete the original latent-moderation hypotheses
+or full H4.
