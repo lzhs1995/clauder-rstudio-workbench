@@ -741,3 +741,62 @@ remote identity and verified the published bytes before deciding whether to
 retry; no second push was needed. Treat a transport timeout as an unknown
 publication outcome, preserve its transcript and inspect the remote branch.
 Do not attribute success to a buffer or retry option that was never exercised.
+
+
+## Follow-up waves can invalidate a technically completed family
+
+An October 2026 Windows/ClaudeR run completed all 40 income-interaction
+imputations, and independent parameter/TECH3 pooling checks passed. A later
+raw-wave audit found that the input builder omitted 2018 children who reported
+12 months of co-residence and therefore skipped the frequency question.
+Current residential address did not recover every such record. The independent
+R/pandas check found 235 omitted child records for 206 parents; in the unchanged
+legacy roster, 163 observed means changed and 36 previously missing means became
+defined. Every actual model DAT in the 40-member family contained the old X4.
+
+Model execution, parameter extraction and MI pooling acceptance therefore remain
+true statements about the **old input**. They do not establish correct survey
+semantics. Publish an incremental input-correction notice, preserve old outputs,
+and mark corrected-input adoption pending. Do not overwrite history or predict
+whether corrected estimates will be significant.
+
+For every wave, bind five layers: raw variable and value labels; questionnaire
+routing; child/household identity; derived value and missingness reason; actual
+model DAT column and hash. A baseline roster check cannot stand in for all
+follow-up waves. Keep PDF hash, printed page and physical page separately:
+different questionnaire layouts can have the same printed page but different
+PDF page numbers.
+
+An unmatched key first requires a source-map diagnosis. In the measured 2013
+case, 1,207 official child-to-household links matched raw xchildmembercv exactly.
+Do not concatenate both records as different children. Keep identity agreement
+separate from disagreements in sex, birth year or contact, and record the chosen
+same-wave source rule. Conversely, 248 observed 2015 contact cells were outside
+the same-wave child count and had no constructed-child record. Preserve these
+values and quarantine the unsupported identity; a valid response range alone
+does not prove that a cell represents an additional child. Do not invent the
+unique cause of such a release inconsistency.
+
+Rebuild one isolated candidate across all affected waves before refitting each
+family. A separate pandas reader verified 32,795 child records and 72,144
+person-by-wave indicator cells against the R rebuild. This establishes numeric
+agreement under the stated roster/proxy rules, not the truth of every survey
+answer or the identifiability of a longitudinal interaction.
+
+Keep available-contact contrasts and full-listed-child contrasts distinct.
+The oldest observed child need not be the oldest child on the roster. Structural
+absence, missing attributes/contact and tied earliest birth years need separate
+statuses; do not impute every resulting NA as ordinary missing data. Report
+source eligibility and per-wave observation coverage before defining a latent
+trajectory sample, without requiring a balanced panel merely for convenience.
+
+When X participates in imputation auxiliaries, changing X also invalidates a
+claim that old completed imputations arose from the corrected procedure. Rebuild
+the affected MI inputs and diagnostics; reuse verified runners and pooling code.
+Only then run the bounded necessary parent checks and complete affected families.
+This does not authorize unchanged failed CFPS reruns or a significance search.
+
+Aggregate evidence and the fixed-input boundary are available in the
+[public source-correction packet](https://github.com/lzhs1995/PP-lcgm-paper/tree/cd7d6ec3218dc313272228a21b93c7368326b062/charls_latent_trajectory_readiness_20261018).
+It contains no participant-level data. The original four latent moderation
+families and full H4 are still incomplete; this lesson does not close them.
