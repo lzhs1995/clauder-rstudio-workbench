@@ -800,3 +800,72 @@ Aggregate evidence and the fixed-input boundary are available in the
 [public source-correction packet](https://github.com/lzhs1995/PP-lcgm-paper/tree/cd7d6ec3218dc313272228a21b93c7368326b062/charls_latent_trajectory_readiness_20261018).
 It contains no participant-level data. The original four latent moderation
 families and full H4 are still incomplete; this lesson does not close them.
+
+
+## Preserve statistical state when Windows infrastructure fails
+
+A progress display is not the analysis checkpoint. In the corrected CHARLS
+income run, `file.rename()` of a progress JSON failed under a real Windows
+sharing lock after a complete MIDS/RNG checkpoint. Keep critical checkpoint
+writes fatal, but make the replaceable progress cache nonfatal and append a
+small event journal. A watcher can read the newer journal when the cache is
+stale. Test with an actual Windows handle denying delete sharing; a mocked
+rename alone does not exercise this failure mode.
+
+Checkpoint recovery must distinguish `iteration < target` from
+`iteration == target`. The former continues sampling; the latter only checks
+and exports. A repair accidentally changed the sampling loop to `<=` and
+started an extra iteration. Preserve the deviation, freeze the complete target
+checkpoint and its hash, exclude partial extra draws, and finalize with zero
+new fits. Do not hide those calls in the accepted-iteration count or silently
+adopt them as a better result. Check both boundary cases before submitting.
+
+If an async submission response is lost, look up the existing job by its actual
+code, agent, PID and creation time before submitting again. Conversely, after
+a verified host reboot, old jobs cannot be revived merely by their IDs. Confirm
+the new boot time and disappearance of the old identities, validate every saved
+input/output hash, reuse completed members, and resume only the first unfinished
+member. A prepared input with no engine receipt is different from a failed fit.
+Preserve consumed budget across the new worker and never reset it to zero.
+
+RStudio discovery can recover while an isolated replacement UI is starting.
+Recheck the user-assigned port before activating the replacement. Bind to the
+actual session and rerun the native wrapper smoke for its new PID. If the
+assigned session has already recovered, close only the extra empty project that
+this run created, using PID/creation/ancestry evidence. Never kill another
+chapter's RStudio or Mplus processes. Windows RStudio's R process can be named
+`rsession-utf8.exe`; checking only `rsession.exe` incorrectly reports no R.
+
+## Reduce orchestration cost without changing the estimator
+
+Measure input preparation, R/Mplus launch, estimation and readback separately.
+Repeated Python numerical-library imports can cost more than a short model.
+A batch-owned persistent helper may call the same frozen compiler and reader;
+keep one model slot, explicit request IDs, bounded calls and an owned shutdown.
+Verify identical generated/readback bytes and unchanged start comparisons before
+using it. The CHARLS helper test compared nine readback files and the double-start
+decision without adding an estimate. An initially invalid cleanup API was fixed
+and tested separately; preserve that failed cleanup receipt.
+
+`processx::run(timeout=...)` takes seconds, while process `wait()` and `poll_io()`
+use milliseconds. Do not mistake `timeout=120000` for a two-minute limit. Model
+engine caps and auxiliary-process caps are separate. Also create and validate
+the isolated output directories before launching the queue; a missing `models`
+directory is a preparation error, not nonconvergence.
+
+One incomplete covariate with fully observed, fixed conditional predictors can
+use independent conditional draws. Cache only its identical deterministic fit;
+retain fresh parameter, random-effect and donor draws. Do not extend this shortcut
+to two variables whose missing values predict one another. Observed products in
+working FCS still do not establish exact latent-interaction compatibility or MAR.
+
+For audit metadata, R named atomic vectors can lose their names during JSON
+serialization. Export a path-to-hash dictionary as `as.list(named_hashes)` and
+validate its shape. A metadata-only verification failure does not justify
+re-estimating models whose raw parameters already passed. Preserve the failure,
+repair the mapping from its authoritative object, and rerun only verification.
+
+Report completed corrected-input families separately from older-input families,
+and conditional working MI separately from the original full latent moderation
+and H4 objectives. Runtime reliability and guide publication do not close those
+scientific requirements.
