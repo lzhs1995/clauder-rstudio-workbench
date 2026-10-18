@@ -65,6 +65,26 @@ requires POSIXt; alternatively obtain a fresh handle and explicitly compare
 
 See Microsoft's [SetThreadExecutionState contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate): CPU/disk activity alone need not reset the idle timer.
 
+If samples still show shared gaps, inspect power events and AC/DC status even
+when the helper heartbeat exists. In an archived APIM batch, three workers
+shared a roughly 32-minute gap while Windows recorded Modern Standby and lid
+events on battery power. An active system-only request did not prove continuous
+computation. Microsoft's [PowerSetRequest documentation](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-powersetrequest)
+also describes the limited lifetime of system/execution requests in Modern
+Standby on DC power; do not infer an indefinite battery guarantee from either API.
+
+When the authorized unattended workflow needs an additional display request,
+use a separate, owner-bound helper with
+`ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED`, a finite expiry,
+heartbeat and cooperative stop. The bundled system-only helper above does
+not currently expose this mode; a project-specific implementation needs its
+own validation. Check the API's nonzero result and retained flags, renew only
+the same verified lease while work remains, and release the calling thread's
+request at expiry, owner exit or task completion. Record the actual expiry in
+the handoff. This does not change the power plan, override deliberate sleep or
+lid closure, or demonstrate a speedup. A single successful heartbeat is only
+request-state evidence; continue checking sample continuity and power events.
+
 ## Use measured admission budgets
 
 Calibrate representative **worker plus child** peaks before revising a
@@ -133,6 +153,14 @@ resource samples, physical availability stayed above 1.88 GiB and commit
 headroom above 10.08 GiB. This qualified that run's third slot; these values
 are observations, not portable thresholds or a recommendation for other model
 families. The remaining queue still requires per-model admission.
+
+A later four-slot trial in that same archived run passed 17,160 printed-value
+comparisons from four previously untouched original models. Four distinct owned
+engines were observed together; 552 samples retained at least 2.09 GiB available
+physical memory and 8.53 GiB commit headroom. All workers, helper processes and
+reservations ended before adoption. This extended feasibility for that frozen
+runtime only. A four-slot setting does not establish a fourfold speedup, and
+the full queue must continue accounting for other Mplus workloads and R loading.
 
 ## Make admission failures recoverable
 
@@ -224,6 +252,37 @@ and checkpoints; a run-specific lease reconciliation must not be presented
 as a generic queue recovery command.
 
 ## Preserve the async progress function's environment
+
+### Recover a missing submission response before retrying
+
+An async start timeout can occur after the R server created the worker. Treat
+that outcome as unknown, retain the complete response, and inspect the same
+bound session's job registry and durable attempt directories before submitting
+again. In the tested ClaudeR fork, `.claude_bg_jobs` in the `ClaudeR` namespace
+holds the original code, agent ID, session binding, process and progress path.
+This is an internal, version-specific recovery surface: inspect the installed
+implementation before using it. Match the exact submitted code, owning agent,
+session and submission time; a similar filename is insufficient.
+
+When a unique matching job exists, recover its original ID, record the actual
+registry observation and poll that job through the native result tool. Save
+its terminal response immediately and inspect any callr error before cleanup.
+Do not label a communication error as terminal or clear the registry entry
+merely because the client never received the ID. Retry only after evidence
+establishes that dispatch did not occur, or after reconciling the completed or
+failed original attempt. If several matches exist, retain them and resolve
+their ownership and outputs before any new submission.
+
+The tested bridge returned error text with `isError: false`, and its short
+health probe sometimes reported the addin absent while an HTTP request to the
+same PID succeeded. Inspect the response text and actual progress as well as
+the outer flag. Prefer serial requests to a busy single R session when concurrent
+health probes fail; independent OS/file checks can still run concurrently.
+Reconnect to the assigned session and use the supported HTTP fallback without
+restarting live model workers. Two timed-out short smoke submissions were
+recovered this way; this proves recovery behavior, not a new Mplus estimate.
+
+### Keep the worker callback in scope
 
 ClaudeR makes `clauder_progress()` available in the asynchronous evaluation
 environment. A helper loaded with the default `source(..., local = FALSE)`
