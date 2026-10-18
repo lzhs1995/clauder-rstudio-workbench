@@ -301,3 +301,70 @@ Record API/transport failures separately from RStudio, worker and Mplus state.
 If the executor provider is unavailable, preserve the same run and queue
 identity and perform a single-writer supervisor takeover; never resubmit a
 live task or create a second coordinator.
+
+
+## Windows buffered output and bounded integration-cost probes
+
+A progressing R/Mplus process can coexist with an unchanged outer log. In the
+worker's installed MplusAutomation 1.3, the Windows `runModels` branch calls
+`system(..., intern = TRUE, wait = TRUE)` and only then prints `the_output`.
+Thus `showOutput=TRUE` does not establish streaming TECH8. Its `logFile` records
+run settings/model scheduling, not a live numerical-iteration feed. Terminating
+the owned runner at a legitimate budget can leave its captured TECH8 unavailable.
+Inspect the actual installed function; do not assume a Linux launch or another
+package version has the same behavior.
+
+The verified CHARLS example used an isolated complete-control sample, identical
+data/model/starting values, and Mplus 9 via ClaudeR/MplusAutomation. Following
+the [official integration guidance](https://www.statmodel.com/HTML_UG/chapter14V8.htm),
+three calls used `MITERATIONS=1`, `STARTS=0`, TECH1 and TECH8. The two-dimensional
+interaction used 900 nodes at 30 points per dimension and 225 at 15 points.
+Six growth factors did not imply six integration dimensions. Reported first-EM
+TIME was 3.29, 3.27 and 0.65 seconds for q30/p1, q30/p4 and q15/p4 respectively;
+the printed whole-second Mplus elapsed times were 8, 5 and 3. Each setting was
+observed once. These are separate timing fields, not a stable causal speedup
+benchmark or proof of final numerical accuracy.
+
+All three outputs explicitly warned of insufficient E steps. That is the
+planned diagnostic disposition, not an admissible estimate. Independent checks
+confirmed input/data hashes, unchanged MODEL and start slots, one EM row, sample
+size, process affinity and released ownership. The checks used Mplus's actual
+warning wording rather than assuming every nonconvergence message contains the
+literal string `NO CONVERGENCE`.
+
+A subsequent bounded q15/p4 candidate still timed out after 241.15 seconds
+including runner launch. Its process-tree peak RSS was about 209 MiB; Mplus
+sampled CPU averaged about 1.59 logical processors and peaked near 3.03, while
+seven OS threads were observed. Threads are not busy cores, and a small model
+RSS does not prove host memory pressure was absent throughout other workloads.
+The failed first member stopped the three dependent start/precision calls.
+No extra variance was fixed, no convergence rule relaxed, and no failed CFPS
+specification was rerun. Lower node cost did not establish a usable fit or
+complete MI inference.
+
+Operational rules:
+
+1. Report dependency loading, input/starting-value preparation, engine
+   estimation and readback separately. Emit a marker before expensive package
+   loads and source readers; a generic async `started` marker is not proof that
+   Mplus has launched.
+2. Preserve the original job ID, PID plus creation time, parent chain, input
+   hashes, cumulative CPU and durable resource samples. An HTTP error or static
+   log alone does not authorize resubmission, killing or a main-R restart.
+3. Use a one-iteration cost probe before another full, expensive integration
+   attempt. Keep point-count exploration outside scientific inference until
+   convergence, admissibility, starts and integration precision are checked.
+4. If live TECH8 is required, independently test a scoped output-forwarding
+   launcher before a newly authorized batch. A proposed launcher or modified
+   `showOutput` flag is not verified streaming. Do not modify a running model
+   or rerun an expensive failure solely to obtain a richer log.
+5. Stop dependent work at its frozen gate. A successful coordinator terminal
+   means attempts have been adjudicated; it does not turn a timed-out model
+   into a null effect, a valid estimate, or a complete imputation family.
+
+Evidence: `charls_latent_compute_probe_20261018` and
+`charls_latent_integration_calibration_20261018`: genuine native terminals,
+actual installed-function inspection, unchanged source hashes, raw outputs,
+TECH8 records for the completed probes, sampled resources and independent
+verification. Original source directories remained untouched. No live-output
+forwarding launcher was implemented or validated in this case.
