@@ -172,3 +172,90 @@ The archive is evidence of an interrupted attempt, not a usable estimate. Keep
 its input, partial output, execution log, request and input manifest together;
 later retries must use a new attempt directory and must not overwrite this
 record.
+
+
+## Live RStudio, unresponsive HTTP, and ambiguous async submission
+
+The October 18 CHARLS income continuation exposed three distinct failures.
+Do not collapse them into “RStudio is closed” or “the model failed.”
+
+1. The assigned R process remained alive with the same creation time and a
+   listener on port 8787, while an HTTP execution request timed out after 30
+   seconds. The Viewer still displayed “Running.” The inspected bridge's
+   `check_addin_status()` used a two-second GET and caught all exceptions as
+   `False`; its tool layer then reported “addin is not running.” A failed
+   health probe therefore did not establish process death. The initial cause
+   of the HTTP stall was not uniquely determined; memory pressure and CPU
+   contention must not be asserted as its cause without additional evidence.
+2. During a scoped stop of the assigned HTTP service, discovery selected
+   another live R session. After restarting the original port, `list_sessions`
+   showed the bridge still connected to that other session. Explicitly binding
+   the assigned session restored the intended route. A successful discovery
+   listing alone does not prove the selected service or research ownership.
+3. A subsequent native `execute_r_async` returned a communication error, but
+   the RStudio execution log already contained a new job ID and the exact
+   submitted script. Polling that original ID returned live model progress.
+   Resubmitting on the error alone would have created a duplicate coordinator.
+
+### Recovery order
+
+- Save the transport error and timestamp. Freeze new submissions, while
+  independently observing existing workers through small durable progress,
+  checkpoint and terminal files. Check PID **and creation time**, executable,
+  parent chain and isolated run root. An inaccessible API does not cancel a
+  worker. A listener, Viewer label, discovery record and healthy execution
+  endpoint are separate observations.
+- Use one bounded short native call and a direct Windows HTTP diagnostic on
+  the assigned port. Record connection refusal, connect/read timeout, HTTP
+  status, empty response and remote R error separately. HTTP diagnostics are
+  not evidence of native MCP success. Avoid accumulating unbounded probes.
+- In this incident, both owned imputation workers had already exited and all
+  four scopes had independently verified 40-imputation artifacts. Restarting
+  only the assigned ClaudeR HTTP service through its Viewer controls was
+  therefore justified. Preserve the RStudio process and unsaved documents;
+  keep **Fresh start on restart unchecked**. This is not permission to restart
+  a live estimator, another session, or the R process. If workers remain live,
+  preserve them and their evidence; do not infer safety from a stale UI label.
+- Record the stopped state, restart the same port, then call `list_sessions`
+  and explicitly `connect_session` to the assigned name. Verify the expected
+  PID in a short R call before any mutation or submission. Recheck discovery
+  after service loss because automatic fallback may select another project.
+- Read the old job using its original ID. In the verified incident the R PID
+  and creation time were unchanged, and the original completed imputation job
+  remained readable after the HTTP restart. Save its genuine terminal reply
+  and close its existing async guard. Do not recreate an inbox, job registry,
+  callback or success receipt by hand. The background-job registry is inside
+  the ClaudeR namespace; assuming it is in `.GlobalEnv` previously produced a
+  diagnostic lookup error, not evidence that the job was missing.
+- For a timeout or communication error **during submission**, treat acceptance
+  as unknown. Inspect the actual execution log and background registry before
+  considering another submission. Match the intended code/run root, unique
+  job ID, worker identity and durable ownership lock. Poll and register that
+  original ID if accepted. Preserve the failed response alongside the recovery
+  receipt; do not fabricate a successful submission response. If identity is
+  ambiguous, investigate instead of choosing an arbitrary job.
+- Recheck Windows resource admission immediately before launching genuinely
+  unsubmitted work. Keep the original input hashes, imputation membership,
+  scientific settings, single-owner lock and runtime budget. After verified
+  FCS exit, this batch moved only its model coordinator and verified descendants
+  to the released CPU set. Such a change needs an ownership/affinity record and
+  observed timing; it is not by itself a causal speed benchmark.
+
+### Required proof and limits
+
+Recovery acceptance requires the expected session binding and PID, a real
+native short-call result, original-job readback when available, one registered
+coordinator, and genuine downstream Mplus execution/output validation. A
+successful request or “Running” label alone is insufficient. The first income
+parent actually completed in Mplus 9 and passed its model gate after recovery;
+the remaining family estimates were still in progress when this case was
+recorded. This proves a recovered execution chain, not complete MI inference,
+four complete dynamic moderations, or full H4.
+
+The evidence includes the original error, R execution-log job identity,
+unchanged R PID/creation time, original imputation terminal reply, recovered
+native poll, async-guard registration, model ownership record and actual
+Mplus output hash. Keep private UI captures local: a window-bounds screenshot
+can accidentally capture an overlapping unrelated application. Public skill
+documentation should carry the recovery procedure and aggregate facts, not
+unreviewed desktop screenshots, credentials, personal records or local IDs.
