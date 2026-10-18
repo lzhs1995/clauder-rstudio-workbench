@@ -85,6 +85,58 @@ the handoff. This does not change the power plan, override deliberate sleep or
 lid closure, or demonstrate a speedup. A single successful heartbeat is only
 request-state evidence; continue checking sample continuity and power events.
 
+Renewal writes are not proof that the request remains active. After renewing,
+check the same helper's PID/creation time, a fresh heartbeat, retained flags,
+stderr and any completion receipt. In a Windows replay, a successful lease
+update was followed one second later by a heartbeat replacement error and
+helper exit. The old implementation mislabeled the exception as a stop request;
+preserve stderr and record the actual terminal cause instead of trusting the
+default completion label. Restart only the failed helper after verifying its
+exit; keep model workers and the main R session alive.
+
+For a project-specific helper, bound retries for transient Windows sharing
+errors and release its execution-state request if the error persists. Test
+replacement against a real temporary Windows handle that denies deletion,
+then verify the launched helper's fresh heartbeat. That tests the sharing
+mechanism, not which program caused the original failure. Startup verification
+and a later clean release are separate lifecycle checks. A renewed JSON file
+alone establishes neither.
+
+## Diagnose heterogeneous CPU scheduling before changing affinity
+
+When an engine receives substantially less than one core of CPU time despite
+spare aggregate capacity, inspect per-core load and the actual Windows CPU
+topology. [GetSystemCpuSetInformation](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-system_cpu_set_information)
+reports `EfficiencyClass`; higher values designate faster, less energy-efficient
+processors. Do not assume that a fixed logical-CPU range represents the faster
+class on another machine, or infer an engine's execution core from aggregate
+per-core utilization alone.
+
+For authorized scheduling work, use the same identity-bound ongoing engines
+in an original-affinity → candidate-affinity → restored-affinity comparison.
+Record original masks, CPU/I/O deltas, interval lengths and competing load;
+preserve data, inputs, versions and all statistical settings. In one replay,
+three engines received about 79–80% of a core before, about 99% under the
+measured faster-class affinity, and about 71–73% after restoration, across
+three 30-second windows. Output writes continued. This supports a CPU-service
+improvement for those windows, not an equal-model wall-clock speedup or a
+portable affinity recommendation. Output bytes are not iteration counts.
+
+If adopting a temporary policy, bind it to verified task workers and their
+owned engines, with original masks, finite expiry, heartbeat and cooperative
+stop recorded outside the model directories. Verify a newly launched child's
+actual affinity before claiming inheritance. Restore parent workers before
+current children so new children do not inherit the temporary policy during
+shutdown. Recheck PID and creation time before restoration, including engines
+whose worker has since ended. Preserve other sessions and global power policy.
+
+Keep the whole-host slot limit and RAM/commit admission contract in force.
+Do not repeatedly shrink the CPU set in response to load created by the task
+itself. An isolated comparison's successful restoration does not prove that
+a later long-running guard has completed its own restore path; observe and
+record that lifecycle separately, and retain an identity-bound recovery path
+for abnormal helper exit.
+
 ## Use measured admission budgets
 
 Calibrate representative **worker plus child** peaks before revising a
