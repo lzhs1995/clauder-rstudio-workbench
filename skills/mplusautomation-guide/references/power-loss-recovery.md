@@ -133,3 +133,47 @@ reproducibility artifacts without deleting source data or active model files.
 On NTFS, compressing inactive text copies can preserve their logical paths and
 contents; verify their hashes afterward. This is a Windows storage option, not
 a prerequisite for macOS. Never disable disk admission limits to hide exhaustion.
+
+## Suspend-aware budgets and exact MI checkpoint recovery
+
+A sleep/resume gap can trigger an elapsed-time watchdog immediately on wake,
+even when the model used little CPU before suspension. In a Windows CHARLS
+batch, Kernel-Power event 507 recorded about 1,962 seconds of sleep. An old
+watchdog charged that interval to one conditional imputation fit and to a
+complete-case Mplus call. Neither timeout established statistical failure.
+
+Keep three quantities: raw wall time, process-tree CPU samples, and the clock
+used for the execution budget. Windows
+[QueryUnbiasedInterruptTime](https://learn.microsoft.com/en-us/windows/win32/api/realtimeapiset/nf-realtimeapiset-queryunbiasedinterrupttime)
+excludes sleep and hibernation. Test the actual Windows API before adopting it;
+do not assume that a language's generic monotonic clock excludes suspension.
+Modern Standby can include short system-active periods. For a long sampling gap,
+inspect explicit sleep/resume events and their recorded sleep duration. Deduct
+only the overlapping verified interval not already excluded by the clock.
+Retain failed event queries and raw timestamps; an unexplained gap is not an
+automatic budget credit. Do not change global lid-close or power policy.
+
+Test both sides: a simulated long host suspension must not exhaust the active
+budget, and a genuinely active overrun must still stop the specifically owned
+worker. Bind termination to its PID, creation time and expected command.
+Reconcile a historical overcharge in an explicit amendment that retains the
+old receipt and ledger, binds their hashes, and allows only the interrupted
+call's bounded recovery. Do not edit old elapsed times to make the run pass.
+An idle-sleep prevention request does not override intentional lid closure.
+
+For chained imputation, resume the last complete iteration rather than keeping
+selected draws from a partial iteration. Verify the saved MIDS data, predictor
+matrix, member count, input hashes and random state; restore any deterministic
+warm-start cache required by the implementation. The retained fit-log prefix
+must match the checkpoint. Preserve the partial suffix in its original directory
+and write recovery into a separate namespace. Restoring the same chain is not
+permission to change seeds or replace unsuccessful completed members.
+
+In the observed recovery, one 20-chain block's iteration 10 was reused and the
+other resumed from iteration 6. A valid complete-case B estimate was reused;
+only the interrupted A input/data were replayed, byte-for-byte, and the recovered
+two-start comparison passed. Those facts establish recovery of those artifacts,
+not convergence of the combined imputation family or scientific acceptance.
+Require the combined-chain diagnostics and all intended model members before
+claiming complete MI inference. A short Addin connection error alone is never
+grounds to submit another copy of a live job.

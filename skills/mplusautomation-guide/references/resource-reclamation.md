@@ -38,6 +38,16 @@ Working-set trimming can increase paging while leaving committed allocations
 unchanged. Do not disable security services, change the pagefile, or close an
 unsaved research application as an automatic memory optimization.
 
+Update the measured worker reserve when the full workload exceeds the pilot.
+In one two-target FCS batch, a two-chain pilot peaked near 0.45 GiB RSS, while
+the actual 20-chain worker reached about 0.64 GiB. Subsequent admission used
+the larger observed resident and private peaks plus the original safety reserve.
+The pilot was not a permanent upper bound. One verified idle-session working-set
+trim greatly reduced that process's RSS without increasing host available RAM;
+the dispatcher correctly waited for measured headroom instead of claiming an
+equivalent physical-memory release. These measurements are workload-specific,
+not a general reserve for integration, Bayes or other imputation models.
+
 After recovery, sample admission again and start ready models immediately when
 eligible. `scripts/resource_admission.py` writes an atomic, timestamped gate for
 a **measured existing-RStudio incremental model budget**, with three CPU samples.
