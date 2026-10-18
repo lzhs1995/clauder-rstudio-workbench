@@ -27,6 +27,22 @@ file such as `CELL_BINDINGS.csv` cannot distinguish table families that both
 export that file. Check malformed source sets and changed symbols even when
 an altered candidate has a fresh, internally consistent file hash.
 
+## Reuse verified extraction before rendering
+
+When a calibrated snapshot already contains the required cells, bind and copy
+its RDS, cell data, readiness and independent numeric receipts before rendering
+the selected complete tables. Verify every copied hash and the original
+producer bindings. A rendering retry need not repeat extraction or Mplus fits.
+In one Windows replay this route produced two tables with 66 and 72 cells,
+then passed the same HTML, actual-browser, visual and terminal checks below.
+
+Record the execution mode that actually occurred. A short synchronous RStudio
+render has a real response and completion receipt but no background job to
+invent or worker to close. Preserve the main session. If connection acceptance
+uses an independently tested MCP stdio route, label that evidence separately
+from the native synchronous producer response. Reusing data does not close
+upstream provenance or scientific-adoption decisions.
+
 ## Inspect the real browser output
 
 Save a screenshot from the actual HTML in an owned browser profile. Verify the

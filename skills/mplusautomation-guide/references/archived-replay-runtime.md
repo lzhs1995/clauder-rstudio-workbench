@@ -24,6 +24,11 @@ other two.
   Reproducing a historical identification or standard-error warning is a
   successful failure reproduction, not an inferentially valid estimate.
 
+Count source paths separately from distinct contents. One archived batch had
+six DAT paths but four DAT hashes. A single frozen copy per hash saved storage;
+the final integrity audit still checked all six original paths. Keep current
+R scripts and same-named archive variants separately bound to their own hashes.
+
 ## Separate compute time, resource waits and sleep
 
 Record timestamps, CPU service, output growth, Windows available RAM/commit,
@@ -334,6 +339,24 @@ Reconnect to the assigned session and use the supported HTTP fallback without
 restarting live model workers. Two timed-out short smoke submissions were
 recovered this way; this proves recovery behavior, not a new Mplus estimate.
 
+Inspect the timeout on the actual request path. A tested bridge used a short
+generic POST timeout while synchronous execution had a different allowance.
+After recovering the ambiguous jobs, a task-private copy with a longer POST
+wait passed an actual independent MCP stdio sync/async chain. Installed files,
+active MCP configuration and R sessions stayed unchanged. Bind that copy and
+the raw responses, label the route `MCP_STDIO_OK`, and retain the failed native
+gate separately. This verifies a working route, not a repaired native wrapper
+or faster estimation. Keep the existing freshness and artifact checks.
+
+Use the bound session's `R.home()`, package path and PID when running runtime
+checks. A validator hard-coded to another R installation does not test that
+session's runtime. If a regression fails before its dummy processes become
+ready, distinguish startup timing from the cleanup/liveness assertions. Any
+revised startup allowance needs an explicit bounded attempt and preserved
+failure logs; retain all behavioral assertions, clean up only the test-owned
+processes, and verify the original research processes remain alive. Do not
+report the original short-timeout attempt as passed.
+
 ### Keep the worker callback in scope
 
 ClaudeR makes `clauder_progress()` available in the asynchronous evaluation
@@ -433,6 +456,12 @@ job, repeat extraction/rendering, or rerun Mplus to make the completion gate
 pass. Keep corrected completion evidence distinguishable from the original
 failure, and count accepted artifacts by unique manuscript identity and
 verified hashes rather than by the number of jobs archived.
+
+Between batches, reuse a verified readiness inventory and subtract IDs in the
+latest hash-linked acceptance chain. Recheck the selected producers at execution
+and reject overlaps before submission and acceptance. This avoids rescanning
+all old figures for each batch; it does not replace the final full-coverage and
+unique-artifact audit or remove models from the authorized scope.
 
 For complete conditional tables and delayed browser shutdown, follow
 [table and browser acceptance](complete-table-and-browser-acceptance.md).
