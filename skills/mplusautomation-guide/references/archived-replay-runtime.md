@@ -142,6 +142,33 @@ a later long-running guard has completed its own restore path; observe and
 record that lifecycle separately, and retain an identity-bound recovery path
 for abnormal helper exit.
 
+### Measure the postprocessing worker separately
+
+Healthy Mplus CPU service does not establish that the R reader or renderer is
+well scheduled. In one bounded Windows comparison, four engines stayed near
+98–99% of one core while a graphics worker alternated between roughly 1–3%
+under its original affinity and 58–71% under the measured faster CPU class.
+Normal CPU/I/O priorities, available RAM and low sampled I/O did not establish
+memory or disk saturation. Measure each process's CPU delta against its own
+observation interval; slow process enumeration can otherwise produce impossible
+rates. This is CPU-service evidence, not a fixed-workload speedup benchmark.
+
+Apply any adopted temporary setting only to the verified background worker,
+with the original affinity and a bounded restore path recorded. Where the
+installed Windows `ps` API supports it, use `ps_get_cpu_affinity()` and
+`ps_set_cpu_affinity()` inside a function with `on.exit()` restoration; verify
+the restored mask in a durable receipt. Keep the main R session, other projects,
+Mplus slots, resource reserves and statistical settings unchanged. A subsequent
+16-figure batch exercised application, same-job polling recovery, actual
+restoration, independent values/geometry and PNG/PDF visual acceptance. Do not
+copy that machine's logical CPU indices into another machine's configuration.
+
+For worker completion, use the same identity-bound native handle and terminal
+checks described in [table and browser acceptance](complete-table-and-browser-acceptance.md).
+A queryable exited process is not an active worker. Serialize creation times
+with adequate precision; if an older receipt rounded them, retain it and compare
+against the precise launch identity using a justified serialization tolerance.
+
 ## Use measured admission budgets
 
 Calibrate representative **worker plus child** peaks before revising a
@@ -347,6 +374,18 @@ active MCP configuration and R sessions stayed unchanged. Bind that copy and
 the raw responses, label the route `MCP_STDIO_OK`, and retain the failed native
 gate separately. This verifies a working route, not a repaired native wrapper
 or faster estimation. Keep the existing freshness and artifact checks.
+
+Persist each actual response as it arrives, including the returned job ID and
+failed polls. A known health-probe false negative during `get_async_result`
+can be retried within a bounded policy for that same ID; never extend that
+rule to an ambiguous async submission or an R error. Require the genuine
+final marker and metadata for the original job before accepting recovery.
+Keep the failed strict check and a separate recovery adjudication, with raw
+response hashes and rejection checks for submission errors, wrong IDs and
+missing terminal evidence. Calculate freshness from the actual verification
+time, not the time a later recovery report was written. An exited client with
+partial logs still requires registry/history reconciliation before another
+submission; client exit alone is not proof that dispatch never occurred.
 
 Use the bound session's `R.home()`, package path and PID when running runtime
 checks. A validator hard-coded to another R installation does not test that
