@@ -259,3 +259,33 @@ Mplus output hash. Keep private UI captures local: a window-bounds screenshot
 can accidentally capture an overlapping unrelated application. Public skill
 documentation should carry the recovery procedure and aggregate facts, not
 unreviewed desktop screenshots, credentials, personal records or local IDs.
+
+
+## Continued background progress during repeated read-side failures
+
+Treat read-side HTTP failure and worker failure as separate events. In a later
+bounded CHARLS batch, native polling reported both communication errors and
+the generic `addin is not running` message, and an independent Windows root
+GET also timed out. Meanwhile the original worker advanced through all four
+branches and saved 16 Mplus attempts. After its durable terminal appeared,
+polling the original job returned the complete native terminal without an
+HTTP restart, Escape, R restart or duplicate submission. Twelve diagnostic
+fits were admissible; four interactions reached their predeclared time caps.
+Recovery of the interface does not change those scientific dispositions.
+
+Prefer known owned PIDs and bounded external Windows diagnostics over a
+whole-process census inside the main R HTTP service thread. A synchronous
+process inspection coincided with this incident, but the trace did not prove
+it was the unique cause. Keep that uncertainty. Preparing a recovery action
+is not executing or validating it: an unused foreground-interrupt candidate
+must not be documented as a successful repair. Recheck the original job
+before acting on a prepared restart, especially after durable completion.
+
+Also separate client hook latency from HTTP, R and Mplus time. Repeated
+ten-second hook timeout messages were observed with RTK and cross-agent
+evidence hooks configured. The configuration alone does not identify which
+hook timed out or prove that it caused the HTTP stall. Diagnose each with
+bounded captured payloads and retain the evidence checks; do not disable a
+security or collaboration guard to make the display look healthy. Continue
+using RTK explicitly for supported shell commands while investigating its
+automatic rewriting path.
