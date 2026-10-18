@@ -177,3 +177,22 @@ not convergence of the combined imputation family or scientific acceptance.
 Require the combined-chain diagnostics and all intended model members before
 claiming complete MI inference. A short Addin connection error alone is never
 grounds to submit another copy of a live job.
+
+Check the merged object's structure before considering new imputation runs.
+With the installed `mice` 3.19.10, `ibind()` assigned `cbind(NULL, NULL)` through
+`imp[[name]] <- ...`, deleting slots for fully observed variables. The resulting
+imputation list had 34 entries for 117 data columns; `complete()` then used
+positional indices and failed. The saved draws and chain diagnostics were intact.
+In a local adapter, preserve all named list slots with `imp[name] <- list(value)`
+and verify every completed member against its original block, including observed
+values and passive products. Preserve the unmodified object and package source;
+do not silently patch the installed package or regenerate statistically valid
+draws to fix this container error. Treat this as observed version-specific
+behavior, not a claim about every `mice` release.
+
+When validating a recovered export, compare column order explicitly and compare
+the numeric values and missingness masks without incidental row/column-name
+attributes. Likewise, an RDS-restored formula environment is a different memory
+reference: compare formula syntax and the frozen data/specification, not pointer
+identity. Keep actual value, order or mask differences fatal. These checks
+separate a readback defect from a statistical or data discrepancy.
