@@ -869,3 +869,55 @@ Report completed corrected-input families separately from older-input families,
 and conditional working MI separately from the original full latent moderation
 and H4 objectives. Runtime reliability and guide publication do not close those
 scientific requirements.
+
+
+## Readiness, parallel FCS and verification-only recovery
+
+Treat a watcher's missing dependency or readiness timeout as an infrastructure
+failure, distinct from an invalid statistical fit. Check the owned PID, process
+creation time and ancestry before publishing an identity-bound ready marker.
+Do not put an expensive whole-machine process scan before that marker. On a
+loaded Windows host, allow a bounded startup window with visible progress;
+do not accept a stale marker from a previous process. In the CHARLS run, failed
+zero-fit startup attempts were retained, and the already successful pilot was
+reused while only the unstarted scopes were recovered.
+
+A native ClaudeR error saying the addin is unavailable does not establish that
+the submitted worker died. Reconcile the assigned session, original job ID,
+owned process identity and durable progress before resubmitting. A successful
+HTTP diagnostic is evidence for that fallback, not a fabricated native receipt.
+Retain the actual terminal response when closing an async registration.
+
+When changing from serial to parallel FCS, hand over at a complete checkpoint.
+Save the original MIDS, RNG state, fit count and hashes; stop the old coordinator
+before its next block, not during a valid draw. Assign disjoint scopes to the new
+queues and preserve already completed blocks. A scheduling handoff is not a
+failed imputation. Keep the original iteration limits and cumulative budgets;
+continuing from iteration 10 to 20 must charge the earlier active time.
+
+Admit workers from measured incremental memory, commit headroom and current
+CPU demand. Do not assume that free logical CPUs imply enough memory. This
+Windows run admitted its second worker only after available memory exceeded
+the existing reserve plus its observed approximately 0.46 GiB increment.
+The thresholds belong to the run contract, not a universal 16 GiB-host rule.
+Measure each owned worker's actual CPU time: a broad affinity mask may still
+place both workers on busy cores. A reversible change to separately observed
+idle cores improved the short-window utilization here. Keep PID/creation-time
+checks, preserve the old mask, and leave other projects' processes untouched.
+Do not interpret that brief sample as a fixed overall speedup.
+
+Verify observed values by their statistical type as well as missingness masks
+and support. R's `identical()` can reject an integer vector and an exactly equal
+double vector. For a binary numeric variable, explicitly compare numeric values
+after checking the binary domain and unchanged observation mask; do not relax
+numeric tolerances or recode factors to hide discrepancies. In the SD scope,
+verification-only replay passed all 40 original imputations, with hashes of both
+block checkpoints, the combined MIDS and all exported DAT files unchanged.
+No sampling or Mplus fit was needed to repair this verifier error.
+
+Keep complete-imputation acceptance separate from subsequent model acceptance.
+Passing FCS checks does not prove MAR or exact compatibility with latent
+interaction models. Completed observed-baseline H4.1 families do not establish
+the four original dynamic moderation families or full H4. Include dependencies
+of the public verifier in its file allowlist; repair a missing package dependency
+by rebuilding the package, not by refitting accepted models.
