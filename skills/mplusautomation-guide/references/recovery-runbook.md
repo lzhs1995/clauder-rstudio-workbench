@@ -639,3 +639,62 @@ The original incomplete family and its timeout remained in the release. The
 cache improved how saved evidence was consumed; it did not supply a missing
 MI member, change an estimate, or complete the original four latent
 moderations and full H4.
+
+
+## Recover an owned result reader without restarting its job
+
+The next income-family replay kept the same native ClaudeR job throughout.
+It verified all 2,962 sealed payload hashes, then independently recomputed
+four complete 40-member families. The final receipt was PASS. The raw-byte
+cache retained 115,097,244 bytes, served 1,817 cache hits and stayed under its
+256-MiB bound. Peak process private allocation was 283,049,984 bytes; cache
+payload size and process allocation remain different quantities.
+
+A slow but advancing parameter phase was investigated without resubmission.
+The owned reader used about 236 MiB private with about 1.8 GiB available on
+Windows. In a five-second sample it accrued about 0.28 CPU seconds and its
+file-read counters did not change. A subsequent per-core sample found logical
+cores 8–15 saturated while 0–7 had spare capacity. This distinguishes an
+observed scheduling opportunity from an unsupported claim that all slowness
+was caused by RAM, disk, Python imports or the RStudio API.
+
+After matching PID and creation time to the actual job owner, only that
+reader was bound to the currently less-busy core set and raised from Normal
+to Above Normal. The last pre-change poll showed `sd_INC 25 of 40` at
+06:05:34 UTC; the change was recorded at 06:06:45 and all four families
+completed at 06:07:16. These observations support the usefulness of this
+intervention in this run. They are not a randomized or equal-work benchmark:
+affinity and priority changed together, and host load could also change.
+Do not publish a universal acceleration factor or a universal `0–7` rule.
+
+For similar recovery:
+
+1. Inspect the existing job ID, stage, owner creation time, CPU deltas,
+   per-core load, private/RSS memory and I/O. Preserve original failures.
+2. When a specific owned worker is advancing and a less-busy eligible core
+   set exists, record its original priority/affinity before a process-local
+   adjustment. Never use Realtime, modify another session, or change model
+   specifications to make a resource optimization appear successful.
+3. Continue the same job. Require the same numerical and file checks and
+   consume its real native terminal. Restore settings if the process will
+   remain alive; otherwise verify its exit. Do not leave a global affinity
+   setting or an unowned restoration watchdog.
+4. Keep API recovery, numerical acceptance and scheduling evidence separate.
+   This operation does not repair the previously timed-out Python imports
+   or establish a global unattended self-healing service.
+
+Resource admission must also describe the actual phase. The first public
+replay check retained simultaneous engine-plus-reader reservations and held
+at 1.386 GiB available. All owned estimates and private readers had already
+exited, no engine lock remained and no host Mplus was running. A separate
+serial-replay contract therefore retained the original 1.2-GiB total floor
+and 2-GiB commit floor, with a 0.45-GiB reader allowance and no simultaneous
+engine reservation. The comparable private reader's observed peak was below
+that allowance. At actual submission availability had risen to 1.963 GiB,
+which also exceeded the old threshold: do not attribute launch to the changed
+budget alone. Archive the original hold and both contracts. This phase
+transition does not loosen the original estimation admission rule.
+
+The published result package still preserves the failed family in the
+registered twelve-test set. Successful recovery of a result reader does not
+complete the original CFPS latent moderations or full H4.
