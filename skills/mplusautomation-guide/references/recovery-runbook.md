@@ -764,3 +764,66 @@ background job and an estimator result. Poll the original job while it lives;
 start a replacement segment only after its actual terminal and ownership are
 reconciled. These observations extend the earlier Addin/rebinding and ambiguous
 submission cases; they do not install a global unattended restart service.
+
+
+## Preserve live Windows output without changing the Mplus model
+
+An inspected MplusAutomation 1.3 Windows `runModels()` calls
+`system(..., intern=TRUE, wait=TRUE)` and prints the returned text afterwards.
+`showOutput=TRUE` therefore does not establish live iteration visibility.
+Keep the installed package unchanged. A tested local adapter supplied an
+exclusive `.cmd` as `Mplus_command`:
+
+```bat
+@echo off
+"C:\licensed\Mplus.exe" "%~1" 1>"mplus_stdout.log" 2>"mplus_stderr.log"
+exit /b %ERRORLEVEL%
+```
+
+Use an actual resolved executable and an exclusive model directory. A bare
+`detectMplus()` result such as `Mplus` must first be resolved with `Sys.which()`;
+normalizing it against the working directory can select a same-named directory.
+Reject directories, missing executables, existing outputs and changed input
+hashes. Keep `killOnFail=FALSE` and leave termination to the identity-bound
+supervisor; do not use MplusAutomation's image-wide failure cleanup.
+
+The native ClaudeR synthetic test retained 35 growing byte snapshots while the
+owned Mplus process was alive. The final interrupted log contained 38 EM/FS
+iterations. Each live prefix was checked against its timestamp, PID/creation
+identity, SHA-256 and the final bytes. This is empirical live-output evidence
+for this Windows engine, not a promise that every engine/runtime flushes at
+the same frequency. Raw partial output must survive a timeout.
+
+The screen heading was `ITER LOGLIKELIHOOD`, not the literal phrase
+`TECHNICAL 8`. The original observer's false trace flag was retained. A separate
+parser used the actual header, complete rows and Fortran D-exponent numbers;
+it checked truncated tails, unrelated parameter rows and real live prefixes.
+Do not use a missing heading substring as proof of no iterations, or infer
+convergence merely because iteration rows exist.
+
+The model did **not** finish normally. Its `.out` stopped after input reading;
+the dependent second synthetic case was not run. The genuine native terminal
+reported an R failure even though the outer tool flag was `isError=false`.
+The owned engine, background worker and observer exited, and the original
+guard was closed. No successful full-parameter equivalence was claimed.
+
+The timeout threshold was first observed at approximately 120.65 seconds,
+while the R call returned at approximately 144.66 seconds. Record the
+deadline, detection, termination request, confirmed exit and R return
+separately. Potentially slow metadata/file operations must not precede the
+deadline check. Validate deadline enforcement with isolated controllable
+processes before deploying it; a bounded policy is not a hard real-time
+guarantee. This prototype did not establish a production-ready supervisor.
+
+The initial design repeatedly loaded MplusAutomation in nested Rscript
+processes. One attempt exhausted its startup limit without creating Mplus.
+A single recorded revision loaded the package once in the existing ClaudeR
+background worker and reused unchanged prepared inputs. Preserve the failed
+startup and separate loading/estimation budgets. Avoid extrapolating a speedup
+from different host conditions, and do not reopen failed research models just
+to obtain better logs.
+
+An earlier ambiguous native submission was recovered by matching the exact
+code in ClaudeR's actual job registry and polling its original ID. It was not
+resubmitted. These observations extend the recovery procedure above; they do
+not install an unattended global restart service or close scientific gaps.
