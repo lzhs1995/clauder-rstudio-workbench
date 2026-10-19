@@ -698,3 +698,69 @@ transition does not loosen the original estimation admission rule.
 The published result package still preserves the failed family in the
 registered twelve-test set. Successful recovery of a result reader does not
 complete the original CFPS latent moderations or full H4.
+
+
+## Distinguish startup latency, unstarted admission and estimator failure
+
+A CHARLS interaction member reached its 240-second awake wall limit after
+Mplus first appeared around 208 seconds. The last sample contained only about
+26 seconds of Mplus CPU. Its output said `INPUT READING TERMINATED NORMALLY`,
+but had no normal model termination or usable TECH3. Preserve this as a real
+timed-out attempt; input acceptance is not estimation success. The trace proves
+late engine creation, not a unique explanation of that delay or model
+non-identification. Another latent-interaction timeout in the same project
+had sustained computational work and does not inherit this diagnosis.
+
+An isolated, bounded recovery kept the input and DAT byte-identical, retained
+the original starts, 30-point integration and statistical constraints, and
+scheduled only the identified Rscript/descendants on currently available CPU
+cores. It finished in 111 seconds and passed independent checks of 88 saved
+parameters, standard errors and TECH3 covariance. This is an observed recovery,
+not a controlled speedup benchmark: host conditions also changed. Launch and
+loading time remained inside the budget; no time was retroactively excluded.
+
+### Resume an unstarted member without replacing an imputation
+
+The continuation completed ten further members before its next member stayed
+below the unchanged physical-memory admission floor. The supervisor had not
+inserted a call reservation or launched Rscript/Mplus for that member. The
+legacy R loop returned `MEMBER_FAILED:...:NOT_RUN_RESOURCE_OR_BUDGET`; the
+underlying `not_run.json` correctly said `RESOURCE_HOLD`. Keep both records and
+classify the event as unstarted admission, rather than a failed statistical
+estimate. Do not count it as an engine call or replace its imputation.
+
+1. Consume the actual original native terminal, close its existing guard and
+   confirm owner exit by PID plus creation time and absence of the engine lock.
+2. Preserve the original call/state snapshot and `not_run.json`. Check that
+   no engine receipt, output or unresolved SQLite reservation exists for the
+   candidate. Reuse its already generated, hash-matching input and original
+   imputation. Successful members remain untouched.
+3. Reclaim authorized idle resources and measure Windows physical/commit
+   headroom. In this incident, one R garbage collection and own-pane history
+   cleanup did not establish meaningful recovery. A Task Manager close request
+   also lacked exit proof; `psutil.wait()` raised `AccessDenied`. Do not treat
+   permission failure as exit, repeat the action indefinitely, or attribute a
+   later host-memory increase to it. Capture the attempted action before a
+   potentially failing wait and classify the exception explicitly.
+4. Register a new execution segment only after actual admission, retaining the
+   original cumulative call/time ledger. The existing successful outputs and
+   original seeds are reused; a new wrapper ID is not a new statistical draw.
+5. Require all original members before pooling. Here the recovered family
+   reached 20/20 and independent raw-parameter/TECH3 Rubin calculations passed.
+   The direct group-difference interval crossed zero. Execution recovery does
+   not guarantee significance or complete the original latent-moderation H4.
+
+A runtime replacement can consume a finite call slot even when much time
+remains. In this case the last original member required one explicitly recorded
+supervisor-reviewed operational amendment, 176 to 177 cumulative calls, with
+the original 10800-second total and 240-second per-call caps unchanged. Apply
+such an amendment only within the user's existing scope/authority, after the
+remaining successful members and owner exit are verified. Keep the original
+contract, failed call and new contract hashes. Do not generalize this case into
+automatic budget escalation; no further retries were admitted.
+
+Preserve the existing distinction between a failed native response, a live
+background job and an estimator result. Poll the original job while it lives;
+start a replacement segment only after its actual terminal and ownership are
+reconciled. These observations extend the earlier Addin/rebinding and ambiguous
+submission cases; they do not install a global unattended restart service.
