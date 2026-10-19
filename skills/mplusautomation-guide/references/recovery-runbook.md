@@ -483,3 +483,101 @@ These are execution and recovery practices. They do not establish missingness
 assumptions, exact compatibility of working FCS with latent interactions, or
 completion of the original four moderations and full H4. This workflow does
 not install an unattended service that restarts RStudio globally.
+
+
+## Verification recovery without restarting successful estimates
+
+This Windows CHARLS case continued the October 18 API recovery documented
+above. Separate the foreground API, background estimation, imputation, and
+result verification. A failure in the last layer does not authorize repeating
+successful Mplus estimates or regenerating imputed data.
+
+### Observed chronology and unsuccessful attempts
+
+| Stage | Observed evidence | Disposition |
+| --- | --- | --- |
+| Native API read | A synchronous process census returned an HTTP error inside a tool response whose `isError` was false; later polls of the original job IDs returned advancing stages. | Preserve the error and original IDs; prefer targeted owned-PID reads. No R restart or duplicate submission. The census was not proved to be the sole cause. |
+| First Python verifier | The shell command exited 143, produced no PASS, and a Windows process check found no matching surviving verifier. | Record command failure; do not invent a kill cause or rerun the completed models. |
+| Detached verifier without useful output | The wrapper was alive but its captured output did not locate the wait. | Archive the exact wrapper and verify owner/child identity before a controlled stop. Add explicit child logs and import-stage markers. |
+| Instrumented imports | A bounded traceback showed pandas importing `platform.machine`, waiting in the Windows version subprocess. A process-local candidate bypassed that wait, but the complete dependency test still timed out. | The stack locates a wait; it does not prove CMD AutoRun, security software, or memory pressure is its unique cause. Do not publish the candidate as a complete repair. |
+| Reduced Python dependencies | Removing pandas still left waits in NumPy module loading and SciPy extension loading. The bounded attempt ended after about 1,203 seconds with failure and no independent PASS. A targeted thread snapshot showed `PageIn` and little accumulated CPU. | Keep the actual timeout. Do not retry the same dependency startup indefinitely or interpret it as statistical nonconvergence. |
+| Native R alternative | Read saved parameter vectors, TECH1 identities and TECH3 covariance directly in a separate ClaudeR background R job, with progress per family and member block. | Accept only after actual native completion and independent numerical checks; changing the verifier must not change the statistical contract. |
+
+Use bounded `faulthandler` diagnostics and explicit child log files to identify
+loading versus numerical work. Record process creation time, accumulated CPU,
+working set/private bytes, stage age and the last saved artifact. A low-CPU
+snapshot is not proof of deadlock. Avoid a whole-process census in the main
+R HTTP thread when targeted Windows reads can answer the ownership question.
+
+### PID identity must fail closed
+
+The installed R `ps` API requires a POSIXt creation timestamp. Passing a numeric
+Unix epoch to `ps_handle()` raised `time must be a time stamp (POSIXt)`.
+The previous `tryCatch(..., error=function(e) FALSE)` incorrectly converted
+that programming error into “process absent,” which could admit a duplicate
+coordinator. Use the actual recorded timestamp type:
+
+```r
+created <- as.POSIXct(owner$created, origin = "1970-01-01", tz = "UTC")
+handle <- ps::ps_handle(owner$pid, created)
+alive <- ps::ps_is_running(handle)
+```
+
+Unexpected handle/access errors must block admission and remain visible;
+only an explicitly identified missing or mismatched process may be treated
+as absent. Native checks in this case returned true for the live PID and its
+actual creation time, and false for the same PID with a different creation
+time. Archive the original executing source before changing future launchers.
+Editing a source file does not change an already-loaded worker and is not a
+reason to restart it.
+
+`ps_kill()` returning is also not an exit receipt. A first immediate check
+still observed the owned process. Wait for bounded exit confirmation and
+recheck identity and descendants before releasing ownership or starting a
+replacement. Retain the unsuccessful stop attempt and final exit proof.
+Never stop by process name alone or touch another project's RStudio.
+
+### Measure comparable workers, preserve statistical work
+
+A completed original imputation block supplied a measured private-byte peak
+of 633,282,560 bytes (about 0.590 GiB). Its paired block had the same scope,
+statistical source hashes, chain count and iteration target. Before using
+that measurement, verify native completion, async-guard closure, actual
+process exit, and checkpoint hash. This justified replacing a cross-scope
+startup estimate with a same-scope measurement, while retaining the explicit
+1.2 GiB Mplus reserve and 0.15 GiB unmeasured-worker allowance. Active peers'
+possible growth was still reserved separately.
+
+The resulting admission budget was about 1.940 GiB; the actual final Windows
+sample showed 2.195 GiB available. That sample also exceeded the older
+threshold, so do not claim the calibration alone caused the successful
+launch. These are case measurements, not universal defaults. Keep original
+chains, seeds, MIDS/RNG checkpoints, fitting rules and cumulative time limits.
+
+A single attempted WSL cache reclamation timed out. Windows available memory
+changed from about 1.751 to 1.857 GiB, but the retained WSL cache observation
+did not establish successful eviction. Do not report this fluctuation as
+memory reclaimed by the task, conflate private commit with physical RAM, or
+repeat global cache eviction while active work must reload files.
+
+### Evidence contract for the alternative verifier
+
+The alternative must independently parse native saved parameters and TECH3,
+map labels through TECH1, verify input/output/source hashes and imputation
+membership, and recompute within/between/total covariance, Rubin intervals,
+direct group differences, supported conditional slopes, finite-cluster
+sensitivity and the registered multiplicity family. It must not call the
+production pooling function or synthesize a PASS receipt. Preserve incomplete
+families and their original failures; no partial-family pooling.
+
+The public replay must read the files actually extracted from the release
+ZIPs and verify their manifest, rather than silently use private model paths.
+Keep the Python implementation as an optional independent route if useful,
+but identify which implementation actually completed on this Windows host.
+Native async submission, terminal reply, exit/guard closure, private result
+checks and public replay have distinct receipts.
+
+This is a recovery procedure for the assigned session and owned workers.
+It does not establish an installed global unattended self-healing service,
+successful repair of every Python dependency, or completed original latent
+moderation and H4 hypotheses.
