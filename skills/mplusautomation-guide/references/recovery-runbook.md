@@ -827,3 +827,65 @@ An earlier ambiguous native submission was recovered by matching the exact
 code in ClaudeR's actual job registry and polling its original ID. It was not
 resubmitted. These observations extend the recovery procedure above; they do
 not install an unattended global restart service or close scientific gaps.
+
+
+## Bounded MplusAutomation integration: distinguish admission, engine and wrapper
+
+Follow the preceding live-output recovery section before this integration. The
+verified sequence was native ClaudeR async -> one R worker loading MplusAutomation
+1.3 -> `runModels(exact.inp, recursive=FALSE, replaceOutfile='never',
+killOnFail=FALSE, Mplus_command=exact_launcher.cmd)` -> a Python controller ->
+the actual licensed Mplus executable as its **direct child**. The cmd launcher
+returns the controller's `%ERRORLEVEL%`; it is not the process being timed/killed.
+
+Keep five states separate: native transport failure, R/package loading, resource
+admission hold, launched-engine termination, and output/reader validation.
+In the 2026-10-19 integration the first R worker loaded successfully, but Windows
+available memory reached 1.152 GiB against the frozen 1.2 GiB floor. The adapter
+returned `NOT_RUN_RESOURCE_HOLD`, exit75, with **zero engine calls**.
+`runModels()` emitted a warning, not an R exception. A subsequent generic
+`stopifnot(process_exited)` obscured the resource cause. Preserve that original
+failure; dispatch on `status` before dereferencing engine-only fields.
+
+After consuming the original native job and verifying its worker absent, check
+the current session and release only owned, unneeded allocations. In this case a
+single main-session `gc()` and a Windows census found no leftover model workers;
+the next measured availability was1.316 GiB. That noisy change is not a measured
+amount reclaimed by `gc()`. Protect other live RStudio sessions and active MCPs.
+Re-admission used a new attempt directory with identical input/data hashes and
+unchanged thresholds. The first attempt's receipt, warning and terminal R error
+remain intact. A resource hold never counts as a failed statistical estimate.
+
+The admitted synthetic regression ran licensed Mplus9 exactly once. The direct
+child exited0 in2.1145 seconds. `readModels(exact.out)` found normal estimation;
+all three estimates and SE matched independent conditional-normal ML formulas
+(residual variance uses SSE/n) within half the printed0.001 unit. This validates
+this small normal-completion route, not equivalence for LMS/Bayes or all models.
+
+A separate **Python fake engine**, explicitly not Mplus, tested timeout through
+the same `runModels()` launcher. Its4-second limit was detected at4.0557 seconds,
+exit confirmed at4.2020 seconds, and its flushed stdout survived. The cmd returned
+124; `runModels()` again only warned, with no R error. Require the controller
+receipt and valid `.out`; do not use absence of R errors or `isError:false` as
+model acceptance. No fake result was adopted. The real native completion marker
+was collected; both async guards closed and both protected sessions retained
+their original PID/creation time.
+
+Separate phase clocks. The successful recovery worker loaded packages in62.7793
+seconds. The fake adapter used18.5353 seconds before engine launch, including
+admission wait; total fake `runModels()` wall time was36.7034 seconds. Therefore a
+4-second engine deadline is **not** a4-second R/API turnaround guarantee. The
+loading budget here was advisory, not a proved hard kill deadline.
+
+The controller retains the actual `Popen` handle, starts a monotonic deadline
+before launch, redirects stdout/stderr directly to files, and keeps process scans
+and log parsing out of the deadline path. Timeout targets only its direct child,
+then waits for confirmed exit. Production use still needs explicit parent-crash,
+descendant/Windows Job Object and durable-queue ownership handling; this prototype
+has not replaced the production queue. Never market one synthetic success as
+unattended recovery for every failure mode.
+
+Evidence: `PP-lcgm-paper/mplus_bounded_adapter_20261019`, with original hold,
+native job receipts, launcher/controller, synthetic inputs, output, independent
+closed-form checks and portable packet verification. No CFPS/CHARLS fit or new MI
+was executed. Full four-moderation inference and full H4 remain incomplete.
