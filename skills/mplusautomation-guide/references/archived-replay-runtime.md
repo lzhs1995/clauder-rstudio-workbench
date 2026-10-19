@@ -171,6 +171,11 @@ against the precise launch identity using a justified serialization tolerance.
 
 ## Use measured admission budgets
 
+For repeated pre-model loading holds, leaking supervisor handles and bounded
+identity-probe recovery, use [Windows worker loading and supervisor recovery](windows-worker-loading-and-supervisor-recovery.md).
+It separates the outer loading policy from the unchanged model launch gate;
+an unchanged configuration hash alone does not establish unchanged admission.
+
 Calibrate representative **worker plus child** peaks before revising a
 conservative budget. Record physical and commit reserves separately. RSS sums
 can double-count shared pages; private allocation is not resident RAM. Make
