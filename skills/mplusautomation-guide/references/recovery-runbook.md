@@ -344,6 +344,56 @@ recovery action depends on the observed state. There is no blanket rule to
 restart on every timeout. The implementation still does not claim a globally
 installed unattended Addin-restart service.
 
+### A cross-imputation audit can occupy the foreground too
+
+On 2026-10-19, a read-only income audit traversed 160 existing completed
+imputations and their latent-cohort subsets. Its first attempt failed because
+`identical()` compared integer and double representations of equal binary
+groups. Correct the comparison after checking exact values and preserve the
+error; a storage-type mismatch is not a reason to regenerate imputations.
+
+The subsequent synchronous request lost its HTTP response, again with
+`isError: false`; native polling temporarily reported that the Addin was not
+running. The same foreground PID/creation time and listening port remained,
+but short health requests timed out. Discovery and a listening socket did
+not establish application responsiveness. Meanwhile the existing background
+job completed one 20-member family and continued the next; its scoped model
+receipts and exact worker/engine identities supplied independent evidence.
+
+The audit eventually wrote its actual results. After rebinding the original
+session, native polling recovered the **same** job ID and an advancing member.
+No RStudio restart, duplicate audit, replacement coordinator, imputation or
+Mplus rerun was used. Long foreground work occupying R/httpuv is consistent
+with this sequence, but was not proved to be the unique cause. Resource
+pressure, process exit and estimation failure must not be inferred from the
+transport message alone.
+
+Extend the preparation rule above to cross-member audits and data readback:
+use an async worker, small stage messages and durable completion evidence.
+When a foreground response has already been lost, reconcile the existing
+outputs before rerunning even a read-only audit; repeated reads can prolong
+the obstruction. After recovery, collect the genuine original terminal and
+close its guard separately from statistical validation. Do not invent a
+terminal from the last observed progress.
+
+The same phase exposed an independent collector-start failure: a copied
+family allowlist rejected a newly admitted family before the first sample.
+The attempted source-text replacement had not matched its whitespace. Check
+the collector's actual exit code, stderr and first timestamped record before
+claiming that monitoring is online. Repair and relaunch only that collector
+after confirming its predecessor exited; retain the missing interval. An
+empty or absent telemetry file does not mean the model queue is idle. A
+monitor's allowlist repair does not authorize a new model specification.
+
+Preserve failed observation attempts too: the targeted Windows screenshot
+capture failed in this incident, so window enumeration was not reported as
+a successful visual inspection. These are tested agent recovery procedures,
+not evidence of a globally installed unattended restart service.
+
+Evidence: [complete-family outputs and raw interface recovery records](https://github.com/lzhs1995/PP-lcgm-paper/tree/38a2e9e9b02da62cde42015ab6def05a9cb0d9d1/charls_latent_h41_remaining_delivery_20261019).
+The package contains aggregate audit results and parameters, not participant
+data. Its family verification is separate from this transport diagnosis.
+
 ### Admit a new imputation worker without starving Mplus
 
 The same run found that checking only the existing Mplus minimum before
