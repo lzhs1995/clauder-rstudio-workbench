@@ -581,3 +581,61 @@ This is a recovery procedure for the assigned session and owned workers.
 It does not establish an installed global unattended self-healing service,
 successful repair of every Python dependency, or completed original latent
 moderation and H4 hypotheses.
+
+
+## Reuse verified bytes during result replay
+
+The October 19 follow-up recovered independent verification through actual
+ClaudeR background R jobs. The private reader checked 158 calls and recomputed
+seven complete 20-member families from saved parameters and TECH3. A second
+job checked the actual extracted public ZIP and reproduced the same seven
+families. Neither job started Mplus. The package and its explanatory files
+were subsequently checked byte-for-byte by anonymous download from
+[the fixed publication](https://github.com/lzhs1995/PP-lcgm-paper/tree/70822535f744283164a8496fe75e011c4192800a/charls_corrected_h42_models_20261018).
+This supplies the completed R fallback evidence; it does not turn the earlier
+Python import timeouts into successful Python verification.
+
+Small-file I/O can become a separate bottleneck after estimation. In a
+targeted snapshot, the owned packager's read counters advanced while its CPU
+counter barely changed; private allocation was about 53 MiB and Windows still
+had about 2.27 GiB available. This establishes continuing reads, not a unique
+diagnosis of storage hardware, antivirus, paging or the original API failure.
+An owned builder that is still advancing must not cause a model resubmission.
+
+The accepted public R replay used a bounded, per-job raw-byte cache. It read
+2,779 payload files and served 1,639 later read requests from those exact
+bytes, retaining 97,466,386 bytes under a 256-MiB limit. Retained payload bytes
+are not the R process's total private memory or RSS. Admission reserved
+0.45 GiB for the reader as well as the existing 1.2-GiB Mplus headroom. These
+are measured case settings, not universal machine requirements. Private and
+public checks have different workloads, so their elapsed times are not a
+controlled speed benchmark.
+
+Use this pattern only for sealed artifacts:
+
+1. Require real producer completion, owner exit, matching input identities
+   and a completely built package. The first appearance of a manifest during
+   extraction does not mean extraction has finished.
+2. Validate paths and expected lengths. Read a file's exact bytes, check its
+   SHA-256 against the manifest, and reuse those same bytes for parsing. In R,
+   `digest(raw_bytes, serialize=FALSE)` hashes file content; the default
+   serialization hash is a different quantity. Preserve encoding, line
+   endings, missing values and numeric parsing semantics.
+3. Bind temporary I/O adapters in a child evaluation environment. Keep the
+   independent TECH1/TECH3 reader and statistical calculations unchanged;
+   do not replace the production pooling function with a cached result or
+   mask readers in the foreground session. Verify actual parameter, covariance,
+   interval, contrast and multiplicity parity after changing the I/O route.
+4. Bound aggregate retained bytes, leave room for parser copies and R itself,
+   report file-count progress, and release the cache with the worker. Record
+   cache hits separately from statistical acceptance. For oversized inputs,
+   retain a bounded streaming path rather than remove a resource gate.
+5. Use a new cache for changed inputs, manifests or attempts. Do not cache
+   live `.out`, checkpoint or queue files as if immutable. In a release check,
+   the same bytes already read for `ZIP entry == extracted file` can also be
+   hashed for the manifest check; a second filesystem read is unnecessary.
+
+The original incomplete family and its timeout remained in the release. The
+cache improved how saved evidence was consumed; it did not supply a missing
+MI member, change an estimate, or complete the original four latent
+moderations and full H4.
