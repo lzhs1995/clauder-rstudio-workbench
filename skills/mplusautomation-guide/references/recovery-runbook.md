@@ -1133,3 +1133,77 @@ its own PID, creation time and exact command; the model worker had already
 finished. Future collectors record their own identity and final reason.
 
 Evidence: [fixed aggregate model and recovery package](https://github.com/lzhs1995/PP-lcgm-paper/tree/81f41a976c5a039b4732f1e93af5d2c6ff859490/charls_latent_h41_mi_20261019). The archive excludes individual records and supports independent raw-parameter/TECH3 replay.
+
+## Progress publication is not a conditional-fit start (Windows, 2026-10-19)
+
+A working-MI worker was terminated by its owned 120-second fit watcher, but the
+saved evidence did not show a 120-second statistical fit. The append-only
+progress stream and completed temporary JSON had reached call 249; the published
+JSON and fan-out state still showed 248. The actual income-fit `BEGIN` log ended
+at 247, and successful income/ADL results ended at 248. This localizes the stall
+to progress publication before entry into call 249, not to the GLMM optimizer.
+The specific Windows lock or filesystem cause was not proved. Available physical
+memory was about 3.26 GiB; this event is not evidence of out-of-memory failure.
+
+Use these phase boundaries:
+
+1. A progress announcement may precede file I/O, native progress reporting and
+   argument preparation. Do not start an estimator deadline from that announcement.
+2. Emit a distinct durable `BEGIN` immediately before each actual conditional
+   fit, including both binary and PMM backends. Match its call ID to the terminal
+   fit record. A lightweight collector reads these markers; it does not infer
+   fit duration from the age of a user-interface status file.
+3. Keep a separate bounded progress/startup-stall disposition and a cumulative
+   worker budget. Preserve both active and wall-clock time. A reporting stall
+   must not be labelled nonconvergence or a failed scientific hypothesis.
+4. Keep frequent progress append-only in the estimation worker. In this recovery,
+   per-fit replacement of the same JSON was removed, native progress was
+   throttled to 20 seconds, and complete checkpoints/final results retained
+   mandatory durable writes. A read-only collector can materialize status for
+   the panel. Do not weaken final-result durability to make a heartbeat succeed.
+
+The owned worker had actually exited, so the recovery reused the last complete
+20-chain checkpoint at iteration 6, its original RNG state and saved warm starts.
+All original failure files remained intact. The eight completed fits in the
+interrupted iteration remained in the old log; the new continuation log began
+with the exact 240-fit prefix represented by the checkpoint. The partial
+iteration was recomputed, not counted as new imputations or as independent
+successful members. Replayed income-fit input hashes at calls 241, 243, 245 and
+247 matched the original hashes; the corrected worker then passed the old fault
+site. The old active charge was retained inside the unchanged block budget.
+Passing this recovery check does not admit an incomplete MI family.
+
+The first recovery attempt itself exposed a real implementation error: the added
+ADL `BEGIN` logger referenced `ROOT` from a wrapper environment that contained
+`fit_env`, but no `ROOT`. It failed after one valid income fit. The repair used
+`fit_env$ROOT`, retained both failed attempts and their active charges, and resumed
+from the same complete checkpoint. For instrumentation of copied package
+functions, verify the actual function environment as well as parsing. Do not
+describe a new logging error as a defect in the package or in the data.
+
+An ambiguous native async submission also occurred during downstream dispatch.
+The bridge returned a start error with outer `isError: false`; the actual job was
+already registered. Matching the namespace record's exact code, session, agent
+and worker recovered the original ID without another submission. Keep the error
+and recovered binding together; a new guard may be opened only after the old
+worker's actual terminal state and owned output disposition are known.
+
+### Efficient family scheduling without changing estimates
+
+- Reuse a loaded parameter-reading helper within one family; close it at family
+  termination or before the separate pooling/readback phase. Repeated NumPy/SciPy
+  imports are avoidable overhead. Count the resident helper in actual available
+  memory/commit, and retain the per-engine admission gate. Do not claim a measured
+  speedup without comparable workloads.
+- Protect two engine slots with an operating-system mutex. Under the lock count
+  completed calls, active reservations and their maximum remaining charges;
+  recognize owned Mplus by its parent chain. Unknown engines produce a hold, not
+  a process kill. Exercise the race with actual concurrent fixture children,
+  while clearly recording that fixtures are not licensed-model validation.
+- When adapting a 20-member routine to 40, update admission assertions as well
+  as loops and array sizes. The income pool's remaining `usable_members == 20`
+  guard was found and corrected to 40 before pooling. Parent calibrations and
+  second starts remain separate diagnostics, never extra MI members.
+- State recovery success, full-family inference, skill release and installation
+  separately. None establishes completion of the original latent moderation or
+  H4 research programme.
