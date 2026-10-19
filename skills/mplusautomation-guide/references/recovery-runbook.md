@@ -933,3 +933,15 @@ current-agent native proof, completed model families, and verified readers; avoi
 turning every resource hold into another installation, synthetic benchmark, full
 CI rerun or permanent polling loop. The priority is to advance the authorized
 analysis while keeping failure classes and process ownership observable.
+
+
+## Output diagnostics and bounded exit are separate from interface health
+
+In the 2026-10-19 CFPS Y-shape pilot, native jobs `9c7a29bc` and `b1ffb424` each submitted once, exposed progress, and returned their original terminal result. Both Mplus attempts timed out. Do not call a responsive RStudio bridge a successful model, or resubmit a live job while diagnosing slow estimation.
+
+- Match the optimizer trace to the actual analysis. Mplus explicitly ignored TECH8 for this non-integration TYPE=COMPLEX model; TECH5 exposed quasi-Newton history. A warning is not automatically an estimation failure, and printed iterations are not a converged result.
+- Preserve failed optimization hypotheses. Both stdout logs printed a large H1 standard-error warning even without an explicit STANDARDIZED request. A single bounded removal of optional TECH4/SAMPSTAT/RESIDUAL output did not remove that warning or obtain an estimate. Do not claim this output change fixed the bottleneck, identify the warning as the unique cause, or standardize data simply to silence it.
+- Report timeout detection and confirmed exit separately. The first direct-child attempt detected its 180-second deadline at 179.998 seconds but confirmed exit at 190.130; the second confirmed exit at 180.132. Popen launch itself took measurable time. An owned-handle deadline avoids broad process killing but cannot guarantee zero operating-system scheduling/termination latency.
+- Reclamation remains reversible and identity bound. An owned idle UI was closed under a restoration lease; both R sessions survived. Verify Windows process terminal state, and restore only the exact main window. Reuse native preflight only with the same bound session and unchanged transport/configuration, while giving each real job its own guard and terminal receipt.
+
+The optional-output comparison preserved DATA/VARIABLE/ANALYSIS/MODEL, starts and SAVEDATA byte-for-byte. Two real calls yielded no admissible parent and no new MI; dependent family members were not launched. This is a negative diagnostic result, not a repaired H4 family or evidence of a null effect. Original sources and failed outputs remain intact.
