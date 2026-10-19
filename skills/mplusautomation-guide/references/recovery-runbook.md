@@ -945,3 +945,141 @@ In the 2026-10-19 CFPS Y-shape pilot, native jobs `9c7a29bc` and `b1ffb424` each
 - Reclamation remains reversible and identity bound. An owned idle UI was closed under a restoration lease; both R sessions survived. Verify Windows process terminal state, and restore only the exact main window. Reuse native preflight only with the same bound session and unchanged transport/configuration, while giving each real job its own guard and terminal receipt.
 
 The optional-output comparison preserved DATA/VARIABLE/ANALYSIS/MODEL, starts and SAVEDATA byte-for-byte. Two real calls yielded no admissible parent and no new MI; dependent family members were not launched. This is a negative diagnostic result, not a repaired H4 family or evidence of a null effect. Original sources and failed outputs remain intact.
+
+
+## Sleeping Windows hosts, lost acknowledgements and completed Mplus outputs
+
+The next CHARLS H4.1 phase exposed three different failures in one real run:
+the R result helper timed out across sleep, the recovery submission lost its
+acknowledgement, and a read-only monitor expired its wall-clock lease during
+another sleep. None justified re-estimating a completed imputation. The fixes
+were task-local; the ClaudeR package, MCP configuration and protected foreground
+RStudio sessions were not restarted or edited.
+
+### Reconstruct the incident before choosing a repair
+
+| Recorded event | What the evidence established | Recovery |
+| --- | --- | --- |
+| Original async job reported `Persistent helper operation exceeded 600 seconds`; outer `isError` was false | MI06 already had a normally terminated output, high-precision parameters and a USABLE receipt. Its producer had finished; the R helper acknowledgement had not completed | Consume the original error, verify the worker's actual exit and close its guard. Preserve the output/input/data hashes and reuse MI01–06, including the first member's second start |
+| Resource samples had gaps of 303 and 2,033 seconds | Kernel-Power 506/507 records identified lid/Modern Standby transitions. In one precisely bounded 2,032-second interval, verified sleep overlap was 2,028.797 seconds | Count verified sleep separately from non-sleep waiting. A sampling gap alone is not sleep evidence |
+| The recovery `execute_r_async` returned `Error starting async job: Error communicating with RStudio` | A short native call found the new job in the installed ClaudeR namespace; its worker PID/creation time matched the exclusive family reservation | Recover the real ID, register it with the existing pre-submit guard, and poll that ID. Do not submit again because an acknowledgement was lost |
+| A later MI10 estimate spanned about 112 minutes of wall time | Direct-child receipt recorded wall 6,710.280 seconds, awake 47.082 seconds, excluded suspension 6,663.198 seconds and normal exit0. Subsequent members continued | Retain both clocks and the actual power events. This is real post-repair sleep/resume evidence, not a claim that a 112-minute optimization was accelerated |
+| The original sentinel reached its 5,400-second wall lease during sleep | Its own terminal was normal; the model worker was still progressing | Verify that collector exited, then start one replacement with an awake lease and a separate finite wall cap. Collector expiry is not engine failure |
+
+The transport error itself did not reveal a unique network, HTTP or package
+root cause. A successful recovery proves that this backend job survived; it
+does not establish why the response was lost or repair every bridge failure.
+Keep the earlier R error, later wrapper error, recovered ID and original native
+polling replies as separate artifacts.
+
+A later pooling submission showed the same acknowledgement ambiguity. A
+read-only HTTP fallback found the exact submitted code and real job; rebinding
+the existing `default` session restored native polling and the original job
+completed. The bridge also briefly said the addin was not running while the
+same port answered HTTP and discovery still listed the protected session.
+Preserve these conflicting observations; do not restart R based on that string
+alone. A broad foreground process diagnostic also timed out. Subsequent short
+calls succeeded; prefer targeted identity queries rather than putting a full
+process-command-line scan in the foreground R request.
+
+### Recover identity, not a guessed job
+
+For the installed local fork in this incident, the registry was
+`get('.claude_bg_jobs', envir=asNamespace('ClaudeR'))`. Do not hard-code a
+nonexistent `.clauder_env$async_jobs`, assume a process in `.GlobalEnv`, or
+replace the registry. Inspect this private structure read-only and verify the
+installed version. Match exact submitted code/task scope, session port, worker
+PID and creation time against the durable reservation. Multiple candidates or
+an access error mean identity is unresolved, not that no job exists.
+
+The recovered job advanced through native `get_async_result` with
+`stage/message/updated_at`. Use `source(script, local=TRUE)` inside the native
+async environment so the worker retains `clauder_progress`. Native wrappers,
+HTTP diagnostics and offline Rscript remain distinct evidence paths.
+
+### Use explicit clocks at each layer
+
+The old helper compared `Sys.time()` to its startup time; system sleep could
+consume its 600-second limit even while the helper had completed its output.
+The local repair observed polling intervals and queried actual Windows power
+events only after a long gap. It subtracted the intersection of verified sleep
+intervals with that gap, recorded the events, and retained the true wall time.
+No event evidence means no subtraction. A failed event query must remain a
+diagnostic failure, not a fabricated sleep exemption. Bound event queries and
+keep them off the ordinary fast polling path.
+
+For engine supervision, retain the actual `Popen` handle and combine
+`QueryUnbiasedInterruptTime` with recorded Modern Standby events. The latter can
+contain short system-active periods. Subtract only any additional sleep overlap
+not already excluded by the unbiased clock; never double-subtract. Preserve
+`active_seconds`, `raw_unbiased_seconds`, `wall_seconds`, exclusions and events.
+Enforce a positive finite awake limit and retain a separate wall/lease policy.
+If Windows process creation is slow, record launch latency too. Sleep handling
+does not exempt genuine awake loading, computation or unproven hangs.
+
+An isolated controllable Python child—not Mplus—verified normal exit and a
+0.4-second awake timeout, including confirmed owned-child exit. The actual MI10
+case then verified the estimator's sleep/resume path. Historical MI06 lacked
+the new clock: its original 373.148-second wall receipt remains unchanged.
+Do not backfill a guessed awake duration or retroactively declare that older
+attempt satisfied a new runtime contract.
+
+`processx::run(timeout=...)` uses seconds, whereas process-object
+`wait()`/`poll_io()` use milliseconds. Keep units explicit. A helper can have
+finished durable numerical files before its parent receives the result; reader
+recovery therefore starts with those files and their hashes, not another fit.
+
+### Admit only the remaining work
+
+Before a new segment, archive the old lock only after native terminal, owner
+exit and descendant reconciliation. A finished receipt is reused only if its
+input, imputation and output hashes still match. A missing wrapper response
+does not authorize another engine. A valid `.out` with a failed reader permits
+readback repair; it does not by itself certify all statistical checks.
+
+This phase closed the short-lived numerical helper before each Mplus launch,
+reducing overlapping resident processes. A measured first model used about
+31.45 MiB peak Windows working set and 235.13 MiB peak private commit. Those
+quantities are different. The same-scope serial admission profile reserved
+1 GiB host headroom plus three measured peak working sets, rounded up to a
+1.10 GiB floor, and a separate 2 GiB commit floor. These are case-specific
+measurements, not defaults for LMS, Bayes, another model, or parallel workers.
+Original higher-floor zero-engine holds remained in the record. Do not remove
+arbitrary user applications or count committed bytes as physically freed RAM.
+
+The substantive efficiency gain was choosing a calibrated known-class
+representation for observed binary resource differences in latent growth
+paths, while retaining six growth factors, the same measurements, and full
+robust covariance checks. It did not make an unestimable latent-by-latent
+interaction equivalent to a simpler model. First validate the same-data parent
+and complete-case two-start family; then admit the complete registered MI
+family. Pool coefficients and full covariances only after every original
+member is usable. Missingness assumptions, scientific interpretation and
+uncompleted H4/moderation branches remain separate from interface recovery.
+
+This is a verified recovery procedure and a task-local bounded supervisor,
+not a claim that a global unattended self-healing service has been installed.
+Keep future repairs in the existing runbook and batch them at substantive
+analysis milestones instead of opening a new PR or benchmark for every poll.
+
+### Preserve creation-time precision and report monitoring gaps
+
+The replacement collector exposed another real defect: a numeric creation
+timestamp serialized by R rounded from `1792425658.255106` to
+`1792425658.25511`. The 4.05-microsecond difference exceeded the existing
+3-microsecond identity gate, so the collector marked the live owner `reused`
+and skipped descendant sampling. Its empty engine list was **not** evidence
+that no engine was running. Retain that gap; the native stage updates and
+engine receipts provide different evidence and do not backfill missing samples.
+
+The repair kept the strict identity gate and added a string field produced by
+`sprintf('%.17g', created)`, parsed to a double by the Windows reader. A live
+native-R/Windows-handle cross-check passed, and a deliberately wrong creation
+time remained rejected. Do not silently broaden identity tolerances to hide
+serialization errors. A collector must terminate on absent/exited/mismatched
+identity even if it never observed an active owner, with an explicit unresolved
+identity reason. The original looping collector was stopped only after matching
+its own PID, creation time and exact command; the model worker had already
+finished. Future collectors record their own identity and final reason.
+
+Evidence: [fixed aggregate model and recovery package](https://github.com/lzhs1995/PP-lcgm-paper/tree/81f41a976c5a039b4732f1e93af5d2c6ff859490/charls_latent_h41_mi_20261019). The archive excludes individual records and supports independent raw-parameter/TECH3 replay.
