@@ -372,3 +372,114 @@ and `ORIGINAL_INCOME_JOB_RECOVERED.json`. Its independent raw-parameter
 verification covers 88 calls and four 20-member observed-baseline working-MI
 families. This does not complete the original latent-moderation hypotheses
 or full H4.
+
+
+## Poll failures and checkpoint-boundary scheduling
+
+An October 18 observation returned `addin is not running` for one original
+income-MI job, with `isError=false`, while two other original-job polls returned
+fresh progress. A sequential retry of the failed job returned its continuing
+conditional-fit progress. Neither the service nor the statistical worker was
+restarted, and no job was resubmitted. Concurrent observation was present, but
+the trace did not establish it as the cause. Preserve the failed response,
+successful retry, original ID and timestamps instead of reporting a diagnosed
+cause from coincidence.
+
+Use sequential observation requests to one assigned RStudio session while its
+statistical workers remain parallel. A healthy poll of another job does not
+make the failed reply successful. Conversely, a failed observation does not
+invalidate checkpoints or terminate an estimator. Check the text and content
+as well as the wrapper flag. Read small durable progress files and verify
+owner PID/creation time when the API is ambiguous. Retry the original ID with
+a bounded observation policy; do not manufacture a terminal response, clear
+the job registry or resubmit merely to obtain a cleaner status display.
+
+New submissions still require current resource and transport admission. A
+transport proof expiring while original jobs are running does not require
+restarting them. Refresh the genuine native short-call/async proof for new
+work, retain the old proof, and consume the real original terminals separately.
+
+Admission freshness includes orchestration latency. One combination submission
+passed its resource snapshot, but the snapshot was older than the existing
+120-second limit when its background R began. The worker stopped before
+creating its owner/watch or reading and combining the MIDS. Preserve the real
+native error; verify absence of statistical artifacts and unchanged checkpoint
+hashes before classifying this as an unstarted admission failure. Close that
+actual job, archive the attempt, and take a new measured resource snapshot
+after slow harness setup and immediately before a new submission. Do not edit
+the old timestamp, relax the age limit or label a preparatory failure as failed
+imputation. A retry is justified by evidence that the statistical step did not
+start, not merely by a missing successful response.
+
+### Release memory at a complete statistical checkpoint
+
+When two FCS lanes occupy memory needed to combine already completed scopes,
+prefer an explicit handoff at a complete-block boundary. In this workflow the
+statistical worker already had a request hook before the next scope entry.
+The supervisor checked that the remaining original scope had no lease, fit
+log or checkpoint, verified the running source hashes, and wrote one durable
+handoff request. Current blocks continued; the hook acted only before the
+unstarted block. The original seeds, observations, random chains, fit budgets
+and statistical code were unchanged.
+
+The legacy lane wrapper labels a caught stop as a failure. Preserve that raw
+record and classify the exact planned-handoff marker separately, with the
+request and unstarted-block evidence. Consumers must keep this source waiting,
+not turn it into a scientific failure or success. Real fitting errors and
+timeouts remain failures. After the original job's actual terminal is consumed,
+close its existing guard and verify process exit before admitting a replacement
+execution segment. A request file alone is not proof that memory was released.
+
+Combine the original blocks and check all members before inference. If the
+frozen mixing rule requires more iterations, resume the same MIDS checkpoint,
+random state and optimization cache within the cumulative original time limit.
+Do not replace members, introduce a new seed or pool only successful draws.
+Separate an unstarted original block from a failed block eligible for recovery.
+
+Budget additional workers from measured complete-worker peaks plus an explicit
+calibration allowance, preserving the existing Mplus reserve. Check Windows
+available physical memory and commit immediately before submission, as well as
+the number of live owned workers. Waiting consumers can exit with durable
+family states and later resume under the same global call/time budget; they
+need not retain an idle R process until every imputation source arrives. Keep
+one Mplus owner across those segments. Never reclaim unrelated research or
+security processes as a shortcut.
+
+The first successful 40-chain combination recorded a process peak of about
+0.496 GiB. This enabled replacing its initially unmeasured 1-GiB worker allowance
+with the maximum eligible measured peak plus an explicit 0.15-GiB calibration
+allowance, while preserving the 1.2-GiB Mplus reserve. Eligibility requires the
+same combination code and chain iteration count, genuine completed/native
+receipts, exited ownership and no larger original checkpoint footprint. File
+size is only a scope screen, not a claim that RAM scales linearly with serialized
+bytes. If no comparable completed run exists, retain the conservative unmeasured
+allowance. Record the source receipt hashes and the new live memory/commit
+sample; never revise an old snapshot or a model's statistical acceptance rule.
+
+### Check the complete evaluation scope before diagnosing a collision
+
+`source(..., local=TRUE)` retains the ClaudeR progress environment, but it can
+evaluate assignments in the caller's environment. An initial inspection saw
+`for (d in ...)` and suspected a collision with the wrapper's receipt directory.
+Reading the complete file showed an existing `local({ ... })` wrapper: the
+suspected collision did not occur. Record that correction; do not present the
+added child environment as a demonstrated bug repair. For a source that lacks
+its own isolation, a child environment can provide explicit binding isolation:
+
+```r
+worker_env <- new.env(parent = environment())
+worker_env$MI_SCOPE <- scope
+worker_env$MI_STOP_ITER <- target_iteration
+source(combination_script, local = worker_env)
+```
+
+The child can resolve the original progress callback while its temporary
+bindings cannot overwrite the wrapper's receipt path. Keep statistical code
+unchanged and record the wrapper hash. A syntax check alone is not end-to-end
+acceptance: require the actual native terminal, receipt at the intended path,
+unchanged original checkpoint hashes and the full combination disposition.
+
+These are execution and recovery practices. They do not establish missingness
+assumptions, exact compatibility of working FCS with latent interactions, or
+completion of the original four moderations and full H4. This workflow does
+not install an unattended service that restarts RStudio globally.
