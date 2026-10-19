@@ -889,3 +889,47 @@ Evidence: `PP-lcgm-paper/mplus_bounded_adapter_20261019`, with original hold,
 native job receipts, launcher/controller, synthetic inputs, output, independent
 closed-form checks and portable packet verification. No CFPS/CHARLS fit or new MI
 was executed. Full four-moderation inference and full H4 remain incomplete.
+
+
+## Recovery follow-through: an online session is not an admitted engine
+
+The 2026-10-19 CHARLS continuation exercised the existing recovery runbook on
+real models. Its chronology belongs with the earlier native-wrapper, live-log,
+and bounded-adapter evidence; it is not a reason to rerun successful families.
+
+| Observed state | Action and evidence | Boundary |
+| --- | --- | --- |
+| 8787 answered; a diagnostic referenced a nonexistent ClaudeR private environment | Correct the diagnostic after inspecting the installed namespace; the real job registry was empty | `isError:false` did not negate the R Error in the response body; no server restart was justified |
+| Background R returned `NOT_RUN_RESOURCE_HOLD`, available RAM 1.1456 GiB below the existing 1.2 GiB floor | Preserve the terminal job and zero-engine receipt; do not count a model failure | A package-loading stage and a resource hold are not Mplus iterations |
+| Task Manager graceful-close helper raised `AccessDenied` in `wait()` before saving its send result | Read-only reconciliation found the original PID; preserve the unknown send result and do not repeat or claim success | Save intent and immediate API result before waiting; catch permission failures separately |
+| The task-owned idle CC Switch window had a recorded PID, creation time and executable | Gracefully close only that verified UI, preserve protected R sessions, lease the resource for a bounded period, then restore the ordinary window | No database/config edits, proxy takeover, blanket process killing or working-set trimming |
+| Some closed WebView PIDs remained queryable | Use identity-bound `WaitForSingleObject(handle,0)` and `GetExitCodeProcess`; final states were exited/absent | `pid_exists`, `create_time` and a cached process object are not proof of continued execution; do not kill exited processes |
+| Re-admission in a new directory used the identical input/data hashes | One native async job loaded MplusAutomation 1.3, passed the unchanged resource gate, and launched one verified four-thread Mplus child | Foreground R still had namespace 1.2 loaded; `.libPaths()` alone would not update it |
+| The interaction reached its 240-second engine cap | Consume the original job, confirm the owned child exited, preserve stdout and restore the UI | A clean timeout/recovery is not a usable estimate or complete MI family |
+
+Restore only the application's identified main window. An overbroad `ShowWindow`
+pass over all titled owned windows also displayed hidden IME helpers in this
+case; their recorded previous visibility was restored immediately. Keep that
+correction in the local evidence rather than repeating the UI experiment.
+
+Log coverage also matters. Default optimization printed 44 iterations, including
+two expensive FS steps followed by two EM steps. Explicit EM printed 51 rows,
+but the last printed cumulative time was only 135.4 seconds when the engine was
+stopped at 240.054 seconds. The unprinted interval cannot be uniquely attributed
+to a particular stage from that evidence. Neither a shorter printed step nor
+more printed iterations proves faster convergence. Check the actual `.out` for
+normal termination: the valid parent model's stdout did not contain that line.
+
+Before trying a scale-based optimization, transform the entire parameterization
+and starts, not selected coefficients. Here, multiplying three change factors by
+nine and dividing their loadings by nine preserved all 126 free parent parameters
+and the full robust TECH3 covariance after inverse transformation. That validates
+equivalence for the parent; it does not fix a negative variance, establish latent
+interaction inference, or prove a speedup. Both bounded interaction attempts still
+timed out. Preserve the separate resource-recovery and scientific outcomes.
+
+Use the existing documentation and evidence gates progressively. Reuse a valid
+current-agent native proof, completed model families, and verified readers; avoid
+turning every resource hold into another installation, synthetic benchmark, full
+CI rerun or permanent polling loop. The priority is to advance the authorized
+analysis while keeping failure classes and process ownership observable.
