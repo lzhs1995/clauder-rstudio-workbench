@@ -164,3 +164,82 @@ not address the dominant estimation cost. Reuse actual stage evidence and
 preserve the frozen model/numerical contract when deciding the next change.
 
 The same-batch aggregate evidence is published at [charls_latent_interaction_models_delivery_20261019](https://github.com/lzhs1995/PP-lcgm-paper/tree/579c7a4f73948cbc7b5ef5167fa2b72e7a2a5495/charls_latent_interaction_models_delivery_20261019). `RUNTIME_RECOVERY.md` and `RUNTIME_RECOVERY_EVIDENCE.json` preserve the sequence; the model packages separately identify complete working-MI families and any stopped families. Original CFPS moderation coverage and full H4 remain incomplete.
+
+## Recover startup and observation without duplicating estimation
+
+A later CHARLS latent H4.2 batch supplied three distinct failure cases. Keep
+their evidence separate; a shared symptom such as an empty tool response does
+not establish a shared root cause.
+
+1. **Lost submit acknowledgement and a late external handshake.** A native
+   async call returned an error although the R child and its real job record
+   existed. The child waited for an external preflight file; by the time the
+   supervisor recovered the actual job ID, the wait had expired. That attempt
+   ended before any Mplus launch. Archive the real terminal and close its
+   guard before a new submission. A timeout of an observation call alone is
+   not grounds for resubmission.
+2. **Extra bootstrap gate blocked an otherwise eligible single engine.** The
+   retry initially added a separate 2 GiB gate above the existing adapter's
+   1.2 GiB physical reserve plus 0.4 GiB incremental model allowance. It made
+   zero engine calls. Removing the redundant gate restored the established
+   admission contract; it did not relax statistical or engine criteria. The
+   values belong to this measured batch, not universal thresholds. If worker
+   startup has a distinct peak, account for it explicitly rather than blindly
+   deleting all startup checks.
+3. **Native observation error while the model was advancing.** During a later
+   full MI family, `get_async_result` returned outer `isError:false` with text
+   saying the addin was not running. Targeted PID/creation-time/parent-chain
+   evidence showed the original worker and its Mplus child alive. The
+   original endpoint answered a short diagnostic; listing and rebinding the
+   same native session restored polling of the same job, now on a later
+   member. No model was restarted. This sequence establishes recovery, not a
+   unique underlying cause or proof that the addin actually stopped. The local
+   bridge source performs a two-second GET health check and swallows exceptions
+   into that generic message. Merely rebinding the same target is not proof
+   that routing caused the failure; a later successful check may reflect
+   responsiveness. Record latency and exception type when available, rather
+   than treating the message as a definitive process-liveness test.
+
+Move the bootstrap's ownership and immutable-source checks into the real
+worker so they do not depend on a possibly lost supervisor acknowledgement.
+Check its PID plus creation time, the actual RStudio ancestry, a fresh run
+nonce and the submitted script hash. Publish the bootstrap result immediately,
+before package loading and estimation. Preserve the real async registration;
+never manufacture an inbox or overwrite a worker's registration to simulate
+success. Internal registry names are installed-version details and should be
+discovered read-only when recovery requires them.
+
+For a true resource hold with **zero** engine calls, first prove that the old
+worker has exited, its guard is closed, no engine or slot lease remains, and
+the input/specification hashes still match. Preserve the old admission and
+terminal records. Resume only the unexecuted member in a new startup namespace;
+do not count it as a failed estimate or duplicate a completed member. Keep the
+original scientific and resource contracts. Resource recovery is distinct from
+a new independent model start required by the statistical design.
+
+## Measure reclamation and retain the actual execution source
+
+An attempted cleanup of the executor's own tmux pane reported hundreds of MiB
+in history accounting, but clearing its archived history did not reduce the
+server RSS or Windows physical pressure. Do not report the accounting number
+as reclaimed RAM or attribute a later memory increase to that failed action.
+Do not repeatedly purge caches, close another agent's pane, or kill unknown
+user applications to turn an unsuccessful attempt into a claimed improvement.
+Terminal captures may contain private context and stay outside public packets.
+
+The same batch's MI generator was patched before its successful execution:
+one watcher argument needed a syntax correction, cleanup moved into an explicit
+`tryCatch(..., finally=...)`, and the fitted design's actual rank and dropped
+columns were checked. Keep the actual executed script as the reproducibility
+entry point; label a pre-patch generator as historical instead of presenting
+it as byte-identical source. Fix documentation without rerunning completed
+imputations. Only a deterministic conditional fit was cached; parameter,
+random-effect and donor draws remained fresh for all imputations.
+
+Do not confuse a runnable helper with an owned active process: record the
+real job, worker and direct child, inspect text-level tool errors, preserve
+durable per-member stages, and verify terminal cleanup. `processx::run` timeouts
+are seconds; process wait/poll timeouts may use milliseconds. A unit conversion
+mistake can silently remove the intended bound.
+
+The preserved full-family status is `COMPLETE_20_MI_WORKING_H42_FAMILY`. Twenty main estimates and one independent-start check were verified from saved parameters and robust covariance; the extracted public packet was replayed without participant data or new estimation. The [fixed public evidence packet](https://github.com/lzhs1995/PP-lcgm-paper/tree/6c56e309630081dadbfc69f0006db82516a22d13/charls_latent_h42_sd_edu_delivery_20261020) contains the actual source, aggregate results and recovery record. This remains one CHARLS contact-frequency SD-by-education working family; original CFPS complete moderation and full H4 are not established by it.
