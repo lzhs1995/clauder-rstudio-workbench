@@ -112,3 +112,55 @@ must be supplied by terminal receipts, not inferred from CC success.
 
 
 Mplus documents STANDARD and GAUSSHERMITE integration in the [official Chapter 16](https://www.statmodel.com/HTML_UG/chapter16V8.htm). The local evidence hashes and scope are in [the evidence manifest](charls-gh-recovery-evidence-20261019.json).
+
+## Followup: foreground process diagnostics can block the interface
+
+The execution agent repeated a failure pattern already documented in the
+recovery runbook: a broad `ps::ps()` enumeration and per-process CPU/affinity
+queries were submitted through synchronous foreground R. The call returned an
+HTTP error with outer `isError: false`; short native probes then said the addin
+was not running, and a Windows HTTP fallback timed out. This was a diagnostic
+placement error, not evidence that the statistical models failed.
+
+Targeted native Windows handles showed the same RStudio and background-worker
+PIDs still alive, TCP8787 still accepted connections, and the original Mplus
+jobs continued growing CPU/output evidence. The operator did not restart R,
+replace a job, edit the bridge, or touch the other RStudio session.
+
+The owned RStudio parent, executable, creation time and window were verified.
+An initial Escape PostMessage proved only message delivery. A later attempt
+temporarily restored and acquired that same window, checked foreground identity
+before sending Ctrl+2 and Escape, then restored the earlier window/focus state.
+This was limited to the operator's known read-only diagnostic. Do not apply it
+to an unknown user analysis or infer that posting a key means recovery.
+
+Subsequent HTTP execution returned200/success with the original R PID. Rebinding
+the existing native session then returned a real R response, and polling the
+original two job IDs showed further completed members. The sequence proves
+same-session recovery; it does not uniquely isolate natural completion,
+PostMessage, console interruption or binding refresh as the cause.
+
+Routine foreground probes must stay short. Broad process inventories belong
+in a bounded external helper with immediate start/PID evidence. Keep interface,
+estimation and durable-output states separate. Preserve actual failed probes,
+ownership/interrupt intent, HTTP success and native success instead of recording
+only a final green status.
+
+## Measure the stage before tuning resources
+
+The completed batch contained 80 main imputation fits plus four start checks.
+Existing stage logs measured 268 seconds of compilation/setup, 11713 seconds
+inside runModels (including wrapper/admission/launch/engine), and 203 seconds
+of result readback across 84 calls. Their per-call medians were 3, 137 and 2
+seconds. Engine awake time summed to 11084.29 seconds; two concurrent queues
+spanned 6271 wall seconds from first compilation to last pooling.
+
+This was an observational stage audit, not a controlled speed benchmark.
+Do not add parallel queue durations to report batch elapsed time, subtract
+sleep-excluding engine time from wall time and assign the remainder to one
+cause, or claim a memory bottleneck from a single free-memory snapshot.
+Readback was a small part of this batch; removing statistical checks would
+not address the dominant estimation cost. Reuse actual stage evidence and
+preserve the frozen model/numerical contract when deciding the next change.
+
+The same-batch aggregate evidence is published at [charls_latent_interaction_models_delivery_20261019](https://github.com/lzhs1995/PP-lcgm-paper/tree/579c7a4f73948cbc7b5ef5167fa2b72e7a2a5495/charls_latent_interaction_models_delivery_20261019). `RUNTIME_RECOVERY.md` and `RUNTIME_RECOVERY_EVIDENCE.json` preserve the sequence; the model packages separately identify complete working-MI families and any stopped families. Original CFPS moderation coverage and full H4 remain incomplete.
