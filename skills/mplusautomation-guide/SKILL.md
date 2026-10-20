@@ -102,6 +102,7 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 
 - [binary-observed-interaction-computation.md](references/binary-observed-interaction-computation.md):
+- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md): actual-input semantic checks after group/control migration, zero mixed-cluster diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
   avoid unnecessary integration for an observed binary moderator when the
   conditional Gaussian model has an equivalent known-class representation;
   calibrate all parameters and robust covariance before using it, and keep
