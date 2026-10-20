@@ -94,8 +94,9 @@ apim_parse <- function(m,prep,folder,out,config) {
     stopifnot(length(nm)==length(ids),!anyNA(ids))
     for(k in seq_along(ids))add(ids[k],'New.Additional.Parameters',nm[k])
   }
-  d<-unique(do.call(rbind,mapping));d<-d[order(d$id),];n<-nrow(d)
-  stopifnot(!anyDuplicated(d$id),identical(d$id,seq_len(n)))
+  d<-unique(do.call(rbind,mapping));d<-d[order(d$id),];n<-max(d$id)
+  # 相等约束下多个路径可以共享一个自由参数；RESULTS仍按唯一参数编号保存。
+  stopifnot(identical(sort(unique(d$id)),seq_len(n)),!anyDuplicated(paste(d$header,d$param)))
   saving<-grep('^RESULTS SAVING INFORMATION',raw);stopifnot(length(saving)==1)
   saving<-trimws(raw[saving:length(raw)])
   std<-c('StdYX standardized coefficients','StdY standardized coefficients','Std standardized coefficients')%in%saving
@@ -107,8 +108,14 @@ apim_parse <- function(m,prep,folder,out,config) {
   fitnames<-saving[seq.int(first,last-1)];fitnames<-fitnames[nzchar(fitnames)]
   v<-scan(file.path(folder,'results.dat'),quiet=TRUE)
   stopifnot(length(v)==blocks*n+length(fitnames),v[blocks*n+1]==f$summaries$Parameters)
-  d$estimate<-v[seq_len(n)];d$se<-v[n+seq_len(n)]
+  d$estimate<-v[d$id];d$se<-v[n+d$id]
   printed<-f$parameters$unstandardized;key<-paste(printed$paramHeader,printed$param,sep='|')
+  # 显式把外生协方差纳入模型时，Mplus将其均值/方差另列；按语义键映射。
+  for(j in seq_len(nrow(d))) {
+    alternative<-switch(d$header[j],Intercepts='Means',Residual.Variances='Variances',NULL)
+    if(!is.null(alternative)&&!paste(d$header[j],d$param[j],sep='|')%in%key&&
+      paste(alternative,d$param[j],sep='|')%in%key)d$header[j]<-alternative
+  }
   ix<-match(paste(d$header,d$param,sep='|'),key)
   for(j in which(is.na(ix)&grepl('\\.WITH$',d$header)))
     ix[j]<-match(paste(paste0(d$param[j],'.WITH'),sub('\\.WITH$','',d$header[j]),sep='|'),key)
@@ -128,7 +135,7 @@ apim_parse <- function(m,prep,folder,out,config) {
     parsing_pass=TRUE,scientific_released=FALSE),file.path(folder,'parse_validation.json'))
 }
 
-apim_effects <- function(m,prep,folder,config) {
+apim_effects <- function(m,prep,folder,config,out_path=file.path(folder,'model_1.out')) {
   d<-readRDS(file.path(folder,'precision_parameters.rds'))
   dictionary<-read.csv(file.path(folder,'effect_dictionary.csv'))
   d<-d[d$header=='New.Additional.Parameters',];idx<-match(dictionary$label,d$param)
@@ -145,7 +152,7 @@ apim_effects <- function(m,prep,folder,config) {
   e$resampling_unit<-'none';e$bootstrap_requested<-e$bootstrap_completed<-NA_integer_
   e$native_ci_point<-NA_real_
   if(identical(config$inference,'row_ML_BCbootstrap')) {
-    f<-readRDS(file.path(folder,'parsed.rds'));raw<-readLines(file.path(folder,'model_1.out'),warn=FALSE)
+    f<-readRDS(file.path(folder,'parsed.rds'));raw<-readLines(out_path,warn=FALSE)
     ci<-apim_native_bc_intervals(f,raw,data.frame(paramHeader='New.Additional.Parameters',param=dictionary$label),
       requested=config$bootstrap$draws)
     stopifnot(all(abs(ci$native_ci_point-e$estimate)<=.00050001))
@@ -167,7 +174,7 @@ apim_render <- function(root) {
     page_margins=officer::page_mar(top=.6,bottom=.6,left=.6,right=.6)))
   doc<-officer::body_add_par(doc,'Dyadic model results — numerical candidates; scientific review pending',style='heading 1')
   for(id in unique(e$model_id)) {
-    d<-e[e$model_id==id,];d$display<-paste(d$label,d$kind,d$probe,sep=' | ')
+    d<-e[e$model_id==id,];d$display<-if('display_label'%in%names(d))d$display_label else paste(d$label,d$kind,d$probe,sep=' | ')
     write.csv(d,file.path(figdir,paste0(id,'_plot_data.csv')),row.names=FALSE)
     method<-unique(d$interval_method);stopifnot(length(method)==1)
     axis<-if(method=='Mplus_native_ML_BCbootstrap')'Estimate and 95% native row-bootstrap BC interval' else

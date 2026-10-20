@@ -207,7 +207,11 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     class_limit = policy.get("max_running_by_class", {}).get(category)
     if class_limit is not None and sum(x.get("execution_class") == category for x in running) >= class_limit:
         return "class_limit:" + category
-    if snapshot["memory_percent"] >= policy["memory_hold_percent"] or snapshot["available_gib"] < policy["reserve_gib"]:
+    # Percent is diagnostic only.  Admit when the measured available headroom
+    # can cover the candidate plus the explicit reserve; otherwise a high
+    # Windows percentage would make the queue wait indefinitely for cache
+    # reclamation even though the contract is satisfied.
+    if snapshot["available_gib"] < policy["reserve_gib"]:
         return "memory_hold"
     if snapshot["cpu_percent"] >= policy["cpu_hold_percent"]:
         return "cpu_hold"
@@ -227,7 +231,7 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
         if headroom - memory - reserved < commit_reserve:
             return 'predicted_commit'
     remaining = snapshot["available_gib"] - memory - reserved
-    if remaining < policy["reserve_gib"] or 100 * (1 - remaining / snapshot["total_gib"]) >= policy["memory_hold_percent"]:
+    if remaining < policy["reserve_gib"]:
         return "predicted_memory"
     return None
 
@@ -321,6 +325,17 @@ class Queue:
         self.profile_max_age_sec = float(self.policy.get("windows_profile_max_age_sec", 300))
         self.producer_state_files = settings.get("producer_state_files", [])
         self.mplus_command = settings.get("mplus")
+        # 新APIM工作流可选择加入跨运行目录的宿主机预约；既有队列默认不变。
+        self.host_reservation_path = settings.get("host_reservation_path")
+        if settings.get("apim_v2") and not self.db.execute("SELECT 1 FROM events LIMIT 1").fetchone():
+            cap = int(settings.get("parallel_cap", 1))
+            if cap not in (1, 2):
+                raise ValueError("APIM v2 parallel_cap must be 1 or 2")
+            self.set("cap", cap)
+            initial = int(settings.get("initial_parallel_limit", 1))
+            if initial < 1 or initial > cap or (initial > 1 and not settings.get("calibrated")):
+                raise ValueError("Parallel start requires a measured calibration")
+            self.set("limit", initial)
         # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
         self.success_policy = settings.get("historical_success_policy")
         self.success_names = None
@@ -602,6 +617,22 @@ class Queue:
                     self.db.execute("UPDATE tasks SET status='failed',finished=?,result=? WHERE id=?", (utc(), json.dumps(result), row["id"]))
                     self.event("invalid_input", dict(id=row["id"], result=result))
                     continue
+                if self.host_reservation_path:
+                    from apim_v2_io import HostReservations
+                    owner = self.db.execute("SELECT pid,created FROM workers WHERE id=?", (worker,)).fetchone()
+                    if owner is None:
+                        raise ValueError("Host reservation requires a registered worker")
+                    registry = HostReservations(self.host_reservation_path)
+                    try:
+                        admission = registry.acquire(str(self.root) + "|" + row["id"], owner["pid"], owner["created"],
+                            float(payload.get("memory_gib", .5)), int(payload.get("processors", 1)),
+                            snapshot["available_gib"], snapshot["free_virtual_gib"], self.policy["reserve_gib"],
+                            self.policy.get("commit_reserve_gib", 1.5), self.policy["processor_budget"])
+                    finally:
+                        registry.db.close()
+                    if not admission["admitted"]:
+                        reasons.add(admission["reason"])
+                        continue
                 self.db.execute("UPDATE tasks SET status='running',worker=?,started=? WHERE id=?", (worker, utc(), row["id"]))
                 self.event("claimed", dict(id=row["id"], worker=worker, resources=snapshot,
                                            waiting_producer=row["id"] in waiting_producers,
@@ -614,11 +645,33 @@ class Queue:
             row = self.db.execute("SELECT status,worker,payload FROM tasks WHERE id=?", (task_id,)).fetchone()
             if not row or row["status"] != "running" or row["worker"] != worker:
                 raise ValueError("Completion does not own a running task")
+            if self.host_reservation_path:
+                owner = self.db.execute("SELECT pid,created FROM workers WHERE id=?", (worker,)).fetchone()
+                process = psutil.Process(owner["pid"])
+                if abs(process.create_time() - owner["created"]) >= .1:
+                    raise ValueError("Completion worker identity changed")
+                if verified_descendants(process, names={'mplus.exe'}):
+                    raise ValueError("Mplus still alive: retain task and host reservation")
             status = "completed" if result.get("estimation_ok") else "failed"
-            self.publish(json.loads(row["payload"]), result)
+            payload = json.loads(row["payload"])
+            self.publish(payload, result)
+            if self.host_reservation_path and result.get("estimation_ok"):
+                folder = Path(payload["output"]).parent
+                # 每个模型独立发布，不等整批结束。输入指纹来自认领前的冻结清单。
+                atomic_json(folder / "output_binding.json", dict(fingerprint=payload["fingerprint"],
+                    out_sha256=sha256(payload["output"]), results_sha256=sha256(folder / "results.dat"),
+                    input_sha256=payload["input_sha256"], worker=worker, completed_at=utc()))
             self.db.execute("UPDATE tasks SET status=?,finished=?,result=? WHERE id=?",
                             (status, utc(), json.dumps(result), task_id))
             self.event("finished", dict(id=task_id, worker=worker, result=result))
+        if self.host_reservation_path:
+            from apim_v2_io import HostReservations
+            owner = self.db.execute("SELECT pid,created FROM workers WHERE id=?", (worker,)).fetchone()
+            registry = HostReservations(self.host_reservation_path)
+            try:
+                registry.release(str(self.root) + "|" + task_id, owner["pid"], owner["created"])
+            finally:
+                registry.db.close()
 
     def publish_deferred(self, payload, result, prior=None):
         folder = Path(payload["output"]).parent

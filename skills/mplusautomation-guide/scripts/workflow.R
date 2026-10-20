@@ -213,6 +213,8 @@ apim_admit <- function(config) {
 }
 
 run_apim_workflow <- function(config, stages=c('check','prepare','compile','fit','parse','effects','render','validate'), resume=TRUE) {
+  if(!is.null(config$schema_version)&&identical(as.integer(config$schema_version),2L))
+    return(run_apim_workflow_v2(config,stages=stages,resume=resume))
   validate_apim_config(config)
   allowed<-c('check','prepare','compile','fit','parse','effects','render','validate')
   stopifnot(all(stages%in%allowed),!anyDuplicated(stages))
@@ -306,3 +308,7 @@ run_apim_workflow <- function(config, stages=c('check','prepare','compile','fit'
   apim_progress('workflow_finished','Requested stages finished; scientific adoption remains separate')
   invisible(manifest)
 }
+
+# v2为显式选择的扩展入口；v1默认语义保持不变。
+for(apim_module in c('apim_v2_config.R','apim_v2_models.R','apim_v2_runtime.R'))
+  source(file.path(apim_script_dir,apim_module),local=TRUE)
