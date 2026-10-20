@@ -1,0 +1,41 @@
+{
+  "status": "COMPLETED_CC_CALIBRATION_AND_MI_INPUT_CHECKS",
+  "evidence": [
+    {
+      "indicator": "sd",
+      "calibration_evidence": "charls_latent_gh_calibration_20261019/audit/INDEPENDENT_VERIFICATION.json",
+      "calibration_sha256": "82794faaa5cfdceaa74d823708bc41e60be464950c9bea92039166619c09a987",
+      "mi_evidence": "charls_latent_interaction_mi_20261019/mi/sd/audit/INDEPENDENT_MI.json",
+      "mi_sha256": "d952245ba32a20d360174935511e96a9d92d61a5b9b357771395746cbaaf54b1",
+      "mi_exported_datasets": 20
+    },
+    {
+      "indicator": "gender",
+      "calibration_evidence": "charls_latent_gh_remaining_20261019/families/gender/audit/INDEPENDENT_VERIFICATION.json",
+      "calibration_sha256": "2e83659afab03f025884c64e0680799763e7ab1cb4e407439f2f4e9c74057680",
+      "mi_evidence": "charls_latent_interaction_mi_20261019/mi/gender/audit/INDEPENDENT_MI.json",
+      "mi_sha256": "ef3edb21dfb3f274cabcda7a964a7cd8dbcda29edd87ae8c8058a4d19e9518a5",
+      "mi_exported_datasets": 20
+    },
+    {
+      "indicator": "oldest",
+      "calibration_evidence": "charls_latent_gh_remaining_20261019/families/oldest/audit/INDEPENDENT_VERIFICATION.json",
+      "calibration_sha256": "4b55ccd3869645cb9e60d354a39589213cf5441314c59a40ce881359f570ab08",
+      "mi_evidence": "charls_latent_interaction_mi_20261019/mi/oldest/audit/INDEPENDENT_MI.json",
+      "mi_sha256": "81fcccda7e917fa745318b83eabc3fee0cdf6d6b9c9c15c6a58b5c3bccf26db1",
+      "mi_exported_datasets": 20
+    },
+    {
+      "indicator": "son",
+      "calibration_evidence": "charls_latent_gh_remaining_20261019/families/son/audit/INDEPENDENT_VERIFICATION.json",
+      "calibration_sha256": "9414f9bed518344b1e4a01cb4cd5db072f79e1e69c7dbe4f5093879942149b6b",
+      "mi_evidence": "charls_latent_interaction_mi_20261019/mi/son/audit/INDEPENDENT_MI.json",
+      "mi_sha256": "d85b53c7e51317dc01a36430c8cc4058bf4f169842d5cd38465d86dd909ec001",
+      "mi_exported_datasets": 20
+    }
+  ],
+  "original_CFPS_four_complete": false,
+  "full_H4_complete": false,
+  "interaction_MI_model_family_completion_claimed": false,
+  "participant_data_included": false
+}

@@ -1207,3 +1207,7 @@ worker's actual terminal state and owned output disposition are known.
 - State recovery success, full-family inference, skill release and installation
   separately. None establishes completion of the original latent moderation or
   H4 research programme.
+
+## Native worker identity and numerical recovery (Windows, 2026-10-19)
+
+See [native-worker-and-quadrature-recovery.md](native-worker-and-quadrature-recovery.md) for the observed Rterm/Rscript preflight defect, bounded native-owner handshake, startup/engine/readback phase separation, and the independently checked CHARLS quadrature calibration. The first startup stderr was not captured; do not claim a unique root cause. The complete interaction-MI queue is separate from these completed checks.

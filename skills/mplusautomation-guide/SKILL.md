@@ -98,6 +98,9 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [native-worker-and-quadrature-recovery.md](references/native-worker-and-quadrature-recovery.md): bind native Rterm/Rscript jobs by identity, separate startup and estimation failures, preserve free-format outputs, and calibrate quadrature before complete-MI inference.
+
+
 - [binary-observed-interaction-computation.md](references/binary-observed-interaction-computation.md):
   avoid unnecessary integration for an observed binary moderator when the
   conditional Gaussian model has an equivalent known-class representation;
