@@ -37,15 +37,34 @@ failure.
    433.
 2. Start from empty member directories. Register the original native
    `execute_r_async(source(..., local=TRUE))` job id immediately.
-3. Treat `runtime/PROGRESS.jsonl`, per-member `engine_receipt.json` and
-   `receipt.json` as authoritative. ClaudeR's generic result can remain at
-   `started` after dozens of completed members; a stale display is not evidence
-   of an idle worker and must not trigger a duplicate submission.
+3. If ClaudeR still displays `started`, inspect `runtime/PROGRESS.jsonl`,
+   per-member `engine_receipt.json`, `receipt.json` and worker identity before
+   acting. A stale display does not establish an idle worker. In this case the
+   entrypoint omitted `local=TRUE`; later urban submissions retained the async
+   environment and exposed advancing native `stage/message/updated_at`.
+   Durable files permit safe recovery; they do not excuse leaving future jobs
+   without native progress.
 4. Keep one Mplus slot on a 16-GiB Windows host unless a fresh measured
    resource contract authorizes more. On this run the serialized family was
    stable and completed in about 2,096 seconds of engine time.
-5. After all 20 A members are usable, run the independent verifier. Only then
-   accept pooled tables and run the MI01 B start-sensitivity check.
+5. After all 20 A members are usable, pool them and run the MI01 B check.
+   Then run the final independent verifier, which requires all 21 outputs.
+   B is a sensitivity call, never a 21st imputation or a replacement for A.
+
+## Corrected reporting details
+
+The original son terminal counted all calls as `A_members=21`; actual membership
+is 20 A plus one B. Use the frozen `primary_sequence` and member-source table.
+The three education families also inherited `dfcom=437` from the larger SD
+sample. Their actual community counts imply 431 (gender), 432 (oldest), and
+432 (son) under this project's communities-minus-one sensitivity convention.
+This convention is not an exact finite-sample robust-cluster correction.
+
+Recompute only derived finite-df sensitivity tables from the saved parameter
+vectors and covariance matrices, verify actual cluster counts independently,
+and retain main Rubin results unchanged. The 2026-10-22 correction required
+zero Mplus calls and zero new MI. A verifier sharing a copied constant can
+confirm arithmetic while missing a sample-definition error.
 
 ## MI auxiliary-file gate
 
@@ -60,6 +79,10 @@ the original MI contract and hashes unchanged.
 Public packages may include sanitized contracts, input/output text, parameter
 and covariance matrices, audit receipts and independent verification code.
 Exclude `data.dat`, MI_INPUTS/RDS/MIDS, `AUXILIARY_INPUTS.csv`, individual
-scores and participant records. A package can support transparent readback
+scores and participant records in **every directory, including failure-audit
+backups**. An early local staging copy contained two archived `data.dat`
+files; they were removed from staging and the ZIP was rebuilt before any
+push. Use an explicit per-file allowlist, inspect archive members and verify
+hashes; file size or CSV row count does not establish privacy. A package can support transparent readback
 without permitting a new Mplus run. The scientific receipt must continue to
 state: **四项调节完整推断、完整 H4 仍未完成。**
