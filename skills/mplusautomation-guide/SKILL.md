@@ -113,6 +113,33 @@ do not execute the estimation steps below merely to close an editorial issue.
   structural absence from missing responses, and prepare scoped moderation inputs
   without treating additive MI or a complete-case pilot as full inference.
 
+- [charls-factor-score-pilot.md](references/charls-factor-score-pilot.md):
+  use a bounded, explicitly approximate FSCORES route only after latent-income
+  timeout, with correct SAVEDATA syntax, resource gating, and RStudio recovery
+  evidence.
+
+- [charls-gender-edu-full-mi.md](references/charls-gender-edu-full-mi.md):
+  native RStudio recovery, WSL/Windows path boundaries, readback-only repair, and a full 20-member latent working-MI family.
+- [charls-oldest-edu-full-mi.md](references/charls-oldest-edu-full-mi.md):
+  a second full CHARLS H4.2 family showing the native `C:/` contract repair,
+  durable progress versus stale MCP status, serialized Mplus admission, and
+  public readback boundaries.
+- [charls-son-edu-full-mi.md](references/charls-son-edu-full-mi.md):
+  a third full CHARLS H4.2 family documenting the precompiled-directory
+  `FileExistsError`, clean retry admission, stale async progress, the MI
+  auxiliary export gate, and independent Rubin verification.
+- [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
+  avoid duplicate first-stage MI fits, reject stale-input output reuse, and
+  distinguish score-regression arithmetic from complete latent inference.
+
+- [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md):
+  freeze CHARLS baseline control identities, household roster missingness, and MI
+  admission gates before submitting a migrated model.
+
+- [rstudio-foreground-diagnostic-recovery.md](references/rstudio-foreground-diagnostic-recovery.md):
+  recover bounded native RStudio/ClaudeR calls after foreground diagnostic
+  overload without restarting workers or duplicating Mplus submissions.
+
 - [bounded-research-reopening.md](references/bounded-research-reopening.md):
   resume author-approved mechanism research after scoped closeout, reuse prior
   failed attempts, bound pilot cost, distinguish H4 feasibility from complete MI,
