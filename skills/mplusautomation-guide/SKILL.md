@@ -118,6 +118,8 @@ do not execute the estimation steps below merely to close an editorial issue.
   timeout, with correct SAVEDATA syntax, resource gating, and RStudio recovery
   evidence.
 
+- [charls-gender-edu-full-mi.md](references/charls-gender-edu-full-mi.md):
+  native RStudio recovery, WSL/Windows path boundaries, readback-only repair, and a full 20-member latent working-MI family.
 - [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
   avoid duplicate first-stage MI fits, reject stale-input output reuse, and
   distinguish score-regression arithmetic from complete latent inference.
