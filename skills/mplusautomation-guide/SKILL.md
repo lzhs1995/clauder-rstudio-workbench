@@ -120,6 +120,10 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 - [charls-gender-edu-full-mi.md](references/charls-gender-edu-full-mi.md):
   native RStudio recovery, WSL/Windows path boundaries, readback-only repair, and a full 20-member latent working-MI family.
+- [charls-oldest-edu-full-mi.md](references/charls-oldest-edu-full-mi.md):
+  a second full CHARLS H4.2 family showing the native `C:/` contract repair,
+  durable progress versus stale MCP status, serialized Mplus admission, and
+  public readback boundaries.
 - [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
   avoid duplicate first-stage MI fits, reject stale-input output reuse, and
   distinguish score-regression arithmetic from complete latent inference.

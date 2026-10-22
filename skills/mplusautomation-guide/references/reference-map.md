@@ -20,6 +20,7 @@ Read what is relevant to the current task rather than the full historical case.
 | External bootstrap and solvers | [external-cluster-bootstrap.md](external-cluster-bootstrap.md), [recursive-kernel-scope-and-calibration.md](recursive-kernel-scope-and-calibration.md) |
 | Memory and versions | [low-memory-verification.md](low-memory-verification.md), [version-upgrade-assessment.md](version-upgrade-assessment.md) |
 | Chapter 4 case study | [chapter4-apim-workflow.md](chapter4-apim-workflow.md) |
+| CHARLS H4.2 oldest × education recovery | [charls-oldest-edu-full-mi.md](charls-oldest-edu-full-mi.md) |
 
 Historical counts and unresolved identities are case facts. They do not invalidate
 unaffected technical tests or become prerequisites for another user's analysis.
