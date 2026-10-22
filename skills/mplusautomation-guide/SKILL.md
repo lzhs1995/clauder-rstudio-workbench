@@ -118,6 +118,10 @@ do not execute the estimation steps below merely to close an editorial issue.
   timeout, with correct SAVEDATA syntax, resource gating, and RStudio recovery
   evidence.
 
+- [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
+  avoid duplicate first-stage MI fits, reject stale-input output reuse, and
+  distinguish score-regression arithmetic from complete latent inference.
+
 - [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md):
   freeze CHARLS baseline control identities, household roster missingness, and MI
   admission gates before submitting a migrated model.
