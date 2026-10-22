@@ -21,6 +21,8 @@ FSCORES=fscores.dat 不是标准 SAVEDATA 写法。输入、数据、job 合同�
 
 单 Mplus、单处理器运行前执行资源门控；可用物理内存低于 1.5 GiB 或提交空间低于 2 GiB 时只写 deferred 证据，不启动引擎。每个异步提交都必须有 durable BOOT_PID、PROGRESS、engine_receipt、model.out 和 fscores.dat 检查。
 
+Windows 的可用物理内存和 commit 可用量不是同一个指标。若探针没有通过 GlobalMemoryStatusEx 或 host profile 独立读取 commit，就只能把该字段标成 RAM proxy，不能声称完成 commit 门控；宁可保守等待，也不要把代理值写进正式资源结论。
+
 ## 实测恢复与终态
 
 第一次 async 回执异常，持久化检查确认没有 reservation、Mplus、model.out 或 fscores.dat；第二次 job ab5c3860 在另一健康 RStudio 会话进入运行，但资源门控 600 秒到期，实际 Mplus 调用为 0。
