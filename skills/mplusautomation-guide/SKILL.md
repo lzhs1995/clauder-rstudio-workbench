@@ -124,6 +124,10 @@ do not execute the estimation steps below merely to close an editorial issue.
   a second full CHARLS H4.2 family showing the native `C:/` contract repair,
   durable progress versus stale MCP status, serialized Mplus admission, and
   public readback boundaries.
+- [charls-son-edu-full-mi.md](references/charls-son-edu-full-mi.md):
+  a third full CHARLS H4.2 family documenting the precompiled-directory
+  `FileExistsError`, clean retry admission, stale async progress, the MI
+  auxiliary export gate, and independent Rubin verification.
 - [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
   avoid duplicate first-stage MI fits, reject stale-input output reuse, and
   distinguish score-regression arithmetic from complete latent inference.
