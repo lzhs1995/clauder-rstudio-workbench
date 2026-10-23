@@ -197,6 +197,9 @@ do not execute the estimation steps below merely to close an editorial issue.
   Windows parent-identity contracts, pilot-to-full start evidence, semantic
   moderator migration, and receipt-preserving recovery of a 20-MI XWITH
   family.
+- [charls-son-urban-pilot-timeout-20261023.md](references/charls-son-urban-pilot-timeout-20261023.md):
+  C3/C4 semantic migration, namespace-qualified R bootstrap checks, adapter
+  syntax validation, and the bounded son-by-urban pilot timeout rule.
 - [charls-boundary-readback.md](references/charls-boundary-readback.md):
   independently read existing CHARLS registries and distinguish summary rows,
   process closures, timeout cases and method-review rows.
