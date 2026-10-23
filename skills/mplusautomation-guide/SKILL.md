@@ -193,6 +193,10 @@ do not execute the estimation steps below merely to close an editorial issue.
 - [charls-scientific-gate.md](references/charls-scientific-gate.md):
   reuse existing CHARLS artifacts while keeping timeout, boundary and formal
   adoption states separate.
+- [charls-oldest-urban-full-recovery-20261023.md](references/charls-oldest-urban-full-recovery-20261023.md):
+  Windows parent-identity contracts, pilot-to-full start evidence, semantic
+  moderator migration, and receipt-preserving recovery of a 20-MI XWITH
+  family.
 - [charls-boundary-readback.md](references/charls-boundary-readback.md):
   independently read existing CHARLS registries and distinguish summary rows,
   process closures, timeout cases and method-review rows.
