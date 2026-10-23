@@ -1,7 +1,8 @@
 # CHARLS son×urban pilot: bootstrap recovery and bounded timeout (2026-10-23)
 
-This case records a Windows/RStudio pilot that used a changed MI input, so it
-is a recovery and contract lesson rather than a completed H4 result.
+This case records a Windows/RStudio pilot with verified input-provenance and
+refinement-generation defects. Its initial MI PASS and feasibility conclusion
+were superseded by a targeted review. It is not a completed H4 result.
 
 ## Keep the moderator semantics explicit
 
@@ -39,13 +40,28 @@ task key; do not overwrite or resubmit an in-flight record.
 
 ## Bounded pilot interpretation
 
-The final native job used one Mplus slot and a 240-second per-model limit.
-Parent and GH07 A/B were usable and the GH07 start comparison passed. GH15 A
-timed out, so GH15 B was correctly withheld. This is a pilot feasibility
-failure, not a failed substantive hypothesis and not a completed MI family.
-Keep `engine_receipt.json`, stdout/stderr, `receipt.json`, the terminal file,
-and the released awake-guard evidence. Never pool the usable prefix or extend
-the same GH15 structure merely to obtain a full family.
+The first completed native job used one Mplus slot and a 240-second per-model
+limit. Parent and GH07 A/B returned usable numerical results; GH15 A timed out,
+and GH15 B was withheld. A subsequent provenance check found two reasons not
+to interpret this as failure of the intended scientific model:
+
+- All 20 DAT files were copied from the education MI family. Urban×XZ columns
+  existed only in an auxiliary CSV added after imputation, while the actual
+  predictor matrix retained education×XZ. The old verifier did not require
+  the target columns in the actual fit. A declaration or derived column is
+  not proof of execution.
+- GH15 inputs had been generated before the current GH07 calls finished.
+  Existing directories caused the runner to skip compilation. All 134 labels
+  differed from the required current GH07 final values. A `refinement: true`
+  metadata flag cannot establish that those starts were used.
+
+The repair uses a new isolated MI root, requires all 25 target interaction
+columns in the actual predictor matrix, exports auxiliary values directly
+from the fitted inputs, and compiles GH15 only after current GH07 success.
+Store source-final-value hashes and compare every inserted label. Keep all old
+outputs and mark them diagnostic-only; do not pool them into the repaired
+family. This is a correction of a demonstrated implementation defect, not an
+unbounded extension after a valid timeout.
 
 ## Reusable Windows checks
 
@@ -55,8 +71,13 @@ the same GH15 structure merely to obtain a full family.
 3. Use a durable `PROGRESS.jsonl` and the same async job ID for polling.
 4. Treat bootstrap failures, Mplus timeouts, readback failures, and usable
    estimates as different terminal classes.
-5. A timeout under a declared bound closes that pilot. A new attempt requires
-   a new contract and explicit change in estimation object or resource plan.
+5. Before classifying a timeout scientifically, verify actual input and
+   prerequisite provenance. A confirmed implementation defect warrants a
+   corrected isolated attempt with an explicit cost bound. A correctly
+   executed timeout is retained without automatic repeated extensions.
+6. Derive C4's data column from the declared schema. C3's column was also
+   mistakenly used for the old mixed-community diagnostic; do not transfer
+   that diagnostic to urban models or infer it from an education template.
 
 The isolated son×urban root contains the complete evidence without private
 MI/RDS release files. The corresponding scientific boundary remains:
