@@ -200,6 +200,8 @@ do not execute the estimation steps below merely to close an editorial issue.
 - [charls-son-urban-pilot-timeout-20261023.md](references/charls-son-urban-pilot-timeout-20261023.md):
   C3/C4 semantic migration, namespace-qualified R bootstrap checks, adapter
   syntax validation, and the bounded son-by-urban pilot timeout rule.
+- [charls-son-urban-full-mi-20261023.md](references/charls-son-urban-full-mi-20261023.md):
+  corrected full 20-MI execution, independent Rubin readback and public-release boundary.
 - [charls-boundary-readback.md](references/charls-boundary-readback.md):
   independently read existing CHARLS registries and distinguish summary rows,
   process closures, timeout cases and method-review rows.
