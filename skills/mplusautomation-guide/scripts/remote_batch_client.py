@@ -521,16 +521,29 @@ class Client:
         preflight = self.state["return_preflight_observation"]
         if preflight["kind"] == "mplus-output-export/1":
             # 传输回执只证明搬运一致；还须核回来的完整文件集与预检时固定的导出合同一致。
+            rejection = {"at": now(), "directory": str(target),
+                         "expected_manifest_sha256": preflight.get("manifest_sha256"),
+                         "actual_manifest_sha256": actual.get("EXPORT_MANIFEST.json", {}).get("sha256"),
+                         "extra_files": None, "missing_files": None, "changed_files": None}
             try:
                 if actual.get("EXPORT_MANIFEST.json", {}).get("sha256") != preflight.get("manifest_sha256"):
                     raise ValueError("导出清单摘要改变")
                 exported = json.loads((target / "EXPORT_MANIFEST.json").read_bytes())
                 expected = exported["files"]
-                if not isinstance(expected, dict) or (
-                        {name: pin for name, pin in actual.items() if name != "EXPORT_MANIFEST.json"} != expected):
+                if not isinstance(expected, dict):
+                    raise ValueError("导出清单的 files 不是文件映射")
+                downloaded = {name: pin for name, pin in actual.items() if name != "EXPORT_MANIFEST.json"}
+                rejection.update(extra_files=sorted(downloaded.keys() - expected.keys()),
+                                 missing_files=sorted(expected.keys() - downloaded.keys()),
+                                 changed_files=sorted(name for name in downloaded.keys() & expected.keys()
+                                                      if downloaded[name] != expected[name]))
+                if downloaded != expected:
                     raise ValueError("文件集、字节数或 SHA 与导出清单不一致")
             except (OSError, ValueError, KeyError, TypeError) as exc:
-                self.checkpoint(collection_state="EXPORT_CHANGED_AFTER_PREFLIGHT")
+                # 仅记录路径与原因，不自动删除失败下载；未知清单不能冒称文件差异已核清。
+                rejection["reason"] = str(exc)
+                self.checkpoint(collection_state="EXPORT_CHANGED_AFTER_PREFLIGHT",
+                                last_export_rejection=rejection)
                 raise ValueError("Windows 预检后导出内容改变；原次保留，不采用本次取回") from exc
         reported = {}
         for line in stdout.splitlines():

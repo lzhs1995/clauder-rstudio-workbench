@@ -213,6 +213,13 @@ class ClientContractTests(unittest.TestCase):
         state = self.read_state()
         self.assertEqual(state["status"], "FINISHED")
         self.assertEqual(state["collection_state"], "EXPORT_CHANGED_AFTER_PREFLIGHT")
+        detail = state["last_export_rejection"]
+        self.assertEqual(detail["directory"], str(self.output.resolve()))
+        self.assertEqual(detail["extra_files"], ["models/member/data.dat"] if change == "extra" else [])
+        self.assertEqual(detail["missing_files"], ["models/member/model.out"] if change == "missing" else [])
+        self.assertEqual(detail["changed_files"], ["models/member/model.out"] if change == "changed" else [])
+        self.assertEqual(detail["actual_manifest_sha256"], detail["expected_manifest_sha256"])
+        self.assertTrue(detail["at"] and detail["reason"])
         self.assertFalse((self.state / "COLLECTION.json").exists())
         self.assertTrue((self.output / "EXPORT_MANIFEST.json").exists())
         self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
