@@ -312,7 +312,8 @@ class Client:
         body = snapshot.read_text("utf-8")
         name = self.state["plan"]["name"]
         binding = self.state["binding_id"]
-        probe = self.directory / f"binding-observe-{len(self.state['phases']):03d}.ps1"
+        # 查询正文落盘后也可能退出；保留旧文件，并以新路径执行同一原任务的只读观察。
+        probe = self.directory / f"binding-observe-{len(self.state['phases']):03d}-{uuid.uuid4().hex[:8]}.ps1"
         script = (
             f"# XDEV_BATCH_OBSERVE_V1 {binding}\n"
             f"$BatchJob = Join-Path $XRoot {ps_quote('jobs' + chr(92) + name)}\n"

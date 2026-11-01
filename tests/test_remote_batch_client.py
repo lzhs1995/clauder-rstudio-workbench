@@ -321,6 +321,33 @@ class ClientContractTests(unittest.TestCase):
         self.assertTrue((leftover / "INTENT.json").exists())
         self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
 
+    def test_exit_after_observation_script_is_frozen_can_resume_without_resubmit(self):
+        self.control["lost_ack"] = True
+        self.write_control()
+        self.submit(expected=124)
+        # 模拟查询脚本已落盘、阶段意图尚未创建时退出；残留证据必须原样保留。
+        harness = self.root / "exit_after_observation_script.py"
+        harness.write_text(
+            "import importlib.util, os\n"
+            f"spec=importlib.util.spec_from_file_location('tested_client',{str(CLIENT)!r})\n"
+            "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\n"
+            "original=m.exclusive_bytes\n"
+            "def freeze(path,body):\n"
+            " original(path,body)\n"
+            " if path.name.startswith('binding-observe-'):os._exit(73)\n"
+            "m.exclusive_bytes=freeze\n"
+            "raise SystemExit(m.main())\n"
+        )
+        self.client = harness
+        self.run_client("reconcile", expected=73)
+        remnants = {path: path.read_bytes() for path in self.state.glob("binding-observe-*.ps1")}
+        self.assertEqual(len(remnants), 1)
+        self.client = CLIENT
+        self.run_client("reconcile")
+        self.assertTrue(all(path.read_bytes() == body for path, body in remnants.items()))
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        self.assertEqual(sum(row[0] == "run" for row in self.calls()), 1)
+
     def test_failed_health_can_resume_same_frozen_plan_without_duplicate_submit(self):
         self.control["health"] = False
         self.write_control()
