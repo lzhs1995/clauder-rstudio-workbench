@@ -68,3 +68,49 @@ Python 3.14 对真实 20 成员保存结果的只读核验；Windows 负例套�
 首个不可采用成员应终止该批次的进一步估计。保留已有 PASS 与失败输出，
 不替换失败 MI，不自动延长 cap，也不因恢复过程顺手扩大研究家族。
 工程探针若与原 cap、准入等待或资源门槛不同，逐项记录其差异与实际影响。
+
+## 独立孤儿检查与采用回执
+
+`scripts/orphan_output_guard.py` 是独立的检查器，所有分支都不启动或结束引擎。
+默认只写具名检查报告；`--record-adoption` 才在运行目录的 `recovery_adoptions/`
+另写采用回执。它不覆盖 RESULT、输入、输出或旧失败，也不改现役 worker。
+
+~~~sh
+python orphan_output_guard.py --source C:\work\original-family \
+  --work C:\work\isolated-run --member MI01_A \
+  --engine C:\tools\Mplus.exe --report C:\work\checks\MI01_A-check.json
+~~~
+
+在 Windows 本机调用，以便实际核原 PID、创建时间、程序、工作目录与 model.inp
+参数。不能在 Mac 检查一个 Windows PID 后把“本机无此 PID”当成远端引擎已退出。
+CLI 拒绝在非 Windows 主机上运行；Windows 调用方仍须确保 marker 属于本机，
+不能把另一台 Windows 的 PID 当成本机进程。库函数的 Mac 测试只使用本机合成进程。
+Mac 可以复核取回的输出和回执，但不能代替这个活跃进程观察。
+
+| 决定 | 含义与下一步 |
+|---|---|
+| WAIT_FOR_ORIGINAL_ENGINE | 原进程身份一致且活跃；继续观察原任务，不终止或重派 |
+| REUSE_VERIFIED_RESULT | RESULT 经过完整输入/当前输出/数值复核，可复用 |
+| ADOPTABLE_SAVED_OUTPUTS | 原进程已退出、完整保存输出满足采用条件；默认还没写采用回执 |
+| OUTPUTS_ADOPTED | 已新建独立采用回执；退出码仍为 null，未造 RESULT/0 |
+| HOLD | 输入、来源、回执、进程或输出存在缺口；保留现场，不自动重估 |
+| NO_WORK_DIRECTORY | 没有可采用的运行目录；这不是新增估计授权 |
+
+孤儿采用要求 ENGINE_STARTED.inputs 与原 job 的运行时输入哈希完全相同，并且输入副本
+仍可逐字节核验；启动器须在运行前固定输入清单，进程出生记录沿用这份清单。
+当前文件相同不能证明历史引擎实际使用过它；旧的仅 PID/时间记录、已经删除的数据副本
+或没有来源绑定的输出保持 HOLD。不能为了让检查通过补造旧启动哈希或恢复一份数据后
+声称它就是历史运行时副本。
+
+正常终止、非时间行、有限数值、输出时间及独立文件身份均会检查。采用回执保留
+`engine_exit_code=null` 与 `budget_remaining=null`，原预算台账另行核收；不把正常
+输出推断成已经观察到退出码 0 或尚有完整重试额度。再次采用先重验当前字节，匹配时
+复用原采用回执，不改其时间或内容。原始资料目录与模型目录不能用作新增报告位置。
+
+采用写入使用 OS 文件锁。真正的 worker 若要自动消费这个决定，也必须协调同一恢复锁
+并保存自身的累计预算和单实例约束；本工具自身不修改原探针的调度/杀进程逻辑。
+Windows worker 尚未接入该检查器时，不能宣称已修复原 worker 的完整自动恢复。
+
+本机 18 项合成测试包含活跃 Python 子进程、PID 复用、错误程序身份、未知进程、错误/空/
+非有限输出、陈旧回执、输入缺失、旧薄启动记录、硬链接和单写者锁。Windows 平台实测
+需要单独留下结果；不能用 Mac 测试代替 Windows msvcrt 锁及进程行为验收。

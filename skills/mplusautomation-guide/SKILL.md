@@ -115,6 +115,8 @@ do not execute the estimation steps below merely to close an editorial issue.
 - [remote-output-acceptance.md](references/remote-output-acceptance.md):
   independent saved-batch verification after remote execution, negative controls
   for stale or non-normal output, and recovery of engines whose controller exited.
+  The independent `orphan_output_guard.py` records qualified adoptions separately;
+  it never reruns a member or invents an unknown engine exit code.
 
 - [charls-son-urban-full-mi-20261023.md](references/charls-son-urban-full-mi-20261023.md):
   the original Windows 20-MI provenance repair and complete independent readback,

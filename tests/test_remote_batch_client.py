@@ -22,7 +22,9 @@ with (root / "calls.jsonl").open("a") as f:
 rp = root / "remote.json"
 remote = json.loads(rp.read_text()) if rp.exists() else {}
 def save():
-    rp.write_text(json.dumps(remote))
+    tmp = rp.with_suffix(".tmp")
+    tmp.write_text(json.dumps(remote))
+    os.replace(tmp, rp)
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 op = args[0]
@@ -33,6 +35,9 @@ elif op == "push":
     data = pathlib.Path(args[1]).read_bytes()
     remote.setdefault("payload", {})[args[2]] = digest(data)
     save()
+    if control.get("push_fail"):
+        print("XDEV_PUSH_FAILED rc=124 job=100", file=sys.stderr)
+        sys.exit(124)
     print(f"XDEV_PUSHED {args[2]} sha256={digest(data)} bytes={len(data)} job=100")
 elif op == "detach":
     name, path = args[1:]
@@ -87,10 +92,12 @@ else:
 '''
 
 
+@unittest.skipUnless(os.name == "posix", "This suite exercises the Mac/POSIX xdev client.")
 class ClientContractTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        self.client = CLIENT
         self.fake = self.root / "fake-xdev"
         self.fake.write_text("#!" + sys.executable + "\n" + FAKE)
         self.fake.chmod(0o700)
@@ -118,7 +125,7 @@ class ClientContractTests(unittest.TestCase):
         (self.root / "control.json").write_text(json.dumps(self.control))
 
     def command(self, *args, timeout=5):
-        return [sys.executable, "-B", str(CLIENT), "--state", str(self.state),
+        return [sys.executable, "-B", str(self.client), "--state", str(self.state),
                 "--xdev", str(self.fake), "--client-timeout", str(timeout), *args]
 
     def run_client(self, *args, expected=0, timeout=5):
@@ -173,9 +180,25 @@ class ClientContractTests(unittest.TestCase):
         self.assertEqual(self.read_state()["detachment_attempts"], 1)
 
     def test_local_timeout_keeps_remote_task_and_recovers(self):
-        self.control["slow_detach"] = 1
+        self.control["slow_detach"] = 3
         self.write_control()
-        self.submit(expected=124, timeout=0.25)
+        # 故障只注入 detach，避免繁忙机器上 0.25 秒全局预算先在 health 阶段到期。
+        harness = self.root / "timeout_detach_only.py"
+        harness.write_text(
+            "import importlib.util\n"
+            f"spec=importlib.util.spec_from_file_location('tested_client',{str(CLIENT)!r})\n"
+            "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\n"
+            "original=m.Client.call\n"
+            "def call(self,phase,arguments):\n"
+            " old=self.client_timeout\n"
+            " if phase=='detach':self.client_timeout=1.0\n"
+            " try:return original(self,phase,arguments)\n"
+            " finally:self.client_timeout=old\n"
+            "m.Client.call=call\n"
+            "raise SystemExit(m.main())\n"
+        )
+        self.client = harness
+        self.submit(expected=124)
         self.run_client("reconcile")
         self.finish()
         self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
@@ -297,6 +320,35 @@ class ClientContractTests(unittest.TestCase):
         self.run_client("reconcile")
         self.assertTrue((leftover / "INTENT.json").exists())
         self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_failed_health_can_resume_same_frozen_plan_without_duplicate_submit(self):
+        self.control["health"] = False
+        self.write_control()
+        self.submit(expected=3)
+        self.assertFalse((self.root / "remote.json").exists())
+        self.control["health"] = True
+        self.write_control()
+        self.run_client("retry-preflight")
+        self.finish()
+        self.assertEqual(sum(row[0] == "health" for row in self.calls()), 2)
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_preflight_retry_refuses_after_any_detach_attempt(self):
+        self.control["lost_ack"] = True
+        self.write_control()
+        self.submit(expected=124)
+        calls = self.calls()
+        self.run_client("retry-preflight", expected=2)
+        self.assertEqual(calls, self.calls())
+
+    def test_preflight_retry_refuses_unknown_push(self):
+        self.control["push_fail"] = True
+        self.write_control()
+        self.submit(expected=124)
+        calls = self.calls()
+        self.run_client("retry-preflight", expected=2)
+        self.assertEqual(calls, self.calls())
+        self.assertEqual(self.read_state()["detachment_attempts"], 0)
 
     def test_client_process_exit_after_detach_intent_recovers_original(self):
         self.control["slow_detach"] = 0.5

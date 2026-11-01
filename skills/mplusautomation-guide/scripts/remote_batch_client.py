@@ -258,6 +258,19 @@ class Client:
         if self.state is not None:
             raise FileExistsError("任务已存在；使用 reconcile/wait/status，不重复 submit")
         self.prepare(load_plan(plan_path))
+        return self._submit_prepared()
+
+    def retry_preflight(self):
+        # 健康检查没有入队副作用；只在从未 push/detach 的已存计划上恢复准备。
+        if self.state["submission"] != "NOT_ATTEMPTED" or self.state["detachment_attempts"] != 0:
+            raise ValueError("已尝试提交，须 reconcile 原任务，不能重做准备")
+        for directory in self.state["phases"]:
+            intent = json.loads((Path(directory) / "INTENT.json").read_text("utf-8"))
+            if intent["phase"] != "health":
+                raise ValueError("已尝试推送或其他操作；原结果待核，不能自动重做")
+        return self._submit_prepared()
+
+    def _submit_prepared(self):
         rc, stdout, _, _ = self.call("health", ["health"])
         if rc or not re.search(r"^XDEV_HEALTH OK\s*$", stdout, re.M):
             self.checkpoint(status="CHANNEL_NOT_READY")
@@ -411,7 +424,7 @@ def main(argv=None):
     wait.add_argument("--max", type=int, default=60)
     collect = sub.add_parser("collect")
     collect.add_argument("--output", type=Path)
-    for name in ("status", "timings", "reconcile", "verify-collection"):
+    for name in ("status", "timings", "reconcile", "retry-preflight", "verify-collection"):
         sub.add_parser(name)
     args = parser.parse_args(argv)
     if not math.isfinite(args.client_timeout) or not 0 < args.client_timeout <= 86400:
@@ -443,6 +456,8 @@ def main(argv=None):
                 rc = client.collect(args.output)
             elif args.command == "reconcile":
                 rc = client.reconcile()
+            elif args.command == "retry-preflight":
+                rc = client.retry_preflight()
             elif args.command == "verify-collection":
                 rc = client.verify_collection()
             else:
