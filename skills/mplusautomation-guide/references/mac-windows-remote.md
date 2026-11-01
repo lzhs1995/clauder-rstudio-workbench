@@ -1,5 +1,8 @@
 # Mac 编写与核验，Windows 执行 Mplus
 
+后续 20 成员真实批次、服务中断和 worker 恢复的独立证据见
+[真实长任务与效率](remote-longtask-evidence.md)。下文保留较早合成试验的原测量边界。
+
 适用情形：Mplus 许可证、原始输入和既有运行环境位于 Windows，而 agent 在 Mac。
 使用已安装的 `cross-device-remote` skill；唯一入口为
 `~/.agents/skills/cross-device-remote/scripts/xdev`。不要启动另一套常驻队列。
@@ -18,6 +21,8 @@
    绕过环境默认值而重新探测路径，不能仅凭设置环境变量声称已固定引擎。
 5. 记录输入/数据哈希、种子、积分、起点、PROCESSORS、引擎版本和唯一任务名。
    有效结果要求正常终止、诊断检查与数值核验，不能只看进程退出码。
+   取回后用[独立输出核验](remote-output-acceptance.md)检查当前字节与完整成员集合；
+   RESULT 存在或包装器 DONE/0 不等于统计结果已通过。
 6. Windows 完成后生成只含所需输出的目录及文件清单，一次取回并复核 SHA256。
    用新目录保存图表、报告和新结果；不覆盖迁移原件或现役 CC Switch 技能目录。
 

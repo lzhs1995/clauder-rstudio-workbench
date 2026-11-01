@@ -107,6 +107,13 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [remote-longtask-evidence.md](references/remote-longtask-evidence.md):
+  a verified 20-member remote batch, actual interruption costs, the extra orphan
+  rerun, PowerShell wrapper encoding, and limits of long-task reliability claims.
+- [remote-output-acceptance.md](references/remote-output-acceptance.md):
+  independent saved-batch verification after remote execution, negative controls
+  for stale or non-normal output, and recovery of engines whose controller exited.
+
 - [charls-son-urban-full-mi-20261023.md](references/charls-son-urban-full-mi-20261023.md):
   the original Windows 20-MI provenance repair and complete independent readback,
   restored from its unmerged historical guide branch. Keep C3/C4 semantics,
