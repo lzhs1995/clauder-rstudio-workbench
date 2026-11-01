@@ -8,6 +8,8 @@ Windows 继续执行原批次，Mac 退出或等待到期后先查原任务。
 积分、起点、原 cap 和实际调用次数仍由具名研究合同与 Windows 执行器约束。
 特别是旧探针 worker 的“缺 RESULT 就重算”路径不能因换了 Mac 客户端而自动启用。
 worker 中断先按 [保存输出与恢复核验](remote-output-acceptance.md) 处理。
+已有完整基准输出的批次可配合 [Windows 执行器](durable-windows-worker.md)：
+永久调用意图、独立超时监督和完整输出复核均留在 Windows 原工作目录。
 
 ## 一次计划，提交后用原状态目录
 

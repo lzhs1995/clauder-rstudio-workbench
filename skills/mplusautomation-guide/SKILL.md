@@ -41,6 +41,8 @@ Use the general workflows below for the other supported model families.
 批处理通过不代表 RStudio/ClaudeR 界面链通过，也不自动恢复已延期的研究家族。
 需要在 Mac 退出后接续批次时，用 [可接续客户端](references/durable-remote-client.md)
 的 submit / reconcile / wait / collect 入口；同一状态目录只提交一次，并保留实际分阶段计时。
+已有基准输出的复现批次可用 [Windows 批次执行器](references/durable-windows-worker.md)：
+独立监督进程延续原 cap，永久调用记录防止重复启动；中断后先核原进程、输出与累计预算。
 
 ## Windows Mplus优先资源执行
 
@@ -109,6 +111,9 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [durable-windows-worker.md](references/durable-windows-worker.md)：
+  Windows 原目录恢复、独立引擎监督、永久预算和实际进程退出判断；
+  与 Mac 客户端分工，原始保存输出复现与新增科研模型保持各自范围。
 - [remote-longtask-evidence.md](references/remote-longtask-evidence.md):
   a verified 20-member remote batch, actual interruption costs, the extra orphan
   rerun, PowerShell wrapper encoding, and limits of long-task reliability claims.
