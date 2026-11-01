@@ -519,10 +519,19 @@ class Client:
             return rc or 2
         actual = manifest(target)
         preflight = self.state["return_preflight_observation"]
-        if (preflight["kind"] == "mplus-output-export/1"
-                and actual.get("EXPORT_MANIFEST.json", {}).get("sha256") != preflight.get("manifest_sha256")):
-            self.checkpoint(collection_state="EXPORT_CHANGED_AFTER_PREFLIGHT")
-            raise ValueError("Windows 预检后导出清单改变；原次保留，不采用本次取回")
+        if preflight["kind"] == "mplus-output-export/1":
+            # 传输回执只证明搬运一致；还须核回来的完整文件集与预检时固定的导出合同一致。
+            try:
+                if actual.get("EXPORT_MANIFEST.json", {}).get("sha256") != preflight.get("manifest_sha256"):
+                    raise ValueError("导出清单摘要改变")
+                exported = json.loads((target / "EXPORT_MANIFEST.json").read_bytes())
+                expected = exported["files"]
+                if not isinstance(expected, dict) or (
+                        {name: pin for name, pin in actual.items() if name != "EXPORT_MANIFEST.json"} != expected):
+                    raise ValueError("文件集、字节数或 SHA 与导出清单不一致")
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.checkpoint(collection_state="EXPORT_CHANGED_AFTER_PREFLIGHT")
+                raise ValueError("Windows 预检后导出内容改变；原次保留，不采用本次取回") from exc
         reported = {}
         for line in stdout.splitlines():
             match = re.fullmatch(r"  ([0-9a-f]{64})  (.+)", line)

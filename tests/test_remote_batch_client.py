@@ -27,6 +27,11 @@ def save():
     os.replace(tmp, rp)
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+def export_package():
+    files = {"models/member/model.out": b"synthetic stopped output\n"}
+    entries = {name: dict(sha256=digest(data), bytes=len(data)) for name, data in files.items()}
+    body = json.dumps(dict(schema="mplus-output-export/1", files=entries), sort_keys=True).encode()
+    return files, body
 op = args[0]
 if op == "health":
     print("XDEV_HEALTH OK" if control.get("health", True) else "XDEV_HEALTH STALE")
@@ -65,8 +70,10 @@ elif op == "run":
             print("MPLUS_EXPORT_REQUIRED", file=sys.stderr)
             sys.exit(2)
         token = "0" * 32 if control.get("return_preflight_wrong_token") else check[1]
+        kind = "mplus-output-export/1" if control.get("mplus_export") else "generic"
+        pin = digest(export_package()[1]) if control.get("mplus_export") else None
         print("XDEV_JSON " + json.dumps(dict(schema="xdev-return-preflight/1", token=token,
-              allowed=True, kind="generic", manifest_sha256=None)))
+              allowed=True, kind=kind, manifest_sha256=pin)))
         sys.exit(0)
     binding = re.search(r"# XDEV_BATCH_OBSERVE_V1 ([a-f0-9]+)", script)[1]
     name = re.search(r"name='([^']+)'", script)[1]
@@ -91,11 +98,25 @@ elif op == "wait":
 elif op == "pull-dir":
     target = pathlib.Path(args[2])
     target.mkdir(parents=True, exist_ok=True)
-    data = b'{"starts": 1, "synthetic": true}\n'
-    (target / "RESULT.json").write_bytes(data)
-    h = "0" * 64 if control.get("bad_hash") else digest(data)
-    print(f"  {h}  RESULT.json")
-    print(f"XDEV_PULLED_DIR {target} files=1 remote_files=1")
+    if control.get("mplus_export"):
+        files, manifest_body = export_package()
+        files["EXPORT_MANIFEST.json"] = manifest_body
+        change = control.get("export_change_after_preflight")
+        if change == "extra":
+            files["models/member/data.dat"] = b"synthetic late input copy\n"
+        elif change == "missing":
+            del files["models/member/model.out"]
+        elif change == "changed":
+            files["models/member/model.out"] = b"changed stopped output\n"
+    else:
+        files = {"RESULT.json": b'{"starts": 1, "synthetic": true}\n'}
+    for name, data in files.items():
+        path = target / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        h = "0" * 64 if control.get("bad_hash") else digest(data)
+        print(f"  {h}  {name}")
+    print(f"XDEV_PULLED_DIR {target} files={len(files)} remote_files={len(files)}")
 else:
     raise SystemExit("unexpected operation")
 '''
@@ -170,6 +191,42 @@ class ClientContractTests(unittest.TestCase):
             result = json.loads((Path(path) / "RESULT.json").read_text())
             self.assertGreaterEqual(result["elapsed_seconds"], 0)
             self.assertEqual(result["stdout_sha256"], hashlib.sha256((Path(path) / "stdout.txt").read_bytes()).hexdigest())
+
+    def test_pinned_mplus_export_collects_exact_declared_files(self):
+        self.control["mplus_export"] = True
+        self.write_control()
+        self.submit()
+        self.finish()
+        self.run_client("collect")
+        self.run_client("verify-collection")
+        self.assertEqual(self.read_state()["collection_state"], "FILES_VERIFIED")
+        self.assertEqual(set(json.loads((self.state / "COLLECTION.json").read_text())["files"]),
+                         {"EXPORT_MANIFEST.json", "models/member/model.out"})
+
+    def assert_export_change_refused(self, change):
+        # 预检后才改变返回目录；伪 xdev 对实际搬运的所有字节仍给出正确 SHA。
+        self.control.update(mplus_export=True, export_change_after_preflight=change)
+        self.write_control()
+        self.submit()
+        self.finish()
+        self.run_client("collect", expected=2)
+        state = self.read_state()
+        self.assertEqual(state["status"], "FINISHED")
+        self.assertEqual(state["collection_state"], "EXPORT_CHANGED_AFTER_PREFLIGHT")
+        self.assertFalse((self.state / "COLLECTION.json").exists())
+        self.assertTrue((self.output / "EXPORT_MANIFEST.json").exists())
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        self.assertEqual(sum(row[0] == "pull-dir" for row in self.calls()), 1)
+
+    def test_post_preflight_added_input_is_not_accepted_as_export(self):
+        self.assert_export_change_refused("extra")
+        self.assertTrue((self.output / "models/member/data.dat").exists())
+
+    def test_post_preflight_missing_output_is_not_accepted_as_export(self):
+        self.assert_export_change_refused("missing")
+
+    def test_post_preflight_changed_output_is_not_accepted_as_export(self):
+        self.assert_export_change_refused("changed")
 
     def test_duplicate_submit_never_calls_detach_twice(self):
         self.submit()
