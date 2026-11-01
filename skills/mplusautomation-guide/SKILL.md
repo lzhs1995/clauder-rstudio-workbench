@@ -107,6 +107,11 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [charls-son-urban-full-mi-20261023.md](references/charls-son-urban-full-mi-20261023.md):
+  the original Windows 20-MI provenance repair and complete independent readback,
+  restored from its unmerged historical guide branch. Keep C3/C4 semantics,
+  predictor-matrix checks, GH07-to-GH15 start identity and the inference boundary.
+
 - [native-worker-and-quadrature-recovery.md](references/native-worker-and-quadrature-recovery.md): bind native Rterm/Rscript jobs by identity, separate startup and estimation failures, preserve free-format outputs, and calibrate quadrature before complete-MI inference.
 
 
