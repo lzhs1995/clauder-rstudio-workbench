@@ -36,6 +36,10 @@ worker 中断先按 [保存输出与恢复核验](remote-output-acceptance.md) �
 `payload` 只列本次确需传输的脚本或小型输入；原研究数据可以继续放在 Windows。
 路径相对于计划文件解析；Windows 路径要求绝对地址或明确的 `%变量%` 根。
 `return_dir` 应为 worker 完成后不会继续写入的结果目录，不能把整个用户目录取回。
+使用 `durable_mplus_worker.py` 时，先在 Windows 执行其 `export`，把 `return_dir`
+指向新导出的目录。客户端按计划取回整个 `return_dir`，不会自动识别或排除个体
+数据；直接指向原 `run` 会把其中的数据副本一并取回。导出规则与完整启动正文见
+[Windows 执行器](durable-windows-worker.md)。
 
 ~~~sh
 B="$HOME/.agents/skills/mplusautomation-guide/scripts/remote_batch_client.py"

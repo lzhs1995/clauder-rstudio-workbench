@@ -114,6 +114,25 @@ def verify_member(source, returned, member, tolerance, provenance_only):
     if not set(removed).issubset(set(expected) - {"model.inp"}):
         raise Rejected("Removed-input list names an undeclared input or model.inp")
     removed_not_reread = []
+    excluded, excluded_not_reread = {}, []
+    exclusions_path = returned / "RETURN_INPUT_EXCLUSIONS.json"
+    if exclusions_path.exists() or exclusions_path.is_symlink():
+        exclusions, exclusion_pin = document(exclusions_path)
+        binding, binding_pin = document(returned / "BATCH_BINDING.json")
+        if not isinstance(exclusions, dict) or not isinstance(exclusions.get("members"), dict) or not isinstance(binding, dict):
+            raise Rejected("Invalid returned input-exclusion document")
+        entry = exclusions["members"].get(member, {})
+        if not isinstance(entry, dict):
+            raise Rejected("Invalid member input-exclusion record")
+        excluded = entry.get("inputs", {})
+        if (exclusions.get("schema") != "mplus-return-input-exclusions/1"
+                or exclusions.get("binding_sha256") != binding_pin["sha256"]
+                or entry.get("result_sha256") != result_pin["sha256"]
+                or binding.get("jobs", {}).get(member, {}).get("inputs") != runtime_inputs
+                or not isinstance(excluded, dict) or not set(excluded).issubset(set(runtime_inputs) - {"model.inp"})
+                or any(runtime_inputs[name] != pin for name, pin in excluded.items())):
+            raise Rejected("Returned input-exclusion receipt is not bound to the original result and inputs")
+        pins.extend((exclusion_pin, binding_pin))
     for name, digest in expected.items():
         safe_name(name)
         _, original_pin = snapshot(src / name)
@@ -131,6 +150,8 @@ def verify_member(source, returned, member, tolerance, provenance_only):
                 raise Rejected(f"Returned input differs: {name}")
         elif name in removed:
             removed_not_reread.append(name)
+        elif name in excluded:
+            excluded_not_reread.append(name)
         else:
             raise Rejected(f"Returned input is missing without a removal receipt: {name}")
     comparison = {}
@@ -173,6 +194,7 @@ def verify_member(source, returned, member, tolerance, provenance_only):
             "probe_cap_seconds": result.get("probe_cap_seconds"),
             "provenance_only_inputs_verified": sorted(set(expected) & provenance_only),
             "input_copy_bytes_no_longer_available_for_independent_read": removed_not_reread,
+            "input_copy_bytes_excluded_from_return": excluded_not_reread,
             "compare": comparison, "pins": pins}
 
 

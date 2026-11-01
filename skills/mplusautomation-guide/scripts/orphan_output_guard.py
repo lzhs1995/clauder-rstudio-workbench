@@ -62,7 +62,7 @@ def verify_pins(pins):
             raise Rejected("A pinned source or output changed during recovery verification")
 
 
-def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=(), probe=process_state):
+def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=(), probe=process_state, cap_seconds=None):
     source, work = Path(source).resolve(), Path(work).resolve()
     member = safe_name(member)
     src, dst = source / "models" / member, work / "models" / member
@@ -72,6 +72,9 @@ def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=
     try:
         if not math.isfinite(tolerance) or tolerance < 0:
             raise Rejected("Invalid numeric tolerance")
+        if cap_seconds is not None and (isinstance(cap_seconds, bool)
+                or not isinstance(cap_seconds, (float, int)) or not math.isfinite(cap_seconds) or cap_seconds <= 0):
+            raise Rejected("Invalid original engine cap")
         if source == work or dst.is_symlink() or (work / "models").is_symlink():
             raise Rejected("Recovery work must be a separate non-symlink directory")
         contract, pin = document(source / "contracts/RUN_CONTRACT.json")
@@ -138,6 +141,9 @@ def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=
                 raise Rejected("Saved output aliases the original: " + name)
             if int(new_pin["mtime_ns"]) / 1e9 + 2 < created:
                 raise Rejected("Saved output predates the recorded engine start: " + name)
+            # 只作超过期限的下界证据；不能拿文件时间差推断精确耗时或剩余预算。
+            if cap_seconds is not None and int(new_pin["mtime_ns"]) / 1e9 - created > cap_seconds:
+                raise Rejected("Orphan output was written after its original cap: " + name)
             comparison[name] = {"original_sha256": old_pin["sha256"], "saved_sha256": new_pin["sha256"]}
             if name == "model.out":
                 if normalized_out(original) != normalized_out(saved):

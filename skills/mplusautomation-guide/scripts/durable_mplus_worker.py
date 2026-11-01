@@ -154,6 +154,13 @@ def live_guardian(claim, work, member):
             if (abs(observed.create_time() - claim["created"]) > 1e-3
                     or process_finished(observed)):
                 return False
+            # 已退出进程的权限读取存在短暂竞态；有界等原 PID，仍活且不可读才 HOLD。
+            try:
+                observed.wait(timeout=.2)
+            except psutil.TimeoutExpired:
+                pass
+            else:
+                return False
         except psutil.NoSuchProcess:
             return False
         except psutil.Error:
@@ -329,6 +336,9 @@ def guardian(work, member):
         if (attempt / "CLAIM.json").exists():
             return 75  # 永久领取记录不是过期锁；它保证同一意图不会第二次启动 Mplus。
         with recovery_lock(work):
+            # STOP 是下一次领取的边界；已经领取的引擎仍按原 cap 正常收尾。
+            if (work / "STOP").exists():
+                return 2
             for name, pin in intent["inputs"].items():
                 if digest(dest / name) != pin:
                     raise Rejected("Staged input changed before engine launch")
@@ -340,63 +350,67 @@ def guardian(work, member):
         created = None
         started = time.monotonic()
         state, exit_code, started_engine = "LAUNCH_FAILED", None, False
+        error, cleanup_error = None, None
         try:
-            if (work / "STOP").exists():
-                state = "STOPPED_BEFORE_ENGINE"
-            else:
-                command = [binding["engine"]]
-                if binding["synthetic"]:
-                    command += ["-X", "utf8", binding["synthetic_script"]]
-                command.append("model.inp")
-                with (attempt / "engine.stdout.log").open("xb") as stdout, (attempt / "engine.stderr.log").open("xb") as stderr:
-                    proc = subprocess.Popen(command, cwd=dest, stdout=stdout, stderr=stderr, **detached_args())
-                started_engine = True
-                created = psutil.Process(proc.pid).create_time()
-                marker = {"pid": proc.pid, "created": created, "at": now(), "inputs": intent["inputs"],
-                          "attempt_id": intent["attempt_id"], "engine_sha256": binding["engine_sha256"],
-                          "host": host(), "boot_time": psutil.boot_time(), "supervisor": claim}
-                with recovery_lock(work):
-                    atomic_json(dest / "ENGINE_STARTED.json", marker, new=True)
-                state = "EXITED"
-                while True:
-                    elapsed = time.monotonic() - started
-                    observed_exit = proc.poll()
-                    # 即使本轮发现引擎已退出，也必须先核原期限；轮询空窗不能把超时变成功。
-                    if elapsed >= intent["cap_seconds"]:
-                        state = "TIMEOUT"
-                        if observed_exit is None:
-                            stop_owned(proc, created)
-                        break
-                    if observed_exit is not None:
-                        break
-                    atomic_json(attempt / "PROGRESS.json", {"at": now(), "stage": "ENGINE_RUNNING",
-                        "member": member, "attempt_id": intent["attempt_id"], "elapsed_seconds": elapsed,
-                        "cap_seconds": intent["cap_seconds"], "engine_pid": proc.pid})
-                    if (work / "STOP").exists():
-                        state = "STOPPED"
+            command = [binding["engine"]]
+            if binding["synthetic"]:
+                command += ["-X", "utf8", binding["synthetic_script"]]
+            command.append("model.inp")
+            with (attempt / "engine.stdout.log").open("xb") as stdout, (attempt / "engine.stderr.log").open("xb") as stderr:
+                proc = subprocess.Popen(command, cwd=dest, stdout=stdout, stderr=stderr, **detached_args())
+            started_engine = True
+            created = psutil.Process(proc.pid).create_time()
+            marker = {"pid": proc.pid, "created": created, "at": now(), "inputs": intent["inputs"],
+                      "attempt_id": intent["attempt_id"], "engine_sha256": binding["engine_sha256"],
+                      "host": host(), "boot_time": psutil.boot_time(), "supervisor": claim}
+            with recovery_lock(work):
+                atomic_json(dest / "ENGINE_STARTED.json", marker, new=True)
+            state = "EXITED"
+            while True:
+                elapsed = time.monotonic() - started
+                observed_exit = proc.poll()
+                # 即使本轮发现引擎已退出，也必须先核原期限；轮询空窗不能把超时变成功。
+                if elapsed >= intent["cap_seconds"]:
+                    state = "TIMEOUT"
+                    if observed_exit is None:
                         stop_owned(proc, created)
-                        break
-                    remaining = intent["cap_seconds"] - (time.monotonic() - started)
-                    if remaining > 0:
-                        time.sleep(min(binding["poll_seconds"], remaining))
-                exit_code = proc.wait(timeout=15)
+                    break
+                if observed_exit is not None:
+                    break
+                atomic_json(attempt / "PROGRESS.json", {"at": now(), "stage": "ENGINE_RUNNING",
+                    "member": member, "attempt_id": intent["attempt_id"], "elapsed_seconds": elapsed,
+                    "cap_seconds": intent["cap_seconds"], "engine_pid": proc.pid})
+                remaining = intent["cap_seconds"] - (time.monotonic() - started)
+                if remaining > 0:
+                    time.sleep(min(binding["poll_seconds"], remaining))
+            exit_code = proc.wait(timeout=15)
         except BaseException as exc:
-            state = "SUPERVISOR_ERROR"
-            if proc is not None and proc.poll() is None and created is not None:
-                stop_owned(proc, created)
-                exit_code = proc.wait(timeout=15)
+            if state != "TIMEOUT":
+                state = "SUPERVISOR_ERROR"
             error = repr(exc)
-        else:
-            error = None
+            try:
+                if proc is not None and proc.poll() is None and created is not None:
+                    stop_owned(proc, created)
+                    exit_code = proc.wait(timeout=15)
+            except BaseException as cleanup_exc:
+                cleanup_error = repr(cleanup_exc)
+        # 清理自身失败也必须写出未知终态，不能让第二次 wait 异常抹去原回执。
+        if proc is not None and exit_code is None:
+            try:
+                exit_code = proc.poll()
+            except (OSError, psutil.Error) as poll_exc:
+                cleanup_error = repr(poll_exc)
         wall_seconds = time.monotonic() - started
         if state == "EXITED" and wall_seconds > intent["cap_seconds"]:
             state = "TIMEOUT"
         receipt = {"schema": "mplus-durable-engine-exit/1", "at": now(), "member": member,
                    "attempt_id": intent["attempt_id"], "engine_started": started_engine,
+                   "engine_exit_confirmed": not started_engine or exit_code is not None,
                    "engine_exit_code": exit_code, "engine_state": state,
                    "wall_seconds": wall_seconds, "cap_seconds": intent["cap_seconds"],
                    "inputs": intent["inputs"], "engine_sha256": binding["engine_sha256"],
-                   "guardian": claim, "synthetic": binding["synthetic"], "error": error}
+                   "guardian": claim, "synthetic": binding["synthetic"], "error": error,
+                   "cleanup_error": cleanup_error}
         with recovery_lock(work):
             atomic_json(attempt / "ENGINE_EXIT.json", receipt, new=True)
         return 0 if exit_code == 0 and state == "EXITED" else 2
@@ -462,7 +476,12 @@ class Worker:
                 receipt = load(folder / "ENGINE_EXIT.json")
                 if receipt["attempt_id"] != intent["attempt_id"] or receipt["inputs"] != intent["inputs"]:
                     raise Rejected("Engine receipt does not match its budget intent")
-                seconds += number(receipt["wall_seconds"], "observed engine duration", zero=True)
+                observed = number(receipt["wall_seconds"], "observed engine duration", zero=True)
+                if receipt.get("engine_exit_confirmed") is False:
+                    unknown.append(folder.name)
+                    seconds += max(observed, intent["cap_seconds"])
+                else:
+                    seconds += observed
                 actual_new_starts += int(receipt["engine_started"])
             else:
                 seconds += intent["cap_seconds"]
@@ -510,8 +529,7 @@ class Worker:
             folder.mkdir(exist_ok=True)
             intent = {"schema": "mplus-durable-engine-intent/1", "at": now(),
                       "attempt_id": uuid.uuid4().hex, "member": member, "inputs": inputs,
-                      "cap_seconds": cap, "host": host(),
-                      "admission_deadline": time.time() + self.binding["resource_contract"]["resource_wait_seconds"]}
+                      "cap_seconds": cap, "host": host()}
             atomic_json(intent_path, intent, new=True)
         return intent
 
@@ -519,26 +537,73 @@ class Worker:
         if self.binding["synthetic"]:
             return
         required = self.binding["resource_contract"]
-        while True:
-            if time.time() > intent["admission_deadline"] or (self.work / "STOP").exists():
-                raise Rejected("Original admission wait expired or STOP requested")
-            mem = memory_state()
-            cpu = psutil.cpu_percent(0.2)
-            others = [p.pid for p in psutil.process_iter(["name"]) if (p.info["name"] or "").lower() == "mplus.exe"]
-            if (not others and mem["available_gib"] >= required["minimum_available_gib"]
-                    and mem["commit_available_gib"] >= required["minimum_commit_available_gib"]
-                    and cpu <= required["max_cpu_percent"]):
-                return
-            if time.time() > intent["admission_deadline"] or (self.work / "STOP").exists():
-                raise Rejected("Original admission wait expired or STOP requested")
-            self.status("ADMISSION_WAIT", member, **mem, cpu_percent=cpu, other_mplus=others)
-            time.sleep(min(5, self.binding["poll_seconds"]))
+        started = time.monotonic()
+        window = number(required["resource_wait_seconds"], "resource wait window")
+        path = self.work / "attempts" / member / ("ADMISSION_" + uuid.uuid4().hex + ".json")
+        record = {"at": now(), "member": member, "attempt_id": intent["attempt_id"],
+                  "max_wait_seconds": window, "engine_budget_changed": False}
+        atomic_json(path, record, new=True)
+        state, error = "ADMITTED", None
+        try:
+            while True:
+                if time.monotonic() - started >= window or (self.work / "STOP").exists():
+                    raise Rejected("Resource admission window expired or STOP requested; resume can recheck the same intent")
+                mem = memory_state()
+                cpu = psutil.cpu_percent(min(.2, max(0, window - (time.monotonic() - started))))
+                others = [p.pid for p in psutil.process_iter(["name"]) if (p.info["name"] or "").lower() == "mplus.exe"]
+                if time.monotonic() - started >= window or (self.work / "STOP").exists():
+                    raise Rejected("Resource admission window expired or STOP requested; resume can recheck the same intent")
+                if (not others and mem["available_gib"] >= required["minimum_available_gib"]
+                        and mem["commit_available_gib"] >= required["minimum_commit_available_gib"]
+                        and cpu <= required["max_cpu_percent"]):
+                    return
+                self.status("ADMISSION_WAIT", member, **mem, cpu_percent=cpu, other_mplus=others)
+                time.sleep(min(5, self.binding["poll_seconds"], max(0, window - (time.monotonic() - started))))
+        except BaseException as exc:
+            state, error = "HOLD", repr(exc)
+            raise
+        finally:
+            atomic_json(path.with_suffix(".RESULT.json"), {**record, "finished_at": now(), "state": state,
+                        "elapsed_seconds": time.monotonic() - started, "error": error}, new=True)
+
+    def observe_unmarked_engines(self, member):
+        """仅报告同目录、同程序的可能引擎；不补造启动记录、不取得终止权。"""
+        dest = (self.work / "models" / member).resolve()
+        engine = os.path.normcase(str(Path(self.binding["engine"]).resolve()))
+        name = Path(engine).name.lower()
+        executable_paths = {engine}
+        if self.binding["synthetic"]:
+            # macOS Python 启动器与内核可执行路径不同；仅合成诊断接受本解释器路径。
+            executable_paths.add(os.path.normcase(str(Path(psutil.Process().exe()).resolve())))
+        matching, unreadable = [], []
+        for proc in psutil.process_iter(["name"]):
+            observed_name = (proc.info["name"] or "").lower()
+            if observed_name != name and not (self.binding["synthetic"] and observed_name.startswith("python")):
+                continue
+            try:
+                if os.path.normcase(str(Path(proc.exe()).resolve())) not in executable_paths or Path(proc.cwd()).resolve() != dest:
+                    continue
+                if not process_finished(proc):
+                    matching.append({"pid": proc.pid, "created": proc.create_time(), "exe": proc.exe(),
+                                     "cwd": str(dest), "has_model_input": "model.inp" in [Path(x).name.lower() for x in proc.cmdline()[1:]]})
+            except psutil.NoSuchProcess:
+                continue
+            except (psutil.Error, OSError):
+                unreadable.append(proc.pid)
+        note = {"at": now(), "member": member, "matching_processes": matching,
+                "unreadable_candidate_pids": unreadable, "observation_only": True, "new_process_authority": False}
+        path = self.work / "attempts" / member / ("UNMARKED_ENGINE_OBSERVATION_" + uuid.uuid4().hex + ".json")
+        atomic_json(path, note, new=True)
+        return path
 
     def collect_member(self, member, intent):
         folder = self.work / "attempts" / member
         dest = self.work / "models" / member
-        options = {"provenance_only": self.binding["provenance_only"]}
+        options = {"provenance_only": self.binding["provenance_only"], "cap_seconds": intent["cap_seconds"]}
         marker_path = dest / "ENGINE_STARTED.json"
+        if not marker_path.exists():
+            note = self.observe_unmarked_engines(member)
+            raise Rejected("Missing engine-start record; a matching engine may still be running. Observation: " + str(note))
         if marker_path.exists():
             marker = load(marker_path)
             if (marker.get("host") != host() or marker.get("attempt_id") != intent["attempt_id"]
@@ -551,6 +616,7 @@ class Worker:
             if (receipt["attempt_id"] != intent["attempt_id"] or receipt["inputs"] != intent["inputs"]
                     or receipt["engine_sha256"] != self.binding["engine_sha256"]
                     or receipt["cap_seconds"] != intent["cap_seconds"]
+                    or receipt.get("engine_exit_confirmed") is False
                     or receipt["engine_exit_code"] != 0 or receipt["engine_state"] != "EXITED"):
                 raise Rejected("Engine did not terminate successfully: " + str(receipt.get("engine_state")))
             if number(receipt["wall_seconds"], "observed engine duration", zero=True) > intent["cap_seconds"]:
@@ -561,7 +627,11 @@ class Worker:
         if checked["decision"] == "WAIT_FOR_ORIGINAL_ENGINE":
             if time.time() > marker["created"] + intent["cap_seconds"]:
                 # 仅原预算到期才终止已严格绑定的本批原引擎；不是因为重启便收掉孤儿。
-                stop_owned(psutil.Process(marker["pid"]), marker["created"], reap_root=True)
+                try:
+                    original = psutil.Process(marker["pid"])
+                except psutil.NoSuchProcess:
+                    return None  # 查询后退出；下一次按原输出再核，不冒认成功或重复启动。
+                stop_owned(original, marker["created"], reap_root=True)
                 with recovery_lock(self.work):
                     atomic_json(folder / "RECOVERY_BUDGET_STOP.json", {"at": now(),
                         "attempt_id": intent["attempt_id"], "engine_exit_code": None,
@@ -581,7 +651,8 @@ class Worker:
             raise Rejected("Complete orphan outputs adopted separately; original exit/time budget remains unknown")
         if checked["decision"] != "REUSE_VERIFIED_RESULT":
             result = {"member": member, "at": now(), "engine_exit_code": 0, "engine_state": "EXITED",
-                      "status": "PASS_NUMERIC", "wall_seconds": receipt["wall_seconds"],
+                      "status": "PASS_IDENTICAL" if all(r["original_sha256"] == r["saved_sha256"]
+                          for r in checked["comparison"].values()) else "PASS_NUMERIC", "wall_seconds": receipt["wall_seconds"],
                       "probe_cap_seconds": intent["cap_seconds"], "inputs": intent["inputs"],
                       "removed_input_copies": [], "synthetic": self.binding["synthetic"],
                       "attempt_id": intent["attempt_id"], "engine_receipt_sha256": digest(exit_path),
@@ -623,6 +694,8 @@ class Worker:
                         return value
             elif time.monotonic() > deadline:
                 raise Rejected("Guardian claim not observed; preserve original intent and inspect its launch log")
+            elif (self.work / "STOP").exists():
+                raise Rejected("STOP requested before guardian claim; the reserved intent is preserved")
             if time.monotonic() - last_status >= 2:
                 last_status = time.monotonic()
                 self.status("OBSERVING_ORIGINAL_ENGINE", member, attempt_id=intent["attempt_id"])
@@ -651,9 +724,87 @@ class Worker:
                 self.status("BATCH_VERIFIED", done=len(results), total=len(results), budget=used,
                             complete_original_family=self.binding["complete_original_family"], synthetic=self.binding["synthetic"])
                 return 0
-            except (Rejected, OSError, ValueError, KeyError, TypeError) as exc:
+            except (Rejected, OSError, ValueError, KeyError, TypeError, psutil.Error) as exc:
                 self.status("HOLD", reason=str(exc), verified_members=len(results))
                 return 2
+
+
+def export_results(work, output):
+    """取回独立输出快照；不复制数据输入、不删除 Windows 副本、不改原 RESULT。"""
+    work, output = Path(work).absolute(), Path(output).absolute()
+    if work.is_symlink() or output.is_symlink() or output.exists():
+        raise Rejected("Export requires the original non-symlink work and a new output directory")
+    work, output = work.resolve(), output.resolve()
+    binding = load_binding(work)
+    source = Path(binding["source"]).resolve()
+    if any(a == b or a in b.parents or b in a.parents for a, b in ((work, output), (source, output))):
+        raise Rejected("Export must be independent of both original source and execution directories")
+    with file_lock(work / ".batch-worker.lock"), recovery_lock(work):
+        if binding != load_binding(work):
+            raise Rejected("Batch binding changed before export lock")
+        validate_binding(binding)
+        candidates = [work / name for name in ("BATCH_BINDING.json", "BATCH_BINDING_SHA256.json", "STATUS.json")]
+        omitted, pins = {}, []
+        for member in binding["members"]:
+            dest, attempt = work / "models" / member, work / "attempts" / member
+            if dest.is_symlink() or attempt.is_symlink():
+                raise Rejected("Export member is a symlink")
+            claim = attempt / "CLAIM.json"
+            if claim.exists() and live_guardian(load(claim), work, member):
+                raise Rejected("Original guardian is still active; wait before exporting")
+            inputs = binding["jobs"][member]["inputs"]
+            names = set(inputs) - {"model.inp"}
+            if names & (set(OUTPUTS) | {"RESULT.json", "ENGINE_STARTED.json"}):
+                raise Rejected("Input names collide with exportable outputs")
+            result_path = dest / "RESULT.json"
+            result_sha = None
+            if result_path.exists():
+                checked = verify_member(source, work, member, 1e-6, set(binding["provenance_only"]))
+                pins.extend(checked["pins"])
+                result_sha = digest(result_path)
+            for name in sorted(names):
+                if (dest / name).exists() or (dest / name).is_symlink():
+                    _, pin = snapshot(dest / name)
+                    pins.append(pin)
+                    if pin["sha256"] != inputs[name]:
+                        raise Rejected("Runtime input changed before export: " + member + "/" + name)
+            omitted[member] = {"inputs": {name: inputs[name] for name in sorted(names)},
+                               "result_sha256": result_sha}
+            candidates += [dest / name for name in (*OUTPUTS, "model.inp", "RESULT.json", "ENGINE_STARTED.json")]
+            candidates += [attempt / name for name in
+                ("INTENT.json", "CLAIM.json", "ENGINE_EXIT.json", "PROGRESS.json", "RECOVERY_BUDGET_STOP.json",
+                 "engine.stdout.log", "engine.stderr.log")]
+            for pattern in ("SUPERVISOR_LAUNCH_*.json", "supervisor_*.log", "ADMISSION_*.json", "UNMARKED_ENGINE_OBSERVATION_*.json"):
+                candidates.extend(sorted(attempt.glob(pattern)))
+            candidates.append(work / "recovery_adoptions" / (member + ".json"))
+        output.mkdir(parents=True, exist_ok=False)
+        files = {}
+        for path in candidates:
+            if not path.exists() and not path.is_symlink():
+                continue
+            data, pin = snapshot(path)
+            pins.append(pin)
+            relative = path.relative_to(work).as_posix()
+            target = output / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("xb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            files[relative] = {"bytes": len(data), "sha256": pin["sha256"]}
+        verify_pins(pins)
+        exclusions = {"schema": "mplus-return-input-exclusions/1", "at": now(), "source_work": str(work),
+                      "binding_sha256": digest(work / "BATCH_BINDING.json"), "members": omitted,
+                      "deleted_from_windows_by_export": False, "original_results_modified": False}
+        atomic_json(output / "RETURN_INPUT_EXCLUSIONS.json", exclusions, new=True)
+        files["RETURN_INPUT_EXCLUSIONS.json"] = {"bytes": (output / "RETURN_INPUT_EXCLUSIONS.json").stat().st_size,
+                                                "sha256": digest(output / "RETURN_INPUT_EXCLUSIONS.json")}
+        manifest = {"schema": "mplus-output-export/1", "at": now(), "source_work": str(work),
+                    "directory": str(output), "files": files, "input_copies_excluded": True,
+                    "numerical_validation": "REQUIRED_SEPARATELY", "engine_calls": 0}
+        atomic_json(output / "EXPORT_MANIFEST.json", manifest, new=True)
+        return {"stage": "OUTPUTS_EXPORTED", "directory": str(output), "files": len(files) + 1,
+                "manifest_sha256": digest(output / "EXPORT_MANIFEST.json"), "engine_calls": 0}
 
 
 def main(argv=None):
@@ -666,10 +817,16 @@ def main(argv=None):
     child = modes.add_parser("guardian")
     child.add_argument("--work", type=Path, required=True)
     child.add_argument("--member", required=True)
+    export = modes.add_parser("export", help="Export only declared results and logs; input data remain on Windows")
+    export.add_argument("--work", type=Path, required=True)
+    export.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
+        if args.mode == "export":
+            print(json.dumps(export_results(args.work, args.out), ensure_ascii=False), flush=True)
+            return 0
         return guardian(args.work, args.member) if args.mode == "guardian" else Worker(args.work, args.plan, args.synthetic_test).run()
-    except (Rejected, OSError, ValueError, KeyError, TypeError) as exc:
+    except (Rejected, OSError, ValueError, KeyError, TypeError, psutil.Error) as exc:
         print(json.dumps({"stage": "REFUSED", "reason": str(exc)}, ensure_ascii=False), flush=True)
         return 75
 

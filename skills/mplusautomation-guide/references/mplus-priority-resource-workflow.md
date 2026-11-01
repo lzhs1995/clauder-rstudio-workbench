@@ -114,3 +114,21 @@ Windows profile；在 WSL 中没有新鲜 profile 时，准入理由固定为
 `host_memory_unverified`，而不是用 WSL 数字猜测。profile 默认五分钟过期，
 每次 claim/tick 都重新读取。该机制只收紧准入，不会杀死 RStudio、WSL、MCP
 或其他会话；确认可恢复检查点后再由会话所有者清理外部协调进程。
+
+
+## Mac 控制时临时回收 WSL 的顺序
+
+在已授权的本批资源回收范围内，先确认并保存相关 Windows/WSL 会话，再暂停
+CC Switch 的 WSL 同步监督器 `supervise.py` 和它派生的 `cc_sync.py watch`，
+确认原进程已退出后才执行 `wsl --shutdown`。只停止同步子进程可能被监督器重启；
+只关闭 WSL 也可能因自动同步立即重新拉起。不要按程序名全局杀 Python、WSL 或 agent。
+
+把原 PID、创建时间、完整启动命令及恢复入口记录在本批资源回执中，估计结束后
+沿原入口恢复监督器与同步，核实际进程。RStudio 是否重开单独记账，不能把同步
+恢复当成所有前台会话都已恢复。没有现成资源回收授权时，只读核负载并联系对应
+会话所有者，不把本次历史经验当作永久关闭其他会话的许可。
+
+PP-LGCM 2026-11-01 长测的执行方记录：关闭获准的 RStudio/WSL 后 Windows
+可用内存由约 2.1 GiB 升至 5.0 GiB，原同步已在 13:36Z 恢复。这是当时的资源
+状态变化，没有隔离证明 Mplus 加速的因果来源；完整计时见
+[真实长任务证据](remote-longtask-evidence.md)。

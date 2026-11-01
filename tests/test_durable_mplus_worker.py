@@ -216,6 +216,20 @@ class DurableMplusWorkerTests(unittest.TestCase):
             with self.assertRaisesRegex(worker.Rejected, "Guardian process is unreadable"):
                 worker.live_guardian(claim, self.work, self.members[0])
 
+    def test_guardian_permission_error_during_exit_is_reobserved(self):
+        release, ready = self.root / "exiting-release", self.root / "exiting-ready"
+        code = "from pathlib import Path\nimport sys,time\nPath(sys.argv[2]).touch()\nwhile not Path(sys.argv[1]).exists():time.sleep(.01)\n"
+        proc = self.child([sys.executable, "-c", code, str(release), str(ready), "guardian", str(self.work), self.members[0]], "exiting")
+        self.wait_path(ready)
+        observed = psutil.Process(proc.pid)
+        claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
+        def exiting_error(_process):
+            release.touch()
+            raise psutil.AccessDenied(proc.pid)
+        with mock.patch.object(psutil.Process, "cmdline", exiting_error):
+            self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
+        proc.wait(timeout=5)
+
     def test_second_coordinator_cannot_change_running_batch(self):
         self.configure(members=1, settings={"wait_before": True})
         first = self.launch_worker()
@@ -420,6 +434,169 @@ class DurableMplusWorkerTests(unittest.TestCase):
         dump(self.plan_path, self.plan)
         self.assertEqual(self.run_worker(), 2)
         self.assertEqual(self.starts(), 0)
+
+    def test_peer_d1_over_cap_orphan_is_not_adopted(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        intent = owner.prepare(member)
+        dest = self.work / "models" / member
+        dump(dest / "ENGINE_STARTED.json", {"pid": 2147483000, "created": time.time() - 30,
+            "host": worker.host(), "inputs": intent["inputs"], "attempt_id": intent["attempt_id"],
+            "engine_sha256": owner.binding["engine_sha256"]})
+        for name in worker.OUTPUTS:
+            (dest / name).write_bytes((self.source / "models" / member / name).read_bytes())
+        before = {p.name: p.read_bytes() for p in dest.iterdir()}
+        with self.assertRaisesRegex(worker.Rejected, "cap"):
+            owner.collect_member(member, intent)
+        self.assertFalse((self.work / "recovery_adoptions" / (member + ".json")).exists())
+        self.assertEqual({p.name: p.read_bytes() for p in dest.iterdir()}, before)
+        self.assertEqual(self.starts(), 0)
+
+    def test_peer_d2_stop_before_claim_does_not_spend_unique_start(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        owner.prepare(self.members[0])
+        (self.work / "STOP").touch()
+        self.assertNotEqual(worker.guardian(self.work, self.members[0]), 0)
+        self.assertFalse((self.work / "attempts" / self.members[0] / "CLAIM.json").exists())
+        self.assertEqual(self.starts(), 0)
+        (self.work / "STOP").unlink()
+        self.assertEqual(self.run_worker(), 0)
+        self.assertEqual(self.starts(), 1)
+
+    def test_peer_d2_stop_finishes_current_member_then_resumes_remaining(self):
+        self.configure(settings={"wait_before": True})
+        first = self.launch_worker()
+        dest = self.work / "models" / self.members[0]
+        self.wait_path(dest / "FAKE_STARTED")
+        (self.work / "STOP").touch()
+        time.sleep(.25)
+        self.assertIsNone(first.poll(), self.logs())
+        self.assertFalse((self.work / "attempts" / self.members[0] / "ENGINE_EXIT.json").exists())
+        (dest / "FAKE_RELEASE").touch()
+        self.assertEqual(first.wait(timeout=30), 2, self.logs())
+        self.assertTrue((dest / "RESULT.json").exists())
+        self.assertEqual(self.starts(), 1)
+        (self.work / "STOP").unlink()
+        self.assertEqual(self.run_worker(), 0)
+        self.assertEqual(self.starts(), 2)
+
+    def test_peer_d3_expired_admission_can_recheck_same_reserved_intent(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        intent = owner.prepare(self.members[0])
+        original = (self.work / "attempts" / self.members[0] / "INTENT.json").read_bytes()
+        # 只替换观测接口；本例不进入 Windows API 或引擎。
+        owner.binding["synthetic"] = False
+        owner.binding["resource_contract"]["resource_wait_seconds"] = .05
+        owner.binding["poll_seconds"] = .02
+        intent["admission_deadline"] = time.time() - 1
+        with mock.patch.object(worker, "memory_state", return_value={"available_gib": 0, "commit_available_gib": 0}), \
+                mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
+                mock.patch.object(worker.psutil, "process_iter", return_value=[]):
+            with self.assertRaises(worker.Rejected):
+                owner.admit(self.members[0], intent)
+        with mock.patch.object(worker, "memory_state", return_value={"available_gib": 100, "commit_available_gib": 100}), \
+                mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
+                mock.patch.object(worker.psutil, "process_iter", return_value=[]):
+            owner.admit(self.members[0], intent)
+        self.assertEqual((self.work / "attempts" / self.members[0] / "INTENT.json").read_bytes(), original)
+        self.assertFalse((self.work / "attempts" / self.members[0] / "CLAIM.json").exists())
+        self.assertEqual(owner.budget()["reserved_calls"], 1)
+        self.assertEqual(self.starts(), 0)
+
+    def test_peer_d5_process_disappearance_leaves_durable_hold(self):
+        with mock.patch.object(worker.Worker, "run_member", side_effect=psutil.NoSuchProcess(2147483000)):
+            self.assertEqual(self.run_worker(), 2)
+        self.assertEqual(read(self.work / "STATUS.json")["stage"], "HOLD")
+        self.assertEqual(self.starts(), 0)
+
+    def test_peer_d4_export_keeps_data_on_windows_and_preserves_original_results(self):
+        self.assertEqual(self.run_worker(), 0)
+        before = {member: (self.work / "models" / member / "RESULT.json").read_bytes() for member in self.members}
+        # 未声明文件不能因处在工作目录就被整目录带回。
+        (self.work / "models" / self.members[0] / "participant_extra.csv").write_text("synthetic-private,1\n")
+        output = self.root / "return"
+        self.assertEqual(worker.main(["export", "--work", str(self.work), "--out", str(output)]), 0)
+        self.assertEqual(verify_batch(self.source, output)["status"], "BATCH_OUTPUTS_VERIFIED")
+        self.assertFalse(any(p.name in {"data.dat", "fixture.json", "participant_extra.csv"} for p in output.rglob("*")))
+        for member in self.members:
+            self.assertTrue((self.work / "models" / member / "data.dat").exists())
+            self.assertEqual((self.work / "models" / member / "RESULT.json").read_bytes(), before[member])
+            self.assertEqual((output / "models" / member / "RESULT.json").read_bytes(), before[member])
+        original = read(output / "RETURN_INPUT_EXCLUSIONS.json")
+        for key in ("result_sha256", "inputs"):
+            bad = json.loads(json.dumps(original))
+            if key == "result_sha256":
+                bad["members"][self.members[0]][key] = "0" * 64
+            else:
+                bad["members"][self.members[0]][key]["data.dat"] = "0" * 64
+            dump(output / "RETURN_INPUT_EXCLUSIONS.json", bad)
+            self.assertEqual(verify_batch(self.source, output)["status"], "REVIEW_REQUIRED")
+        dump(output / "RETURN_INPUT_EXCLUSIONS.json", original)
+        self.assertEqual(self.starts(), 2)
+
+    def test_peer_d4_failed_batch_exports_diagnostics_without_input_data(self):
+        self.configure(members=1, settings={"invalid_output": True})
+        self.assertEqual(self.run_worker(), 2)
+        output = self.root / "failed-return"
+        self.assertEqual(worker.main(["export", "--work", str(self.work), "--out", str(output)]), 0)
+        self.assertTrue((output / "models" / self.members[0] / "model.out").exists())
+        self.assertFalse(any(p.name in {"data.dat", "fixture.json"} for p in output.rglob("*")))
+        self.assertEqual(verify_batch(self.source, output)["status"], "REVIEW_REQUIRED")
+        self.assertTrue((self.work / "models" / self.members[0] / "data.dat").exists())
+
+    def test_peer_d6_missing_marker_reports_matching_live_process_without_killing(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        intent = owner.prepare(member)
+        dest = self.work / "models" / member
+        command = "from pathlib import Path\nimport time\nPath('UNMARKED_READY').touch()\nwhile not Path('UNMARKED_RELEASE').exists():time.sleep(.02)\n"
+        proc = subprocess.Popen([sys.executable, "-c", command, "model.inp"], cwd=dest)
+        self.children.append(proc)
+        self.wait_path(dest / "UNMARKED_READY")
+        with self.assertRaises(worker.Rejected):
+            owner.collect_member(member, intent)
+        notes = list((self.work / "attempts" / member).glob("UNMARKED_ENGINE_OBSERVATION_*.json"))
+        self.assertEqual(len(notes), 1)
+        self.assertIn(proc.pid, [p["pid"] for p in read(notes[0])["matching_processes"]])
+        self.assertIsNone(proc.poll())
+        (dest / "UNMARKED_RELEASE").touch()
+        proc.wait(timeout=5)
+
+    def test_peer_d7_failed_termination_preserves_unknown_exit_and_budget(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        owner.prepare(member)
+        child = mock.Mock(pid=2147483000)
+        child.poll.return_value = None
+        child.wait.side_effect = subprocess.TimeoutExpired("synthetic-engine", 15)
+        identity = mock.Mock(pid=2147483000)
+        identity.create_time.return_value = 1700000000.0
+        identity.exe.return_value = str(Path(sys.executable).resolve())
+        with mock.patch.object(worker.subprocess, "Popen", return_value=child), \
+                mock.patch.object(worker.psutil, "Process", return_value=identity), \
+                mock.patch.object(worker.time, "monotonic", side_effect=[100.0, 113.0, 114.0]), \
+                mock.patch.object(worker, "stop_owned"):
+            self.assertEqual(worker.main(["guardian", "--work", str(self.work), "--member", member]), 2)
+        receipt = read(self.work / "attempts" / member / "ENGINE_EXIT.json")
+        self.assertIsNone(receipt["engine_exit_code"])
+        self.assertFalse(receipt["engine_exit_confirmed"])
+        self.assertEqual(owner.budget()["unsettled_members"], [member])
+        self.assertFalse((self.work / "models" / member / "RESULT.json").exists())
+
+    def test_peer_d8_byte_identical_output_has_matching_status(self):
+        self.configure(members=1)
+        self.assertEqual(self.run_worker(), 0)
+        self.assertEqual(read(self.work / "models" / self.members[0] / "RESULT.json")["status"], "PASS_IDENTICAL")
 
     @unittest.skipUnless(os.name == "nt", "Native Windows memory API")
     def test_windows_resource_observation_is_real(self):

@@ -46,13 +46,31 @@ $BatchRoot = Expand '%LOCALAPPDATA%\xdev\work\my-approved-batch'
 & 'C:\Users\LZHS\AppData\Local\Programs\Python\Python314\python.exe' -X utf8 -B `
   (Join-Path $BatchRoot 'tools\durable_mplus_worker.py') run `
   --plan (Join-Path $BatchRoot 'plan.json') --work (Join-Path $BatchRoot 'run')
-exit $LASTEXITCODE
+$RunExit = $LASTEXITCODE
+& 'C:\Users\LZHS\AppData\Local\Programs\Python\Python314\python.exe' -X utf8 -B `
+  (Join-Path $BatchRoot 'tools\durable_mplus_worker.py') export `
+  --work (Join-Path $BatchRoot 'run') --out (Join-Path $BatchRoot 'return')
+$ExportExit = $LASTEXITCODE
+if ($ExportExit -ne 0) { exit $ExportExit }
+exit $RunExit
 ```
 
 一起传入同版 `durable_mplus_worker.py`、`orphan_output_guard.py` 和
 `verify_saved_batch.py`；Windows Python 需已有 `psutil`。来源和运行目录必须分开，
 首次运行目录为空。代码与来源在 `BATCH_BINDING.json` 中固定，另存其摘要。
 改变计划、来源、代码或引擎后不能沿旧目录继续执行。
+
+外层计划的 `return_dir` 指向本次新建的 `return`，不能指向 `run`。`export` 保留
+声明的输出、INP 和诊断日志，排除所有非 INP 输入副本及未声明文件；原 Windows
+数据与 RESULT 字节不改。单独的 `RETURN_INPUT_EXCLUSIONS.json` 绑定原 RESULT、
+输入 SHA 与 BATCH_BINDING；`EXPORT_MANIFEST.json` 固定导出文件集。失败批次也可
+导出诊断，导出成功不代表统计结果通过；上例保留原运行的非零退出码。
+
+导出目录必须是独立的新路径，且没有活跃的原监督器。恢复后再次导出时用新的
+返回目录，同时更新新恢复包装器的 `return_dir`；不要覆盖已核收的返回快照。
+独立数值读取器需要原 source。个体数据仅留 Windows 时，在 Windows 运行
+`verify_saved_batch.py`，Mac 核回执、输出及传输清单；不能为满足 Mac 端读取器而
+补传原数据，也不能把 Mac 文件 SHA 核验宣称为重新独立读取了 Windows 数据。
 
 ## 中断时如何接续
 
@@ -67,6 +85,10 @@ exit $LASTEXITCODE
 - 监督进程和退出回执都丢失，但引擎已经退出、输出完整：另写采用回执，保留
   未知退出码和未知剩余预算；不自动启动下一成员。若原引擎仍活着，保持观察，
   仅在它原有 cap 到期时按严格身份结束本批自己的引擎树。
+- 输出写入时间晚于原进程创建时间加 cap 时，拒绝孤儿采用；这个时间差仅证明
+  输出晚于期限，不能用来估算实际引擎耗时或剩余预算。
+- 启动记录丢失时，另存同程序、同工作目录的进程观察，提示可能仍有引擎运行。
+  观察本身不授予终止权，不补造 ENGINE_STARTED。
 
 `attempts/<member>/INTENT.json` 在启动前永久保留一次调用和时间预算；
 `CLAIM.json` 保证同一意图最多启动一次，即使两个迟到监督器同时出现。
@@ -80,7 +102,15 @@ exit $LASTEXITCODE
 采用退出回执时还要独立确认实测耗时没有超过原 cap；保存输出和退出码正常并不足够。
 这个口径约束的是执行器观察到的完成时间，不伪称掌握系统没有记录的精确退出时刻。
 
-Mac 等待上限与引擎 cap 分开；在运行目录写 `STOP` 只针对本批新引擎。
+Mac 等待上限与引擎 cap 分开。在运行目录写 `STOP` 后，已领取的成员按原 cap
+完成并核验，后续成员不再领取；领取前收到 STOP 不消耗唯一启动。解除 STOP 后
+在原目录接续，不删除永久 CLAIM。它是停止新增工作的命令，不是紧急终止命令。
+
+资源准入等待每次有独立的单调时钟期限和 ADMISSION 回执。超时后没有启动引擎，
+可在原目录重新检查同一预留意图；调用次数和引擎时间预留不重置，旧等待记录保留。
+终止本批引擎失败时仍保存退出回执，退出码记未知、预算保持未结算；不得因已有
+回执文件而启动下一成员。
+
 程序不会按 `Mplus.exe` 名字批量杀进程。系统保持唤醒请求是尽力措施，不能代替
 实际电源、登录和联网条件，也没有保证 Windows 注销或断电后自动继续。
 
@@ -117,3 +147,13 @@ Windows 共覆盖 19 项，来自完整套件的 18 项通过和 1 项定向补�
 两处检查移除后两个负例都失败，等价改写仍通过，实验副本已恢复原 SHA。
 本次测试全为合成，Windows 套件用时 375.92 秒，取回核验用时 19.16 秒；
 这不是 Mplus 性能比较，也没有重跑原研究。前述首轮失败与验收原件继续保留。
+
+2026-11-02 的交叉审查修订 `07f9536b` 增加了上述 STOP、准入恢复、孤儿 cap、
+未知退出和输出导出处理。Mac 完整 32 项为 31 通过、1 Windows API 跳过；同一
+源码在 Windows 完整 32/32 通过。另两套独立 guard/保存结果读取器在两端均为
+18/18 和 13/13 通过。Windows 执行器套件用时 609.89 秒，包含独立读取器的
+整段验证用时 672.18 秒；1512 个合成证据文件取回并核 SHA 用时 18.54 秒。
+
+五个分别移除 cap、导出文件过滤、结果绑定、输入绑定、未知退出预算保护的变体
+均被指定测试检出；等价改写通过，实验代码恢复原 SHA。原旧版失败保留。这轮
+没有运行真实 Mplus，不能把 Python 合成进程测试数写成模型估计数。

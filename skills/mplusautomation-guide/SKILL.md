@@ -43,6 +43,8 @@ Use the general workflows below for the other supported model families.
 的 submit / reconcile / wait / collect 入口；同一状态目录只提交一次，并保留实际分阶段计时。
 已有基准输出的复现批次可用 [Windows 批次执行器](references/durable-windows-worker.md)：
 独立监督进程延续原 cap，永久调用记录防止重复启动；中断后先核原进程、输出与累计预算。
+取回前在 Windows 用该执行器的 `export` 生成仅含声明输出与日志的新目录，外层
+`return_dir` 指向此目录，个体输入副本留在 Windows；`collect` 本身不会过滤数据。
 
 ## Windows Mplus优先资源执行
 
