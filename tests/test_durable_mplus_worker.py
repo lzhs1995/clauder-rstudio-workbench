@@ -528,7 +528,8 @@ class DurableMplusWorkerTests(unittest.TestCase):
             self.assertTrue((self.work / "models" / member / "data.dat").exists())
             self.assertEqual((self.work / "models" / member / "RESULT.json").read_bytes(), before[member])
             self.assertEqual((output / "models" / member / "RESULT.json").read_bytes(), before[member])
-        original = read(output / "RETURN_INPUT_EXCLUSIONS.json")
+        original_bytes = (output / "RETURN_INPUT_EXCLUSIONS.json").read_bytes()
+        original = json.loads(original_bytes)
         for key in ("result_sha256", "inputs"):
             bad = json.loads(json.dumps(original))
             if key == "result_sha256":
@@ -537,7 +538,11 @@ class DurableMplusWorkerTests(unittest.TestCase):
                 bad["members"][self.members[0]][key]["data.dat"] = "0" * 64
             dump(output / "RETURN_INPUT_EXCLUSIONS.json", bad)
             self.assertEqual(verify_batch(self.source, output)["status"], "REVIEW_REQUIRED")
-        dump(output / "RETURN_INPUT_EXCLUSIONS.json", original)
+        # 恢复完整原字节，避免 JSON 重新排版留下与导出清单不符的测试快照。
+        (output / "RETURN_INPUT_EXCLUSIONS.json").write_bytes(original_bytes)
+        for relative, item in read(output / "EXPORT_MANIFEST.json")["files"].items():
+            self.assertEqual(hashlib.sha256((output / relative).read_bytes()).hexdigest(),
+                             item["sha256"], relative)
         self.assertEqual(self.starts(), 2)
 
     def test_peer_d4_failed_batch_exports_diagnostics_without_input_data(self):
