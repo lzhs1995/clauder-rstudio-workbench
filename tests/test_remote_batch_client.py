@@ -1,0 +1,325 @@
+"""只运行本机假 xdev：验证中断、重复提交、错误绑定和独立取回，不调用 Windows/Mplus。"""
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+
+CLIENT = Path(os.environ.get("REMOTE_BATCH_CLIENT",
+                            Path(__file__).resolve().parents[1] / "skills/mplusautomation-guide/scripts/remote_batch_client.py"))
+FAKE = r'''
+import hashlib, json, os, pathlib, re, sys, time
+root = pathlib.Path(os.environ["FAKE_XDEV_HOME"])
+control = json.loads((root / "control.json").read_text())
+args = sys.argv[1:]
+with (root / "calls.jsonl").open("a") as f:
+    f.write(json.dumps(args) + "\n")
+rp = root / "remote.json"
+remote = json.loads(rp.read_text()) if rp.exists() else {}
+def save():
+    rp.write_text(json.dumps(remote))
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+op = args[0]
+if op == "health":
+    print("XDEV_HEALTH OK" if control.get("health", True) else "XDEV_HEALTH STALE")
+    sys.exit(0 if control.get("health", True) else 3)
+elif op == "push":
+    data = pathlib.Path(args[1]).read_bytes()
+    remote.setdefault("payload", {})[args[2]] = digest(data)
+    save()
+    print(f"XDEV_PUSHED {args[2]} sha256={digest(data)} bytes={len(data)} job=100")
+elif op == "detach":
+    name, path = args[1:]
+    if control.get("collision"):
+        remote.update(name=name, body="someone else's body")
+        save()
+        print("XDEV_DETACH_FAILED rc=3 job=101 NAME_EXISTS", file=sys.stderr)
+        sys.exit(3)
+    if "body" in remote:
+        print("DUPLICATE DETACH", file=sys.stderr)
+        sys.exit(99)
+    remote.update(name=name, body=pathlib.Path(path).read_text(), waits=0)
+    save()
+    if control.get("slow_detach"):
+        time.sleep(control["slow_detach"])
+    if control.get("lost_ack"):
+        print("XDEV_WAITING id=101", file=sys.stderr)
+        sys.exit(124)
+    print(f"XDEV_DETACHED {name} dir=C:\\xdev\\jobs\\{name} pid=123 job=101")
+elif op == "run":
+    script = pathlib.Path(args[1]).read_text()
+    binding = re.search(r"# XDEV_BATCH_OBSERVE_V1 ([a-f0-9]+)", script)[1]
+    name = re.search(r"name='([^']+)'", script)[1]
+    body = remote.get("body", "")
+    matches = bool(body) and ("'" + body.replace("'", "''") + "'") in script
+    if control.get("bad_binding"):
+        matches = False
+    result = dict(schema="xdev-batch-binding-observation/1", binding_id=binding, name=name,
+                  exists=bool(body), matches=matches, body_sha256=digest(body.encode()),
+                  dir="C:\\xdev\\jobs\\" + name)
+    print("XDEV_JSON " + json.dumps(result))
+    print("XDEV_RC job=102 rc=0", file=sys.stderr)
+elif op == "wait":
+    remote["waits"] += 1
+    save()
+    if remote["waits"] <= control.get("running_waits", 1):
+        print(f"XDEV_STILL_RUNNING {args[1]} (later: xdev wait {args[1]})")
+        sys.exit(124)
+    rc = control.get("remote_rc", 0)
+    print(f"XDEV_STATE {args[1]} DONE rc={rc} finished=2026-11-01T00:00:00Z")
+    sys.exit(rc & 255)
+elif op == "pull-dir":
+    target = pathlib.Path(args[2])
+    target.mkdir(parents=True, exist_ok=True)
+    data = b'{"starts": 1, "synthetic": true}\n'
+    (target / "RESULT.json").write_bytes(data)
+    h = "0" * 64 if control.get("bad_hash") else digest(data)
+    print(f"  {h}  RESULT.json")
+    print(f"XDEV_PULLED_DIR {target} files=1 remote_files=1")
+else:
+    raise SystemExit("unexpected operation")
+'''
+
+
+class ClientContractTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.fake = self.root / "fake-xdev"
+        self.fake.write_text("#!" + sys.executable + "\n" + FAKE)
+        self.fake.chmod(0o700)
+        self.control = {}
+        self.write_control()
+        self.env = {**os.environ, "FAKE_XDEV_HOME": str(self.root)}
+        self.launcher = self.root / "含 空格.ps1"
+        self.launcher.write_text("'synthetic launcher'\nexit 0\n", encoding="utf-8")
+        self.payload = self.root / "input.txt"
+        self.payload.write_text("synthetic only", encoding="utf-8")
+        self.state = self.root / "state"
+        self.output = self.root / "returned"
+        self.plan = self.root / "plan.json"
+        self.plan.write_text(json.dumps({
+            "schema": "xdev-batch-plan/1", "name": "test-batch",
+            "launcher": str(self.launcher), "return_dir": r"%LOCALAPPDATA%\xdev\work\test\results",
+            "output_dir": str(self.output),
+            "payload": [{"local": str(self.payload), "remote": r"%LOCALAPPDATA%\xdev\work\test\input.txt"}]
+        }, ensure_ascii=False), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write_control(self):
+        (self.root / "control.json").write_text(json.dumps(self.control))
+
+    def command(self, *args, timeout=5):
+        return [sys.executable, "-B", str(CLIENT), "--state", str(self.state),
+                "--xdev", str(self.fake), "--client-timeout", str(timeout), *args]
+
+    def run_client(self, *args, expected=0, timeout=5):
+        result = subprocess.run(self.command(*args, timeout=timeout), env=self.env,
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        return result
+
+    def read_state(self):
+        return json.loads((self.state / "TASK.json").read_text())
+
+    def calls(self):
+        path = self.root / "calls.jsonl"
+        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+    def submit(self, expected=0, **kwargs):
+        return self.run_client("submit", "--plan", str(self.plan), expected=expected, **kwargs)
+
+    def finish(self, rc=0):
+        self.run_client("wait", "--max", "1", expected=124)
+        self.run_client("wait", "--max", "1", expected=rc)
+
+    def test_one_submit_wait_resume_collect_and_timing(self):
+        self.submit()
+        self.finish()
+        self.run_client("collect")
+        self.run_client("verify-collection")
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        state = self.read_state()
+        self.assertEqual(state["status"], "COLLECTED")
+        self.assertEqual(state["numerical_validation"], "REQUIRED_SEPARATELY")
+        for path in state["phases"]:
+            result = json.loads((Path(path) / "RESULT.json").read_text())
+            self.assertGreaterEqual(result["elapsed_seconds"], 0)
+            self.assertEqual(result["stdout_sha256"], hashlib.sha256((Path(path) / "stdout.txt").read_bytes()).hexdigest())
+
+    def test_duplicate_submit_never_calls_detach_twice(self):
+        self.submit()
+        calls = self.calls()
+        self.submit(expected=2)
+        self.assertEqual(calls, self.calls())
+
+    def test_unknown_detach_reconciles_exact_body_without_resubmit(self):
+        self.control["lost_ack"] = True
+        self.write_control()
+        self.submit(expected=124)
+        self.assertEqual(self.read_state()["submission"], "UNKNOWN")
+        self.run_client("wait", expected=2)
+        self.run_client("reconcile")
+        self.finish()
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        self.assertEqual(self.read_state()["detachment_attempts"], 1)
+
+    def test_local_timeout_keeps_remote_task_and_recovers(self):
+        self.control["slow_detach"] = 1
+        self.write_control()
+        self.submit(expected=124, timeout=0.25)
+        self.run_client("reconcile")
+        self.finish()
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        phase = Path(self.read_state()["phases"][2]) / "RESULT.json"
+        self.assertTrue(json.loads(phase.read_text())["local_wait_timed_out"])
+
+    def test_name_collision_cannot_adopt_other_job(self):
+        self.control["collision"] = True
+        self.write_control()
+        self.submit(expected=3)
+        self.run_client("reconcile", expected=2)
+        self.run_client("wait", expected=2)
+        self.assertEqual(self.read_state()["submission"], "REJECTED")
+
+    def test_original_launcher_can_change_but_frozen_body_is_reused(self):
+        self.control["lost_ack"] = True
+        self.write_control()
+        self.submit(expected=124)
+        self.launcher.write_text("'new development version'\nexit 1\n")
+        self.payload.write_text("new development payload")
+        self.run_client("reconcile")
+        self.finish()
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_tampered_frozen_launcher_refuses_recovery(self):
+        self.control["lost_ack"] = True
+        self.write_control()
+        self.submit(expected=124)
+        Path(self.read_state()["launcher_snapshot"]).write_text("tampered")
+        calls = self.calls()
+        self.run_client("reconcile", expected=2)
+        self.assertEqual(calls, self.calls())
+
+    def test_tampered_return_hash_refuses_collection(self):
+        self.control["bad_hash"] = True
+        self.write_control()
+        self.submit()
+        self.finish()
+        self.run_client("collect", expected=2)
+        self.assertEqual(self.read_state()["collection_state"], "HASH_OR_FILESET_MISMATCH")
+        self.assertNotEqual(self.read_state()["status"], "COLLECTED")
+
+    def test_preexisting_output_is_preserved(self):
+        self.submit()
+        self.finish()
+        self.output.mkdir()
+        (self.output / "user.txt").write_text("keep")
+        self.run_client("collect", expected=2)
+        self.assertEqual((self.output / "user.txt").read_text(), "keep")
+        self.assertFalse(any(row[0] == "pull-dir" for row in self.calls()))
+
+    def test_failed_remote_job_preserves_actual_exit_and_collects_diagnostics(self):
+        self.control["remote_rc"] = 9
+        self.write_control()
+        self.submit()
+        self.finish(rc=9)
+        self.run_client("collect", expected=9)
+        self.assertEqual(self.read_state()["remote_exit_code"], 9)
+        self.assertEqual(self.read_state()["status"], "COLLECTED")
+
+    def test_negative_remote_exit_code_not_lost_in_shell_encoding(self):
+        self.control["remote_rc"] = -9
+        self.write_control()
+        self.submit()
+        self.finish(rc=1)
+        self.assertEqual(self.read_state()["remote_exit_code"], -9)
+
+    def test_collected_file_change_is_detected_without_new_pull(self):
+        self.submit()
+        self.finish()
+        self.run_client("collect")
+        (self.output / "RESULT.json").write_text("changed")
+        calls = self.calls()
+        self.run_client("collect", expected=2)
+        self.assertEqual(calls, self.calls())
+
+    def test_aliased_windows_payload_paths_rejected_before_side_effects(self):
+        plan = json.loads(self.plan.read_text())
+        plan["payload"].append({"local": str(self.payload), "remote": r"%LOCALAPPDATA%/xdev/work/test/INPUT.txt"})
+        self.plan.write_text(json.dumps(plan))
+        self.submit(expected=2)
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.calls(), [])
+
+    def test_same_state_lock_rejects_second_client(self):
+        self.control["slow_detach"] = 0.8
+        self.write_control()
+        process = subprocess.Popen(self.command("submit", "--plan", str(self.plan)),
+                                   env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            end = time.monotonic() + 4
+            while not (self.state / "TASK.json").exists() and time.monotonic() < end:
+                time.sleep(0.02)
+            self.run_client("status")  # 等待/传输期间仍能只读状态。
+            self.run_client("wait", expected=2)
+            out, err = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 0, out + err)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_timing_does_not_invent_engine_or_queue_durations(self):
+        self.submit()
+        result = self.run_client("timings")
+        timing = json.loads(result.stdout)
+        self.assertIsNone(timing["windows_engine_seconds"])
+        self.assertIsNone(timing["windows_queue_seconds"])
+        self.assertEqual(timing["local_call_counts"]["detach"], 1)
+        self.assertGreater(timing["local_call_seconds"]["push"], 0)
+
+    def test_phase_directory_left_before_journal_append_does_not_block_observation(self):
+        self.submit()
+        count = len(self.read_state()["phases"])
+        leftover = self.state / f"phase-{count:03d}-reconcile"
+        leftover.mkdir()
+        (leftover / "INTENT.json").write_text('{"unfinished_old_directory": true}')
+        self.run_client("reconcile")
+        self.assertTrue((leftover / "INTENT.json").exists())
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_client_process_exit_after_detach_intent_recovers_original(self):
+        self.control["slow_detach"] = 0.5
+        self.write_control()
+        process = subprocess.Popen(self.command("submit", "--plan", str(self.plan)),
+                                   env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            end = time.monotonic() + 4
+            while not (self.root / "remote.json").exists() and time.monotonic() < end:
+                time.sleep(0.02)
+            # push 也会写 remote.json；须等到假远端已创建原任务。
+            while "body" not in json.loads((self.root / "remote.json").read_text()) and time.monotonic() < end:
+                time.sleep(0.02)
+            process.kill()
+            process.communicate(timeout=2)
+            self.run_client("reconcile")
+            self.finish()
+            self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+
+if __name__ == "__main__":
+    unittest.main()

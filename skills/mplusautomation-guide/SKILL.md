@@ -39,6 +39,8 @@ Use the general workflows below for the other supported model families.
 原任务恢复、两端耗时、技能版本合并和 PP-LGCM 的当前科学边界。
 显式设置 `MPLUS_COMMAND`；`run_mplus_model()` 默认读取该值，显式 `command=` 优先。
 批处理通过不代表 RStudio/ClaudeR 界面链通过，也不自动恢复已延期的研究家族。
+需要在 Mac 退出后接续批次时，用 [可接续客户端](references/durable-remote-client.md)
+的 submit / reconcile / wait / collect 入口；同一状态目录只提交一次，并保留实际分阶段计时。
 
 ## Windows Mplus优先资源执行
 
