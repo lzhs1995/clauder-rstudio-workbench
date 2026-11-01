@@ -358,16 +358,27 @@ def guardian(work, member):
                 with recovery_lock(work):
                     atomic_json(dest / "ENGINE_STARTED.json", marker, new=True)
                 state = "EXITED"
-                while proc.poll() is None:
+                while True:
                     elapsed = time.monotonic() - started
+                    observed_exit = proc.poll()
+                    # 即使本轮发现引擎已退出，也必须先核原期限；轮询空窗不能把超时变成功。
+                    if elapsed >= intent["cap_seconds"]:
+                        state = "TIMEOUT"
+                        if observed_exit is None:
+                            stop_owned(proc, created)
+                        break
+                    if observed_exit is not None:
+                        break
                     atomic_json(attempt / "PROGRESS.json", {"at": now(), "stage": "ENGINE_RUNNING",
                         "member": member, "attempt_id": intent["attempt_id"], "elapsed_seconds": elapsed,
                         "cap_seconds": intent["cap_seconds"], "engine_pid": proc.pid})
-                    if elapsed >= intent["cap_seconds"] or (work / "STOP").exists():
-                        state = "TIMEOUT" if elapsed >= intent["cap_seconds"] else "STOPPED"
+                    if (work / "STOP").exists():
+                        state = "STOPPED"
                         stop_owned(proc, created)
                         break
-                    time.sleep(binding["poll_seconds"])
+                    remaining = intent["cap_seconds"] - (time.monotonic() - started)
+                    if remaining > 0:
+                        time.sleep(min(binding["poll_seconds"], remaining))
                 exit_code = proc.wait(timeout=15)
         except BaseException as exc:
             state = "SUPERVISOR_ERROR"
@@ -377,10 +388,13 @@ def guardian(work, member):
             error = repr(exc)
         else:
             error = None
+        wall_seconds = time.monotonic() - started
+        if state == "EXITED" and wall_seconds > intent["cap_seconds"]:
+            state = "TIMEOUT"
         receipt = {"schema": "mplus-durable-engine-exit/1", "at": now(), "member": member,
                    "attempt_id": intent["attempt_id"], "engine_started": started_engine,
                    "engine_exit_code": exit_code, "engine_state": state,
-                   "wall_seconds": time.monotonic() - started, "cap_seconds": intent["cap_seconds"],
+                   "wall_seconds": wall_seconds, "cap_seconds": intent["cap_seconds"],
                    "inputs": intent["inputs"], "engine_sha256": binding["engine_sha256"],
                    "guardian": claim, "synthetic": binding["synthetic"], "error": error}
         with recovery_lock(work):
@@ -539,6 +553,8 @@ class Worker:
                     or receipt["cap_seconds"] != intent["cap_seconds"]
                     or receipt["engine_exit_code"] != 0 or receipt["engine_state"] != "EXITED"):
                 raise Rejected("Engine did not terminate successfully: " + str(receipt.get("engine_state")))
+            if number(receipt["wall_seconds"], "observed engine duration", zero=True) > intent["cap_seconds"]:
+                raise Rejected("Engine duration exceeds its original cap; preserve outputs without accepting the member")
             if (dest / "RESULT.json").exists() and load(dest / "RESULT.json").get("engine_receipt_sha256") != digest(exit_path):
                 raise Rejected("Engine exit receipt changed after result acceptance")
         checked = assess_member(self.binding["source"], self.work, member, self.binding["engine"], **options)

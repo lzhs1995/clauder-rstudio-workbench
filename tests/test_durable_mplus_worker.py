@@ -359,6 +359,51 @@ class DurableMplusWorkerTests(unittest.TestCase):
         self.assertIn("receipt changed", read(self.work / "STATUS.json")["reason"])
         self.assertEqual(self.starts(), 2)
 
+    def test_over_cap_exit_receipt_is_not_accepted_before_result_publication(self):
+        self.assertEqual(self.run_worker(), 0)
+        member = self.members[0]
+        dest = self.work / "models" / member
+        receipt_path = self.work / "attempts" / member / "ENGINE_EXIT.json"
+        receipt = read(receipt_path)
+        receipt["wall_seconds"] = receipt["cap_seconds"] + 1
+        dump(receipt_path, receipt)
+        # 仅在合成夹具中模拟退出回执已有、RESULT 尚未发布的窗口。
+        (self.root / "prior_synthetic_result.json").write_bytes((dest / "RESULT.json").read_bytes())
+        (dest / "RESULT.json").unlink()
+        before = {name: (dest / name).read_bytes() for name in ("model.inp", "model.out", "estimates.dat", "tech3.dat")}
+        self.assertEqual(self.run_worker(), 2)
+        self.assertIn("exceeds its original cap", read(self.work / "STATUS.json")["reason"])
+        self.assertFalse((dest / "RESULT.json").exists())
+        self.assertEqual(read(receipt_path), receipt)
+        self.assertEqual(self.starts(), 2)
+        self.assertEqual({name: (dest / name).read_bytes() for name in before}, before)
+
+    def test_guardian_exit_observed_after_deadline_is_not_success(self):
+        # 受控单调时钟精确覆盖“轮询空窗中已退出”的边界，不用短 sleep 猜机器速度。
+        for elapsed, expected_rc in ((1.0, 0), (13.0, 2)):
+            with self.subTest(elapsed=elapsed):
+                self.work = self.root / ("clock-" + str(int(elapsed)))
+                controller = worker.Worker(self.work, self.plan_path, synthetic=True)
+                controller.initialize()
+                member = self.members[0]
+                controller.prepare(member)
+                child = mock.Mock(pid=2147483000)
+                child.poll.return_value = child.wait.return_value = 0
+                identity = mock.Mock(pid=2147483000)
+                identity.create_time.return_value = 1700000000.0
+                identity.exe.return_value = str(Path(sys.executable).resolve())
+                with mock.patch.object(worker.subprocess, "Popen", return_value=child), \
+                        mock.patch.object(worker.psutil, "Process", return_value=identity), \
+                        mock.patch.object(worker.time, "monotonic", side_effect=[100.0, 100.0 + elapsed, 100.0 + elapsed]), \
+                        mock.patch.object(worker, "stop_owned") as stop:
+                    rc = worker.main(["guardian", "--work", str(self.work), "--member", member])
+                self.assertEqual(rc, expected_rc)
+                receipt = read(self.work / "attempts" / member / "ENGINE_EXIT.json")
+                self.assertEqual(receipt["engine_exit_code"], 0)
+                self.assertEqual(receipt["engine_state"], "EXITED" if expected_rc == 0 else "TIMEOUT")
+                self.assertEqual(receipt["wall_seconds"], elapsed)
+                stop.assert_not_called()
+
     def test_legacy_directory_never_becomes_new_authority(self):
         self.work.mkdir()
         original = self.work / "worker.lock"
