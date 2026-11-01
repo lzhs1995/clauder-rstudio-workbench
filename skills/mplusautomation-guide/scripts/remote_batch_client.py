@@ -91,6 +91,103 @@ def windows_path(value):
     return value
 
 
+def windows_paths_overlap(left, right):
+    left, right = (ntpath.normcase(ntpath.normpath(value)) for value in (left, right))
+    try:
+        return ntpath.commonpath([left, right]) in (left, right)
+    except ValueError:
+        return False  # 不同盘符；环境变量别名另在 Windows 展开后复核。
+
+
+def return_preflight_script(return_dir, work_dir, token):
+    """生成取回前的 Windows 只读检查；不解析或重发模型启动正文。"""
+    return (
+        f"# XDEV_RETURN_PREFLIGHT_V1 {token}\n$ErrorActionPreference = 'Stop'\n"
+        f"$BatchReturn = Expand {ps_quote(windows_path(return_dir))}\n"
+        f"$BatchProtected = " + (f"Expand {ps_quote(windows_path(work_dir))}\n" if work_dir else "''\n")
+        + r'''
+function CanonicalBatchReturn([string]$Value) {
+  $Full = [IO.Path]::GetFullPath($Value)
+  if ($Full -eq [IO.Path]::GetPathRoot($Full)) { return $Full }
+  return $Full.TrimEnd([char[]]'\/')
+}
+function BatchPathsOverlap([string]$Left, [string]$Right) {
+  return ($Left.Equals($Right, [StringComparison]::OrdinalIgnoreCase) -or
+    $Left.StartsWith($Right.TrimEnd([char[]]'\/') + '\', [StringComparison]::OrdinalIgnoreCase) -or
+    $Right.StartsWith($Left.TrimEnd([char[]]'\/') + '\', [StringComparison]::OrdinalIgnoreCase))
+}
+$BatchReturn = CanonicalBatchReturn $BatchReturn
+if (-not (Test-Path -LiteralPath $BatchReturn -PathType Container)) { throw 'RETURN_DIRECTORY_MISSING' }
+if ($BatchProtected) {
+  $BatchProtected = CanonicalBatchReturn $BatchProtected
+  if (BatchPathsOverlap $BatchReturn $BatchProtected) { throw 'RETURN_OVERLAPS_MPLUS_WORK' }
+}
+$BatchBindingPath = Join-Path $BatchReturn 'BATCH_BINDING.json'
+$BatchKind = 'generic'
+$BatchManifestSHA = $null
+# 原研究目录的父目录也不能作为返回包；明确合成的测试现场可以保留诊断副本。
+foreach ($NestedBinding in (Get-ChildItem -LiteralPath $BatchReturn -Filter 'BATCH_BINDING.json' -File -Recurse -Force)) {
+  if ($NestedBinding.FullName -ieq $BatchBindingPath) { continue }
+  $NestedContract = [IO.File]::ReadAllText($NestedBinding.FullName) | ConvertFrom-Json
+  if ($NestedContract.schema -eq 'mplus-durable-plan/1' -and $NestedContract.synthetic -ne $true) {
+    throw 'RETURN_CONTAINS_MPLUS_TREE'
+  }
+}
+if ($BatchProtected -or (Test-Path -LiteralPath $BatchBindingPath)) {
+  $BatchBinding = [IO.File]::ReadAllText($BatchBindingPath) | ConvertFrom-Json
+  if ($BatchBinding.schema -ne 'mplus-durable-plan/1') { throw 'MPLUS_RETURN_BINDING_REQUIRED' }
+  $BatchManifestPath = Join-Path $BatchReturn 'EXPORT_MANIFEST.json'
+  $BatchExport = [IO.File]::ReadAllText($BatchManifestPath) | ConvertFrom-Json
+  if ($BatchExport.schema -ne 'mplus-output-export/1' -or $BatchExport.input_copies_excluded -ne $true) {
+    throw 'MPLUS_EXPORT_REQUIRED'
+  }
+  $BatchSourceWork = CanonicalBatchReturn $BatchExport.source_work
+  if (BatchPathsOverlap $BatchReturn $BatchSourceWork) { throw 'RETURN_OVERLAPS_MPLUS_WORK' }
+  if ($BatchProtected -and -not $BatchProtected.Equals($BatchSourceWork, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'MPLUS_EXPORT_WORK_DIFFERS'
+  }
+  if (-not $BatchReturn.Equals((CanonicalBatchReturn $BatchExport.directory), [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'MPLUS_EXPORT_DIRECTORY_DIFFERS'
+  }
+  $BatchExclusionPath = Join-Path $BatchReturn 'RETURN_INPUT_EXCLUSIONS.json'
+  $BatchExcluded = [IO.File]::ReadAllText($BatchExclusionPath) | ConvertFrom-Json
+  $BatchBindingSHA = (Get-FileHash -LiteralPath $BatchBindingPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($BatchExcluded.schema -ne 'mplus-return-input-exclusions/1' -or $BatchExcluded.binding_sha256 -ne $BatchBindingSHA) {
+    throw 'MPLUS_EXPORT_INPUT_BINDING_DIFFERS'
+  }
+  $BatchEntries = @(Get-Item -LiteralPath $BatchReturn -Force) + @(Get-ChildItem -LiteralPath $BatchReturn -Recurse -Force)
+  $BatchCount = 0
+  foreach ($Entry in $BatchEntries) {
+    if (($Entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'MPLUS_EXPORT_LINK_REFUSED' }
+    if ($Entry.PSIsContainer) { continue }
+    $Relative = $Entry.FullName.Substring($BatchReturn.Length + 1).Replace('\', '/')
+    if ($Relative -ceq 'EXPORT_MANIFEST.json') { continue }
+    $Property = $BatchExport.files.PSObject.Properties[$Relative]
+    if ($null -eq $Property -or $Entry.Length -ne $Property.Value.bytes) { throw 'MPLUS_EXPORT_FILESET_DIFFERS' }
+    if ((Get-FileHash -LiteralPath $Entry.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Property.Value.sha256) {
+      throw 'MPLUS_EXPORT_FILE_HASH_DIFFERS'
+    }
+    $BatchCount++
+  }
+  if ($BatchCount -ne @($BatchExport.files.PSObject.Properties).Count) { throw 'MPLUS_EXPORT_FILESET_DIFFERS' }
+  foreach ($Member in $BatchBinding.members) {
+    if ($Member -notmatch '\A[A-Za-z0-9][A-Za-z0-9_.-]*\z') { throw 'MPLUS_MEMBER_INVALID' }
+    foreach ($InputProperty in $BatchBinding.jobs.$Member.inputs.PSObject.Properties) {
+      $InputName = $InputProperty.Name
+      if ($InputName -ieq 'model.inp') { continue }
+      if ($InputName -match '[\\/:]' -or $InputName -in @('.', '..')) { throw 'MPLUS_INPUT_NAME_INVALID' }
+      $InputCopy = Join-Path (Join-Path (Join-Path $BatchReturn 'models') $Member) $InputName
+      if (Test-Path -LiteralPath $InputCopy) { throw 'MPLUS_INPUT_COPY_REFUSED' }
+    }
+  }
+  $BatchKind = 'mplus-output-export/1'
+  $BatchManifestSHA = (Get-FileHash -LiteralPath $BatchManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+''' + f"Emit @{{ schema='xdev-return-preflight/1'; token={ps_quote(token)}; allowed=$true; "
+        "kind=$BatchKind; directory=$BatchReturn; manifest_sha256=$BatchManifestSHA }\n"
+    )
+
+
 def load_plan(path):
     path = Path(path).expanduser().resolve()
     raw = path.read_bytes()
@@ -98,6 +195,10 @@ def load_plan(path):
     if plan.get("schema") != "xdev-batch-plan/1" or not NAME.fullmatch(plan.get("name", "")):
         raise ValueError("计划 schema 或唯一任务名无效")
     plan["return_dir"] = windows_path(plan.get("return_dir"))
+    if "mplus_work_dir" in plan:
+        plan["mplus_work_dir"] = windows_path(plan["mplus_work_dir"])
+        if windows_paths_overlap(plan["return_dir"], plan["mplus_work_dir"]):
+            raise ValueError("return_dir 不能包含或位于原 Mplus 运行目录内")
     for key in ("launcher", "output_dir"):
         if not isinstance(plan.get(key), str) or not plan[key]:
             raise ValueError(f"缺少 {key}")
@@ -374,6 +475,29 @@ class Client:
             raise ValueError("已取回文件发生变化；保留旧回执，不能继续声称核验通过")
         return 0
 
+    def check_return_directory(self):
+        plan = self.state["plan"]
+        token = uuid.uuid4().hex
+        probe = self.directory / ("return-observe-" + token + ".ps1")
+        exclusive_bytes(probe, return_preflight_script(plan["return_dir"], plan.get("mplus_work_dir"), token).encode("utf-8"))
+        rc, stdout, _, receipt = self.call("return_preflight", ["run", str(probe), "--timeout", "30", "--wait", "45"])
+        rows = []
+        for line in stdout.splitlines():
+            if line.startswith("XDEV_JSON "):
+                try:
+                    rows.append(json.loads(line[10:]))
+                except json.JSONDecodeError:
+                    pass
+        matched = [row for row in rows if row.get("schema") == "xdev-return-preflight/1" and row.get("token") == token]
+        if (rc != 0 or receipt["local_wait_timed_out"] or len(matched) != 1
+                or matched[0].get("allowed") is not True
+                or matched[0].get("kind") not in ("generic", "mplus-output-export/1")
+                or (plan.get("mplus_work_dir") and matched[0].get("kind") != "mplus-output-export/1")):
+            self.checkpoint(collection_state="RETURN_PREFLIGHT_REFUSED", return_preflight_observation=matched)
+            return rc or 2
+        self.checkpoint(return_preflight_observation=matched[0], return_preflight_receipt=receipt)
+        return 0
+
     def collect(self, output=None):
         if self.state["status"] == "COLLECTED":
             self.verify_collection()
@@ -385,12 +509,20 @@ class Client:
             raise ValueError("输出目录不能包含或位于本机状态目录内")
         if target.exists() and (not target.is_dir() or any(target.iterdir())):
             raise FileExistsError("输出目录非空；原次保留，另指定新的 --output 目录")
+        checked = self.check_return_directory()
+        if checked:
+            return checked
         rc, stdout, _, receipt = self.call("pull", ["pull-dir", self.state["plan"]["return_dir"], str(target)])
         summary = re.search(r"^XDEV_PULLED_DIR (.+) files=(\d+) remote_files=(\d+)\s*$", stdout, re.M)
         if rc != 0 or not summary or Path(summary[1]).resolve() != target:
             self.checkpoint(status="FINISHED", collection_state="UNCONFIRMED")
             return rc or 2
         actual = manifest(target)
+        preflight = self.state["return_preflight_observation"]
+        if (preflight["kind"] == "mplus-output-export/1"
+                and actual.get("EXPORT_MANIFEST.json", {}).get("sha256") != preflight.get("manifest_sha256")):
+            self.checkpoint(collection_state="EXPORT_CHANGED_AFTER_PREFLIGHT")
+            raise ValueError("Windows 预检后导出清单改变；原次保留，不采用本次取回")
         reported = {}
         for line in stdout.splitlines():
             match = re.fullmatch(r"  ([0-9a-f]{64})  (.+)", line)

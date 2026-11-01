@@ -36,9 +36,22 @@ worker 中断先按 [保存输出与恢复核验](remote-output-acceptance.md) �
 `payload` 只列本次确需传输的脚本或小型输入；原研究数据可以继续放在 Windows。
 路径相对于计划文件解析；Windows 路径要求绝对地址或明确的 `%变量%` 根。
 `return_dir` 应为 worker 完成后不会继续写入的结果目录，不能把整个用户目录取回。
+
+使用 `durable_mplus_worker.py` 的新计划还应填写 `mplus_work_dir`，指向 Windows
+原 `run` 目录；`return_dir` 指向该 worker 的独立 `export` 目录。客户端在本机
+拒绝两个目录重叠，并在 Windows 展开环境变量后复核。不要改写已有计划来补字段；
+旧状态目录继续按原计划核收。
+
+每次首次 collect 都先经一次有界 Windows 只读预检。原运行目录即使漏写上述字段，
+也会因缺少有效导出合同而被拒绝；包含非合成 Mplus 批次树的父目录同样拒绝。
+有效导出必须匹配来源工作目录、输入排除回执和完整文件清单，出现输入副本、额外
+文件或改变的摘要时不会开始 pull。明确标为合成的嵌套测试现场可随诊断包返回。
+普通 R 等结果目录仍按其原通用合同处理，客户端不会替它猜测哪些文件属于原始数据。
+预检失败或回执未知时保留原 FINISHED 状态和记录，不重提计算。预检与传输是两步，
+所以返回目录仍须已停止写入；取回后再核预检时的导出清单摘要及全部传输文件。
 使用 `durable_mplus_worker.py` 时，先在 Windows 执行其 `export`，把 `return_dir`
-指向新导出的目录。客户端按计划取回整个 `return_dir`，不会自动识别或排除个体
-数据；直接指向原 `run` 会把其中的数据副本一并取回。导出规则与完整启动正文见
+指向新导出的目录。Windows 执行器负责排除个体输入，客户端预检其导出合同后
+取回完整 `return_dir`；未经导出的原 `run` 会被拒绝。导出规则与完整启动正文见
 [Windows 执行器](durable-windows-worker.md)。
 
 ~~~sh
@@ -89,6 +102,7 @@ Mac 等待预算，不是 Mplus cap。客户端到期只结束自己的等待进
   `verify-collection` 可在后续使用前复核本地文件是否改变。
 - `timings`：分别汇总 health、push、detach、reconcile、wait、pull 调用。每项仍包含相应
   排队、执行与轮询；Windows 引擎时间和单独的队列时间未测时为 `null`。
+  新取回另列 `return_preflight`，不把这次目录和摘要检查算作引擎用时。
 
 `status` 与 `timings` 在另一个客户端持锁等待时仍可只读。实际 submit、reconcile、
 wait、collect 则由同一本地状态目录锁串行，防止两个 agent 同时改变其状态。

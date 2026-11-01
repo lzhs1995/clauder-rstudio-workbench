@@ -59,6 +59,15 @@ elif op == "detach":
     print(f"XDEV_DETACHED {name} dir=C:\\xdev\\jobs\\{name} pid=123 job=101")
 elif op == "run":
     script = pathlib.Path(args[1]).read_text()
+    check = re.search(r"# XDEV_RETURN_PREFLIGHT_V1 ([a-f0-9]+)", script)
+    if check:
+        if control.get("return_preflight_deny"):
+            print("MPLUS_EXPORT_REQUIRED", file=sys.stderr)
+            sys.exit(2)
+        token = "0" * 32 if control.get("return_preflight_wrong_token") else check[1]
+        print("XDEV_JSON " + json.dumps(dict(schema="xdev-return-preflight/1", token=token,
+              allowed=True, kind="generic", manifest_sha256=None)))
+        sys.exit(0)
     binding = re.search(r"# XDEV_BATCH_OBSERVE_V1 ([a-f0-9]+)", script)[1]
     name = re.search(r"name='([^']+)'", script)[1]
     body = remote.get("body", "")
@@ -250,6 +259,37 @@ class ClientContractTests(unittest.TestCase):
         self.assertEqual((self.output / "user.txt").read_text(), "keep")
         self.assertFalse(any(row[0] == "pull-dir" for row in self.calls()))
 
+    def test_mplus_work_overlap_rejected_before_any_submission(self):
+        plan = json.loads(self.plan.read_text())
+        plan["mplus_work_dir"] = r"%LOCALAPPDATA%\xdev\work\test\run"
+        for returned in (r"%LOCALAPPDATA%/xdev/work/test/RUN", r"%LOCALAPPDATA%\xdev\work\test",
+                         r"%LOCALAPPDATA%\xdev\work\test\run\models"):
+            plan["return_dir"] = returned
+            self.plan.write_text(json.dumps(plan))
+            self.submit(expected=2)
+            self.assertFalse(self.state.exists())
+            self.assertEqual(self.calls(), [])
+
+    def test_remote_return_refusal_prevents_data_transfer(self):
+        self.control["return_preflight_deny"] = True
+        self.write_control()
+        self.submit()
+        self.finish()
+        self.run_client("collect", expected=2)
+        self.assertEqual(self.read_state()["collection_state"], "RETURN_PREFLIGHT_REFUSED")
+        self.assertFalse(any(row[0] == "pull-dir" for row in self.calls()))
+        self.assertFalse(self.output.exists())
+        self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)
+
+    def test_unrelated_return_preflight_receipt_cannot_authorize_pull(self):
+        self.control["return_preflight_wrong_token"] = True
+        self.write_control()
+        self.submit()
+        self.finish()
+        self.run_client("collect", expected=2)
+        self.assertFalse(any(row[0] == "pull-dir" for row in self.calls()))
+        self.assertFalse(self.output.exists())
+
     def test_failed_remote_job_preserves_actual_exit_and_collects_diagnostics(self):
         self.control["remote_rc"] = 9
         self.write_control()
@@ -378,19 +418,36 @@ class ClientContractTests(unittest.TestCase):
         self.assertEqual(self.read_state()["detachment_attempts"], 0)
 
     def test_client_process_exit_after_detach_intent_recovers_original(self):
-        self.control["slow_detach"] = 0.5
-        self.write_control()
+        # 等确实已在远端提交、尚未写本地确认的信号，再结束本机客户端。
+        # 繁忙主机上的固定四秒等待可能仍停在 health/push，不能冒充 detach 故障。
+        ready = self.root / "detach-confirmation-ready"
+        harness = self.root / "hold_before_local_confirmation.py"
+        harness.write_text(
+            "import importlib.util,time\nfrom pathlib import Path\n"
+            f"spec=importlib.util.spec_from_file_location('tested_client',{str(CLIENT)!r})\n"
+            "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\n"
+            "original=m.Client.call\n"
+            "def call(self,phase,arguments):\n"
+            " result=original(self,phase,arguments)\n"
+            " if phase=='detach' and result[0]==0:\n"
+            f"  Path({str(ready)!r}).touch()\n"
+            "  time.sleep(30)\n"
+            " return result\n"
+            "m.Client.call=call\nraise SystemExit(m.main())\n"
+        )
+        self.client = harness
         process = subprocess.Popen(self.command("submit", "--plan", str(self.plan)),
                                    env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            end = time.monotonic() + 4
-            while not (self.root / "remote.json").exists() and time.monotonic() < end:
+            end = time.monotonic() + 20
+            while not ready.exists() and process.poll() is None and time.monotonic() < end:
                 time.sleep(0.02)
-            # push 也会写 remote.json；须等到假远端已创建原任务。
-            while "body" not in json.loads((self.root / "remote.json").read_text()) and time.monotonic() < end:
-                time.sleep(0.02)
+            self.assertTrue(ready.exists(), "Fault injection never reached the intended detach boundary")
+            self.assertIn("body", json.loads((self.root / "remote.json").read_text()))
+            self.assertEqual(self.read_state()["submission"], "INTENT")
             process.kill()
             process.communicate(timeout=2)
+            self.client = CLIENT
             self.run_client("reconcile")
             self.finish()
             self.assertEqual(sum(row[0] == "detach" for row in self.calls()), 1)

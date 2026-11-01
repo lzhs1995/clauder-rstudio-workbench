@@ -729,6 +729,31 @@ class Worker:
                 return 2
 
 
+def require_stopped_export_engine(dest, attempt):
+    """只读确认原引擎已结束；监督器退出不代表其子进程退出。"""
+    marker_path = dest / "ENGINE_STARTED.json"
+    if not marker_path.exists():
+        receipt_path = attempt / "ENGINE_EXIT.json"
+        if (attempt / "CLAIM.json").exists() and (
+                not receipt_path.exists() or load(receipt_path).get("engine_exit_confirmed") is not True):
+            raise Rejected("Engine-start record is missing and exit is unconfirmed; hold export")
+        return
+    marker = load(marker_path)
+    pid, created = marker["pid"], number(marker["created"], "engine creation time")
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        raise Rejected("Invalid engine PID before export")
+    try:
+        process = psutil.Process(pid)
+        if abs(process.create_time() - created) > 1e-3 or process_finished(process):
+            return
+    except psutil.NoSuchProcess:
+        return
+    except psutil.Error as exc:
+        raise Rejected("Original engine state is unreadable; hold export: " + type(exc).__name__) from exc
+    # 不终止进程，也不把未知退出回执改成成功；等原进程结束后再导出。
+    raise Rejected("Original engine is still active; wait before exporting")
+
+
 def export_results(work, output):
     """取回独立输出快照；不复制数据输入、不删除 Windows 副本、不改原 RESULT。"""
     work, output = Path(work).absolute(), Path(output).absolute()
@@ -752,6 +777,7 @@ def export_results(work, output):
             claim = attempt / "CLAIM.json"
             if claim.exists() and live_guardian(load(claim), work, member):
                 raise Rejected("Original guardian is still active; wait before exporting")
+            require_stopped_export_engine(dest, attempt)
             inputs = binding["jobs"][member]["inputs"]
             names = set(inputs) - {"model.inp"}
             if names & (set(OUTPUTS) | {"RESULT.json", "ENGINE_STARTED.json"}):

@@ -555,6 +555,64 @@ class DurableMplusWorkerTests(unittest.TestCase):
         self.assertEqual(verify_batch(self.source, output)["status"], "REVIEW_REQUIRED")
         self.assertTrue((self.work / "models" / self.members[0] / "data.dat").exists())
 
+    def test_peer_n2_export_waits_for_live_orphan_then_allows_exited_diagnostics(self):
+        self.configure(members=1, settings={"wait_after": True})
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        intent = owner.prepare(member)
+        dest, attempt = self.work / "models" / member, self.work / "attempts" / member
+        dump(attempt / "CLAIM.json", {"pid": 2147483000, "created": 1, "host": worker.host()})
+        proc = subprocess.Popen([sys.executable, str(self.fake), "model.inp"], cwd=dest)
+        self.children.append(proc)
+        self.wait_path(dest / "FAKE_OUTPUTS_READY")
+        dump(dest / "ENGINE_STARTED.json", {"pid": proc.pid, "created": psutil.Process(proc.pid).create_time(),
+             "inputs": intent["inputs"], "engine_sha256": owner.binding["engine_sha256"]})
+        before = (dest / "model.out").read_bytes()
+        output = self.root / "return-after-orphan"
+        with self.assertRaisesRegex(worker.Rejected, "engine is still active"):
+            worker.export_results(self.work, output)
+        self.assertFalse(output.exists())
+        self.assertIsNone(proc.poll())
+        self.assertEqual((dest / "model.out").read_bytes(), before)
+        (dest / "FAKE_RELEASE").touch()
+        proc.wait(timeout=10)
+        self.assertEqual(worker.export_results(self.work, output)["stage"], "OUTPUTS_EXPORTED")
+        self.assertFalse((output / "models" / member / "data.dat").exists())
+        self.assertFalse((output / "models" / member / "RESULT.json").exists())
+        self.assertEqual(read(output / "EXPORT_MANIFEST.json")["numerical_validation"], "REQUIRED_SEPARATELY")
+        self.assertEqual(self.starts(), 1)
+
+    def test_peer_n2_missing_start_and_unknown_exit_refuse_export(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        owner.prepare(member)
+        attempt = self.work / "attempts" / member
+        dump(attempt / "CLAIM.json", {"pid": 2147483000, "created": 1, "host": worker.host()})
+        output = self.root / "unmarked-return"
+        with self.assertRaisesRegex(worker.Rejected, "Engine-start record is missing"):
+            worker.export_results(self.work, output)
+        dump(attempt / "ENGINE_EXIT.json", {"engine_exit_confirmed": False})
+        with self.assertRaisesRegex(worker.Rejected, "Engine-start record is missing"):
+            worker.export_results(self.work, output)
+        self.assertFalse(output.exists())
+        self.assertEqual(self.starts(), 0)
+
+    def test_peer_n2_unreadable_original_engine_refuses_export(self):
+        self.configure(members=1)
+        owner = worker.Worker(self.work, self.plan_path, synthetic=True)
+        owner.initialize()
+        member = self.members[0]
+        owner.prepare(member)
+        dump(self.work / "models" / member / "ENGINE_STARTED.json", {"pid": 4242, "created": 1})
+        output = self.root / "unreadable-return"
+        with mock.patch.object(worker.psutil, "Process", side_effect=psutil.AccessDenied(4242)):
+            with self.assertRaisesRegex(worker.Rejected, "engine state is unreadable"):
+                worker.export_results(self.work, output)
+        self.assertFalse(output.exists())
+
     def test_peer_d6_missing_marker_reports_matching_live_process_without_killing(self):
         self.configure(members=1)
         owner = worker.Worker(self.work, self.plan_path, synthetic=True)
