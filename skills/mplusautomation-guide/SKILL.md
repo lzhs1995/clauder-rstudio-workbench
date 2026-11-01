@@ -1,6 +1,6 @@
 ---
 name: mplusautomation-guide
-description: Use when running or reproducing Mplus models from R with MplusAutomation, including APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
+description: Use when running or reproducing Mplus models from R with MplusAutomation, including Mac-to-Windows xdev execution, APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
 ---
 
 # MplusAutomation Guide
@@ -30,6 +30,15 @@ historical thesis source does not block these independent skill operations;
 manuscript adoption and historical reproduction retain their own requirements.
 The [APIM reference map](references/reference-map.md) indexes Chapter 4 lessons.
 Use the general workflows below for the other supported model families.
+
+## Mac 控制 Windows
+
+当 Mplus 仅安装在 Windows 时，Mac 负责代码、审阅与结果核验，通过
+`cross-device-remote` 的唯一入口 `xdev` 在 Windows 运行引擎。
+先读 [跨机接续与实测效率](references/mac-windows-remote.md)：它说明单次提交、
+原任务恢复、两端耗时、技能版本合并和 PP-LGCM 的当前科学边界。
+显式设置 `MPLUS_COMMAND`；`run_mplus_model()` 默认读取该值，显式 `command=` 优先。
+批处理通过不代表 RStudio/ClaudeR 界面链通过，也不自动恢复已延期的研究家族。
 
 ## Windows Mplus优先资源执行
 
@@ -102,11 +111,25 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 
 - [binary-observed-interaction-computation.md](references/binary-observed-interaction-computation.md):
-- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md): actual-input semantic checks after group/control migration, zero mixed-cluster diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
   avoid unnecessary integration for an observed binary moderator when the
   conditional Gaussian model has an equivalent known-class representation;
   calibrate all parameters and robust covariance before using it, and keep
   faster computation separate from admissibility and complete MI inference.
+
+- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md):
+  actual-input semantic checks after group/control migration, zero mixed-cluster
+  diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
+
+- [charls-factor-score-pilot.md](references/charls-factor-score-pilot.md),
+  [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md),
+  and [rstudio-foreground-diagnostic-recovery.md](references/rstudio-foreground-diagnostic-recovery.md):
+  preserved Windows-local lessons on bounded factor-score trials, control/MI
+  identity, and recovery after foreground diagnostics. Historical income wording
+  is clarified by the current estimand boundary in the cross-machine reference.
+
+- [artifact_manifest.py](scripts/artifact_manifest.py): build and verify complete
+  result-package hashes without self-reference. Pin the manifest hash outside
+  the package; byte integrity is separate from numerical validation.
 
 - [charls-roster-missingness.md](references/charls-roster-missingness.md):
   verify child/household crosswalks before within-family contrasts, distinguish

@@ -18,3 +18,13 @@ and, for one capability check, Windows symlink privilege. The run used the repos
 environment and inserted the current checkout first on `sys.path`, avoiding
 an older globally installed workbench package. The symlink-capability test was
 the only platform-privilege skip among the Windows-specific checks.
+
+## Stable file hashing on Windows Python 3.14
+
+The 2026-11-01 native check observed identical device, inode, size, mtime and
+SHA256, but path `stat` and handle `fstat` returned ctime values 11 ms apart.
+Both APIs were stable across the read. Compare each API before/after using its
+own ctime, and compare device/inode/size/mtime across the two APIs. Do not
+discard ctime stability checks entirely or label the differing API values as
+an actual file mutation. The manifest tests include that observed case and a
+real mid-read content change; the original false rejection is retained.

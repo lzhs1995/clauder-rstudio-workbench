@@ -1,0 +1,88 @@
+# Mac 编写与核验，Windows 执行 Mplus
+
+适用情形：Mplus 许可证、原始输入和既有运行环境位于 Windows，而 agent 在 Mac。
+使用已安装的 `cross-device-remote` skill；唯一入口为
+`~/.agents/skills/cross-device-remote/scripts/xdev`。不要启动另一套常驻队列。
+
+## 接续顺序
+
+1. 读原接续 Prompt、最新专题交接、家族覆盖表及终态回执。已完成估计先复用。
+   迁移时的暂停由用户后来的具体恢复指令更新；传输成功本身不授权估计。
+2. `xdev health` 返回 OK 后，记录 Windows R、包、Mplus 路径、可用内存和现有
+   Mplus 进程。一次先提交一个模型；Windows 内存和其他任务共同决定并发。
+3. 在 Mac 的新工作目录编写完整脚本，用 `xdev rscript ... --out <新目录>`，
+   或用 `xdev detach <唯一名字> worker.ps1` 在 Windows 运行一个有界批次。
+   原始数据留在已有 Windows 目录；只复制本批确需的输入到隔离工作目录。
+4. 明确设置 `MPLUS_COMMAND` 为 Windows 完整 exe 路径。helper 的默认 `command`
+   读取这个环境变量；显式 `command=` 可覆盖。旧 helper 的 `command=""` 会
+   绕过环境默认值而重新探测路径，不能仅凭设置环境变量声称已固定引擎。
+5. 记录输入/数据哈希、种子、积分、起点、PROCESSORS、引擎版本和唯一任务名。
+   有效结果要求正常终止、诊断检查与数值核验，不能只看进程退出码。
+6. Windows 完成后生成只含所需输出的目录及文件清单，一次取回并复核 SHA256。
+   用新目录保存图表、报告和新结果；不覆盖迁移原件或现役 CC Switch 技能目录。
+
+## 等待和预算
+
+`xdev run --timeout` 是 Windows 短命令的运行上限；`--wait` 是客户端等回执的
+上限。迟到回执用 `xdev result <job_id>` 取回。不要因客户端超时再派原命令。
+
+`xdev wait <name> --max` 及 `rscript --max` 控制等待，**不会终止模型**。
+等待到期后继续 `xdev wait <原名>`，再 `pull-dir` 原工作目录。
+研究模型的预算必须在 Windows worker 内执行，例如对本次新建的 processx
+子进程设置 timeout 并 cleanup_tree；只监督自己的进程树。保留原失败和已用预算。
+
+2026-11-01 的恢复试验只提交一个 25 秒无模型任务：首次等待返回 124，
+原名续等返回 DONE/0，Windows 回执 starts=1。它证明等待到期恢复，未模拟断网、
+休眠、重启或整夜任务。Rscript 链不等于原生 RStudio/ClaudeR 链。
+
+## 测量与选择
+
+2026-11-01 在同一 Windows Mplus 9 / R 4.5.2 / MplusAutomation 1.2 上，
+完成三组配对：每组 helper 合成回归，然后以完全相同 INP/DAT 直接运行 Mplus。
+六个估计均正常终止，每对三行参数的估计与标准误差为零。
+
+| 组 | Windows 整段 R 脚本 | 直接引擎 | Mac 完整往返 |
+|---|---:|---:|---:|
+| 1 | 24.61 s | 0.43 s | 69.253 s |
+| 2 | 17.04 s | 0.57 s | 68.359 s |
+| 3 | 16.67 s | 0.41 s | 69.243 s |
+
+Mac 往返含两次输入推送、后台提交、轮询、打包及输出下载。二者的差值还含
+R 脚本计时以外的启动，不是纯网络延迟。固定顺序、同一台 Windows 和小样本
+限制了比较；没有测量人在 Windows 本地开发的效率，也未测复杂 MI/LMS 长任务。
+
+推荐 Mac 负责编辑、版本比较、输出复核；Windows 集中执行有用途的模型批次。
+不要把每个短命令、每个 MI 成员拆成一次完整往返。长期任务靠 Windows 本地
+日志和阶段文件推进，Mac 适度轮询；把等待间隔降到很小也会增加共用队列开销。
+大型初次迁移仍用既有百度网盘流程，日常 xdev 传脚本和结果增量。
+频繁 GUI/许可证操作、Windows 无法保持在线或持续网络故障时，保留 Windows
+原会话作为回退。远程控制改善开发位置，不会使同一 Mplus 算法自动变快。
+
+## 技能版本与文件验真
+
+Windows 现役目录可能由 CC Switch 管理。先按文件导出并核 SHA，再与仓库比较；
+“Windows 比主分支新”不足以决定整目录覆盖。此次双方各有三份独有参考文件，
+Mac 候选按并集保存，并保留较新的恢复说明；模型 helper 的变化另做真实回归。
+Mac 技能可与 Windows 的已验证隔离候选配合，安装、仓库合并和现役切换分别记账。
+
+PowerShell 5.1 使用 ZipArchiveMode 前须加载 `System.IO.Compression` 和
+`System.IO.Compression.FileSystem`。读取 JSON 数组直接赋值给变量；把
+`ConvertFrom-Json` 包进额外 `@(...)` 可能形成嵌套数组。R、Python 和 shell
+代码写成文件再调用，避免 Windows 原生命令参数重新解析引号。
+
+结果包清单不得登记自身哈希。`artifact_manifest.py build <新候选目录>` 会拒绝
+覆盖已有清单；`verify ... --expected-sha256 <包外摘要>` 同时检查完整文件集、
+大小和 SHA。原有错误清单保留在原件中。清单通过不证明统计结果；PP-LGCM 的
+完整数值复核在隔离副本执行原独立验证器，公开包仍缺少个体输入，不能重估模型。
+
+## PP-LGCM 科学边界
+
+2026-10-23 终态为 CHARLS H4.1 12/12，H4.2 核心 4/4，H4.2 资源 8/12；
+四个收入分组资源家族延期。此处收入是观测基期收入分组下的 `SX XWITH IZ`，
+不能称为收入本身的潜轨迹。`SX XWITH Z0` 是另一种敏感性估计对象，收入通常
+40 份 MI，教育/城乡通常 20 份。未启动依赖与真实 Mplus 超时分别报告。
+
+修复的 son×urban 20 A + MI01 B 家族采用正确 C4 城乡语义、进入实际拟合矩阵
+的辅助乘积项，以及 GH07 终值核验后的 GH15 起点。既有输出的复核不会新增
+家族覆盖。CFPS 原四项调节完整推断与完整 H4 仍未完成；超时不等于零效应，
+基础设施修复不授权重跑原样失败规格或延长研究预算。
