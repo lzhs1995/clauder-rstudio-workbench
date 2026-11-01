@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import sys
@@ -61,6 +62,36 @@ class OrphanGuardTests(unittest.TestCase):
 
     def adopt(self, **kwargs):
         return guard.adopt_member(self.source, self.work, self.member, sys.executable, **kwargs)
+
+    @contextmanager
+    def active_fixture(self):
+        # Windows 上固定 0.5 秒 sleep 可能先于核验结束；用显式握手保持本测试进程存活。
+        ready, release = self.root / "fixture-ready", self.root / "fixture-release"
+        code = (
+            "from pathlib import Path\nimport sys,time\n"
+            "ready,release=map(Path,sys.argv[1:3])\n"
+            "ready.write_text('ready')\n"
+            "deadline=time.monotonic()+60\n"
+            "while not release.exists() and time.monotonic()<deadline:time.sleep(0.05)\n"
+            "raise SystemExit(0 if release.exists() else 23)\n"
+        )
+        process = subprocess.Popen([sys.executable, "-c", code, str(ready), str(release), "model.inp"], cwd=self.dst)
+        try:
+            deadline = time.monotonic() + 15
+            while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(ready.exists(), "Synthetic process did not reach its ready handshake")
+            self.assertIsNone(process.poll(), "Synthetic process exited before guard inspection")
+            yield process
+        finally:
+            release.write_text("release")
+            try:
+                code = process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()  # 只清理本测试新建的 Python 进程，绝不终止被测 guard 观察的外部任务。
+                process.wait()
+                raise
+            self.assertEqual(code, 0, "Synthetic process exceeded its own bounded lifetime")
 
     def add_result(self):
         dump(self.dst / "RESULT.json", {
@@ -124,18 +155,13 @@ class OrphanGuardTests(unittest.TestCase):
         self.assertEqual(result["engine_exit_code"], 0)
 
     def test_active_original_python_fixture_is_observed_not_killed(self):
-        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.8)", "model.inp"], cwd=self.dst)
-        try:
+        with self.active_fixture() as process:
             import psutil
             self.marker.update(pid=process.pid, created=psutil.Process(process.pid).create_time())
             dump(self.dst / "ENGINE_STARTED.json", self.marker)
             result = guard.adopt_member(self.source, self.work, self.member, psutil.Process(process.pid).exe())
             self.assertEqual(result["decision"], "WAIT_FOR_ORIGINAL_ENGINE", result)
             self.assertIsNone(process.poll())
-            self.assertEqual(process.wait(timeout=5), 0)
-        finally:
-            if process.poll() is None:
-                process.wait(timeout=5)
 
     def test_unreadable_process_is_unknown(self):
         result = self.adopt(probe=lambda *args: {"state": "UNKNOWN", "reason": "AccessDenied"})
@@ -143,16 +169,13 @@ class OrphanGuardTests(unittest.TestCase):
         self.assertIsNone(result["engine_exit_code"])
 
     def test_live_process_with_wrong_declared_executable_is_not_adopted(self):
-        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.5)", "model.inp"], cwd=self.dst)
-        try:
+        with self.active_fixture() as process:
             import psutil
             self.marker.update(pid=process.pid, created=psutil.Process(process.pid).create_time())
             dump(self.dst / "ENGINE_STARTED.json", self.marker)
             result = guard.adopt_member(self.source, self.work, self.member, self.root / "not-the-engine.exe")
-            self.assertEqual(result["decision"], "HOLD")
+            self.assertEqual(result["decision"], "HOLD", result)
             self.assertIsNone(process.poll())
-        finally:
-            process.wait(timeout=5)
 
     def test_pid_reuse_does_not_target_current_process(self):
         import psutil

@@ -6,6 +6,9 @@
 适用情形：Mplus 许可证、原始输入和既有运行环境位于 Windows，而 agent 在 Mac。
 使用已安装的 `cross-device-remote` skill；唯一入口为
 `~/.agents/skills/cross-device-remote/scripts/xdev`。不要启动另一套常驻队列。
+需要跨 Mac 会话保存任务状态时，使用 [可接续客户端](durable-remote-client.md)；
+它仍调用原 xdev。Mac 的 21 项客户端测试、两端各 18 项独立孤儿检查测试及原任务
+查询恢复已有独立回执。原 worker 自动恢复的集成状态按当前任务交接核实。
 
 ## 接续顺序
 
