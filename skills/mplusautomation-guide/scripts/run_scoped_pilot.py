@@ -15,32 +15,38 @@ import sys
 import time
 
 
+def require(condition, message="单模型合同核验失败"):
+    """python -O 不能取消运行闸门。"""
+    if not condition:
+        raise ValueError(message)
+
+
 def run(contract_path, work, output, helpers):
     contract_path, work, output, helpers = map(lambda p: Path(p).resolve(), (contract_path, work, output, helpers))
     contract = json.loads(contract_path.read_bytes())
-    assert contract["schema"] == "pp-scientific-single-pilot/1"
-    assert contract["authorization"] and contract["new_engine_calls_maximum"] == 1
+    require(contract["schema"] == "pp-scientific-single-pilot/1", '运行合同核验失败（run_scoped_pilot.py:27）')
+    require(contract["authorization"] and contract["new_engine_calls_maximum"] == 1, '运行合同核验失败（run_scoped_pilot.py:28）')
     synthetic = contract.get("synthetic") is True
-    assert synthetic or os.name == "nt", "Scientific engines run on Windows only"
-    assert work != output and work not in output.parents and output not in work.parents
+    require(synthetic or os.name == "nt", "Scientific engines run on Windows only")
+    require(work != output and work not in output.parents and output not in work.parents, '运行合同核验失败（run_scoped_pilot.py:31）')
     for name, expected in contract["helper_sha256"].items():
-        assert hashlib.sha256((helpers / name).read_bytes()).hexdigest() == expected, name
+        require(hashlib.sha256((helpers / name).read_bytes()).hexdigest() == expected, name)
     sys.path.insert(0, str(helpers))
     import durable_mplus_worker as w
     import psutil
 
     if synthetic:
-        assert contract["synthetic_fixture"] == "NO_RESEARCH_DATA"
-    assert w.digest(Path(__file__)) == contract["runner_sha256"]
+        require(contract["synthetic_fixture"] == "NO_RESEARCH_DATA", '运行合同核验失败（run_scoped_pilot.py:39）')
+    require(w.digest(Path(__file__)) == contract["runner_sha256"], '运行合同核验失败（run_scoped_pilot.py:40）')
     cap = w.number(contract["cap_seconds"], "engine cap")
     prior = w.number(contract["historical_engine_seconds"], "prior seconds", zero=True)
-    assert math.isclose(contract["new_plus_historical_seconds_ceiling"], prior + cap)
+    require(math.isclose(contract["new_plus_historical_seconds_ceiling"], prior + cap), '运行合同核验失败（run_scoped_pilot.py:43）')
     engine = Path(contract["engine"])
-    assert engine.is_absolute() and w.digest(engine) == contract["engine_sha256"]
+    require(engine.is_absolute() and w.digest(engine) == contract["engine_sha256"], '运行合同核验失败（run_scoped_pilot.py:45）')
     inputs = {n: (Path(row["path"]), row["sha256"]) for n, row in contract["inputs"].items()}
-    assert set(inputs) == {"model.inp", "data.dat"}
+    require(set(inputs) == {"model.inp", "data.dat"}, '运行合同核验失败（run_scoped_pilot.py:47）')
     for name, (source, expected) in inputs.items():
-        assert source.is_absolute() and w.digest(source) == expected, name
+        require(source.is_absolute() and w.digest(source) == expected, name)
     work.mkdir(exist_ok=True)
     if output.exists():
         raise RuntimeError("Output snapshot already exists; reconcile it without rerunning")
@@ -58,22 +64,22 @@ def run(contract_path, work, output, helpers):
             observed["mplus_processes"] = external
             w.atomic_json(work / "RESOURCE_ADMISSION.json", {"at": w.now(), **observed})
             limits = contract["resources"]
-            assert not external, "Another Mplus engine is present; no new claim"
-            assert observed["available_gib"] >= limits["minimum_available_gib"]
-            assert observed["commit_available_gib"] >= limits["minimum_commit_available_gib"]
-            assert observed["cpu_percent"] <= limits["max_cpu_percent"]
+            require(not external, "Another Mplus engine is present; no new claim")
+            require(observed["available_gib"] >= limits["minimum_available_gib"], '运行合同核验失败（run_scoped_pilot.py:68）')
+            require(observed["commit_available_gib"] >= limits["minimum_commit_available_gib"], '运行合同核验失败（run_scoped_pilot.py:69）')
+            require(observed["cpu_percent"] <= limits["max_cpu_percent"], '运行合同核验失败（run_scoped_pilot.py:70）')
         model = work / "model"
         model.mkdir(exist_ok=False)
         for name, (source, expected) in inputs.items():
             shutil.copy2(source, model / name)
-            assert w.digest(model / name) == expected
+            require(w.digest(model / name) == expected, '运行合同核验失败（run_scoped_pilot.py:75）')
         shutil.copy2(contract_path, work / "EXECUTION_CONTRACT.json")
         claim = {**w.process_record(), "member": contract["member"], "contract_sha256": w.digest(contract_path)}
         w.atomic_json(work / "CLAIM.json", claim, new=True)
         command = [str(engine)]
         if synthetic:
             fake = Path(contract["synthetic_script"])
-            assert w.digest(fake) == contract["synthetic_script_sha256"]
+            require(w.digest(fake) == contract["synthetic_script_sha256"], '运行合同核验失败（run_scoped_pilot.py:82）')
             command += [str(fake)]
         command.append("model.inp")
         proc, created, code = None, None, None
@@ -139,7 +145,7 @@ def run(contract_path, work, output, helpers):
         if not confirmed:
             raise RuntimeError("Engine exit remains unknown; no export, no new claim")
         for name, (_, expected) in inputs.items():
-            assert w.digest(model / name) == expected, "Input changed during execution"
+            require(w.digest(model / name) == expected, "Input changed during execution")
         output.mkdir(exist_ok=False)
         allowed = {"model.inp", "model.out", "estimates.dat", "tech3.dat"}
         for name in allowed:
