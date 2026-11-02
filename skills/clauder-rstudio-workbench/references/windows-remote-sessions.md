@@ -58,5 +58,28 @@ a substitute for the execution log.
   process inspection is needed. Record a timeout honestly even if a subsequent
   smaller request succeeds.
 
+## Windows HTTP text fidelity
+
+PowerShell 5.1 can decode `Invoke-WebRequest.Content` incorrectly when a JSON
+response declares `application/json` without a charset. In the observed case,
+the R-written JSON file contained correct Chinese while the HTTP-derived text
+was mojibake. On the same subsequent live response, strict UTF-8 decoding of
+`RawContentStream` preserved Chinese, U+0085, U+2028 and U+2029, while `.Content`
+differed. The maintained fix belongs to the xdev transport adapter; it requires
+no RStudio or ClaudeR runtime restart. Preserve the old response and compare
+against R's durable output rather than silently repairing historical text.
+
+Line-oriented JSON consumers must split on LF, not Python `str.splitlines()`:
+the latter also splits these valid Unicode characters inside a JSON string.
+Save complete raw replies before structural parsing. If an outer logger fails
+after a terminal result was cached, recover that exact job's cache; this does
+not justify a second R or Mplus submission.
+
+An async worker's package library is also independent of transport. Record the
+loaded MplusAutomation path/version and let the statistical driver bind its
+original library; in the observed project, default 1.2 and project 1.3 had
+different parser functions. Do not unload the user's active namespace to fix
+the selection, and do not change the model while changing the agent location.
+
 These observations justify an adapter and a distinct transport label. They do
 not establish reboot recovery, exactly-once execution, or statistical acceptance.
