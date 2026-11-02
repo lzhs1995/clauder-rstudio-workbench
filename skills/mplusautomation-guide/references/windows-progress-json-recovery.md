@@ -61,8 +61,33 @@ at most 42 calls, 14,623.765247 remaining seconds, the original 240-second
 per-call cap and the original coordinator deadline. Windows verified all
 38 reused stages; 30 reader tests on both platforms preserved R lineage,
 model identity, old costs and full-MI pooling gates. The first recovered
-estimates used the same RStudio and MplusAutomation library. These checks
-do not establish completion of the unfinished scientific family.
+estimates used the same RStudio and MplusAutomation library. Prefix acceptance
+alone did not establish completion of the scientific family.
+
+## Complete-family follow-through
+
+The recovery subsequently completed all 42 remaining calls in 4,686.910432
+engine seconds. Together with the original 36 calls, this was 78 new calls
+and 8,783.145186 seconds; the two original calibration stages remained imports.
+The original 240-second per-call cap, 18,720-second family allowance and absolute
+coordinator deadline were retained. No accepted stage was rerun.
+
+An independent Windows reader checked all 80 GH7/GH15 stages and 40 primary
+imputations, including exact output sets, hashes and sizes, each original R
+producer, the 140-parameter covariance matrices, and each GH15 start against
+that imputation's GH7 result. A separate read-only ClaudeR job in the same
+RStudio compared the Python Rubin/D1 results with the original R functions and
+mitml: 21 scalar contrasts under two degrees-of-freedom conventions, three
+joint tests and covariance checks, 354 comparisons in total. It made no Mplus
+calls. Both agent entry points can run this same producer and reader.
+
+This accepts one complete conditional working-MI family. It does not prove
+MAR, exact imputation/analysis congeniality, completion of other families, or
+native Mac MCP operation. The eleven pooled-result files totalled 6,289,416
+bytes and stayed on Windows because current Mac capacity was below the user's
+transfer floor. Small signed-transport receipts and hashes are not a downloaded
+result package. Recheck capacity before collection rather than re-estimating
+because results have not yet been copied.
 
 ## Keep status replies small
 
