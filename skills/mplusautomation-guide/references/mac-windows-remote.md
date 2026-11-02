@@ -21,8 +21,11 @@
    迁移时的暂停由用户后来的具体恢复指令更新；传输成功本身不授权估计。
 2. `xdev health` 返回 OK 后，记录 Windows R、包、Mplus 路径、可用内存和现有
    Mplus 进程。一次先提交一个模型；Windows 内存和其他任务共同决定并发。
-3. 在 Mac 的新工作目录编写完整脚本，用 `xdev rscript ... --out <新目录>`，
-   或用 `xdev detach <唯一名字> worker.ps1` 在 Windows 运行一个有界批次。
+3. 在 Mac 的新工作目录编写完整脚本。用户要求 RStudio／ClaudeR 时，先按
+   [两种入口共用流程](rstudio-two-entry-workflow.md) 绑定真实 Windows 会话，
+   再用 `xdev rstudio submit` 让 ClaudeR source 同一 R 批次脚本；该脚本在
+   Windows 本机 agent 下也可直接经 ClaudeR 执行。只有用户选择后台 Rscript
+   或直接引擎路线时，才使用相应 `xdev rscript` / `detach` 入口。
    原始数据留在已有 Windows 目录；只复制本批确需的输入到隔离工作目录。
 4. 明确设置 `MPLUS_COMMAND` 为 Windows 完整 exe 路径。helper 的默认 `command`
    读取这个环境变量；显式 `command=` 可覆盖。旧 helper 的 `command=""` 会

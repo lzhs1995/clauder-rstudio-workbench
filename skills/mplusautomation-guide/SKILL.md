@@ -16,6 +16,14 @@ engine. For a requested ClaudeR workflow, first use the sibling
 `clauder-rstudio-workbench` skill to bind RStudio and prove the actual agent
 tools. An offline Rscript run does not establish that chain.
 
+Maintain one Windows RStudio scientific workflow with two agent entry points:
+an agent running on Windows, or a Mac agent controlling the same Windows
+RStudio through `cross-device-remote`. Both use the same R drivers,
+MplusAutomation calls, model specifications, budgets and output acceptance.
+Put cross-machine transport in `cross-device-remote`, and ClaudeR session and
+async behavior in `clauder-rstudio-workbench`; do not duplicate those layers
+inside the statistical driver. See [the shared execution contract](references/rstudio-two-entry-workflow.md).
+
 ## APIM, mediation and moderation
 
 For distinguishable-dyad APIM, APIMeM, APIMoM and b-path conditional mediation,

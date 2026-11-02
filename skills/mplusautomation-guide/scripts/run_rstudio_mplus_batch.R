@@ -1,0 +1,149 @@
+# 同一 Windows RStudio/ClaudeR 入口：R 持有 MplusAutomation，Python 只负责原调度和 cap。
+# 先 source 本文件，再调用 run_rstudio_mplus_batch(config_file)。不在加载时运行模型。
+run_rstudio_mplus_batch <- function(config_file) {
+  stopifnot(.Platform$OS.type == "windows")
+  requireNamespace("jsonlite"); requireNamespace("ps"); requireNamespace("processx")
+  requireNamespace("digest"); requireNamespace("MplusAutomation")
+  config <- jsonlite::fromJSON(config_file, simplifyVector = FALSE)
+  stopifnot(identical(config$schema, "rstudio-mplus-batch-driver/1"))
+  sha <- function(path) digest::digest(path, file = TRUE, algo = "sha256")
+  write_once <- function(value, path) {
+    stopifnot(!file.exists(path))
+    temporary <- paste0(path, ".part")
+    stopifnot(!file.exists(temporary))
+    jsonlite::write_json(value, temporary, auto_unbox = TRUE, pretty = TRUE,
+                         digits = NA, null = "null")
+    stopifnot(file.rename(temporary, path))
+  }
+  say <- function(stage, message) {
+    cat(format(Sys.time(), tz = "UTC"), stage, message, "\n"); flush.console()
+    if (exists("clauder_progress", mode = "function", inherits = TRUE)) {
+      clauder_progress(stage, message)
+    }
+  }
+  # 原生 RStudio 或 ClaudeR 的异步后代都可用；普通离线 Rscript 不满足身份。
+  current <- ps::ps_handle()
+  ancestor <- current
+  found <- FALSE
+  for (i in seq_len(64L)) {
+    if (grepl("^rsession", ps::ps_name(ancestor), ignore.case = TRUE)) {
+      found <- TRUE
+      break
+    }
+    parent <- ps::ps_parent(ancestor)
+    if (is.null(parent) || as.numeric(ps::ps_create_time(parent)) >
+        as.numeric(ps::ps_create_time(ancestor)) + 0.01) break
+    ancestor <- parent
+  }
+  stopifnot(found)
+  studio <- ps::ps_parent(ancestor)
+  stopifnot(grepl("^rstudio", ps::ps_name(studio), ignore.case = TRUE))
+  stopifnot(identical(sha(config$coordinator), config$coordinator_sha256))
+  channel <- config$channel
+  stopifnot(!dir.exists(channel), dir.create(channel, recursive = TRUE))
+  stopifnot(dir.create(file.path(channel, "requests")))
+  owner <- list(r_pid = Sys.getpid(), r_created = as.numeric(ps::ps_create_time(current)),
+                rstudio_r_pid = ps::ps_pid(ancestor),
+                rstudio_r_created = as.numeric(ps::ps_create_time(ancestor)),
+                rstudio_pid = ps::ps_pid(studio),
+                rstudio_created = as.numeric(ps::ps_create_time(studio)),
+                R_version = R.version.string,
+                MplusAutomation = as.character(utils::packageVersion("MplusAutomation")),
+                MplusAutomation_path = find.package("MplusAutomation"),
+                config_sha256 = sha(config_file))
+  write_once(owner, file.path(channel, "R_OWNER.json"))
+  say("BATCH_START", "RStudio R worker starts the original batch coordinator")
+  coordinator <- processx::process$new(
+    config$python, c("-X", "utf8", "-B", config$coordinator,
+                     unlist(config$arguments, use.names = FALSE),
+                     "--rstudio-channel", channel),
+    stdout = file.path(channel, "coordinator.stdout.log"),
+    stderr = file.path(channel, "coordinator.stderr.log"),
+    cleanup = FALSE, cleanup_tree = FALSE, supervise = FALSE
+  )
+  write_once(list(pid = coordinator$get_pid(), at = format(Sys.time(), tz = "UTC")),
+             file.path(channel, "COORDINATOR.json"))
+  began <- proc.time()[["elapsed"]]
+  invocation_count <- 0L
+  last_progress <- ""
+  repeat {
+    requests <- list.files(file.path(channel, "requests"), pattern = "REQUEST.json$",
+                           recursive = TRUE, full.names = TRUE)
+    pending <- requests[!file.exists(file.path(dirname(requests), "R_WRAPPER_RETURN.json"))]
+    stopifnot(length(pending) <= 1L)
+    if (length(pending)) {
+      request_file <- pending[[1L]]
+      request <- jsonlite::fromJSON(request_file, simplifyVector = FALSE)
+      folder <- dirname(request_file)
+      stopifnot(identical(sha(request$target), request$input_sha256),
+                identical(sha(request$wrapper), request$wrapper_sha256),
+                identical(sha(request$contract), request$contract_sha256),
+                identical(as.integer(request$owner$r_pid), Sys.getpid()),
+                !file.exists(file.path(folder, "R_MPLUSAUTOMATION_CALL.json")))
+      call <- list(at = format(Sys.time(), tz = "UTC", usetz = TRUE),
+                   member = request$member,
+                   request_sha256 = sha(request_file), r_pid = Sys.getpid(),
+                   r_created = owner$r_created, rstudio_r_pid = owner$rstudio_r_pid,
+                   package_version = owner$MplusAutomation,
+                   package_path = owner$MplusAutomation_path,
+                   target_sha256 = request$input_sha256,
+                   Mplus_command_sha256 = request$wrapper_sha256)
+      # "function" 是 R 关键字，使用命名赋值保留跨语言字段名。
+      call[["function"]] <- "MplusAutomation::runModels"
+      write_once(call, file.path(folder, "R_MPLUSAUTOMATION_CALL.json"))
+      say("MPLUSAUTOMATION_RUNMODELS", request$member)
+      error <- NULL; warnings <- character(); started <- proc.time()[["elapsed"]]
+      invocation_count <- invocation_count + 1L
+      withCallingHandlers(tryCatch({
+        MplusAutomation::runModels(
+          target = request$target, recursive = FALSE, showOutput = TRUE,
+          replaceOutfile = "never", Mplus_command = request$wrapper,
+          killOnFail = FALSE, logFile = file.path(folder, "MplusAutomation.log")
+        )
+      }, error = function(e) { error <<- conditionMessage(e) }),
+      warning = function(w) { warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning") })
+      parsed_rows <- NULL; readback_error <- NULL
+      output <- file.path(folder, "model.out")
+      if (file.exists(output) && any(grepl("THE MODEL ESTIMATION TERMINATED NORMALLY",
+                                          readLines(output, warn = FALSE), fixed = TRUE))) {
+        say("MPLUSAUTOMATION_READBACK", request$member)
+        parsed <- tryCatch(suppressWarnings(MplusAutomation::readModels(
+          output, what = c("parameters", "summaries"), quiet = TRUE)),
+          error = function(e) { readback_error <<- conditionMessage(e); NULL })
+        if (!is.null(parsed$parameters$unstandardized)) parsed_rows <- nrow(parsed$parameters$unstandardized)
+      }
+      write_once(list(status = "WRAPPER_RETURNED", at = format(Sys.time(), tz = "UTC"),
+                      request_sha256 = sha(request_file), r_pid = Sys.getpid(),
+                      error = error, warnings = warnings,
+                      elapsed_seconds = proc.time()[["elapsed"]] - started,
+                      readModels_parameter_rows = parsed_rows, readModels_error = readback_error),
+                 file.path(folder, "R_WRAPPER_RETURN.json"))
+      say("MODEL_WRAPPER_RETURNED", request$member)
+    }
+    if (!coordinator$is_alive()) break
+    if (!is.null(config$progress_file) && file.exists(config$progress_file)) {
+      text <- paste(readLines(config$progress_file, warn = FALSE), collapse = "\n")
+      if (!identical(last_progress, text)) {
+        progress <- tryCatch(jsonlite::fromJSON(text), error = function(e) NULL)
+        if (!is.null(progress)) {
+          say(progress$stage, if (is.null(progress$member)) "batch checkpoint" else progress$member)
+          last_progress <- text
+        }
+      }
+    }
+    if (proc.time()[["elapsed"]] - began > config$maximum_driver_seconds) {
+      stop("原批次 R 等待期限已过；原 coordinator/引擎证据保留，禁止自动再提交")
+    }
+    Sys.sleep(0.25)
+  }
+  status <- coordinator$get_exit_status()
+  result <- list(status = if (identical(status, 0L)) "BATCH_RETURNED" else "BATCH_HOLD",
+                 coordinator_exit_code = status,
+                 MplusAutomation_invocations = invocation_count,
+                 elapsed_seconds = proc.time()[["elapsed"]] - began,
+                 result_file = config$result_file, r_owner = owner,
+                 native_MCP_verified = FALSE)
+  write_once(result, file.path(channel, "R_DRIVER_RESULT.json"))
+  say(result$status, paste("coordinator exit", status))
+  result
+}
