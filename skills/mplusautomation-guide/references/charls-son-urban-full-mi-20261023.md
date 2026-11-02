@@ -11,7 +11,7 @@
 
 ## 完整执行结果
 
-隔离根：`C:/Users/LZHS/pp_lgcm_review/charls_latent_h42_son_urban_full_20261023`。原生 RStudio async job `c0ae878a` 共记录 21 个成员（20 A + MI01 B）；A 全部 `USABLE`，B 起点敏感性通过。Mplus 新调用为 19 次，MI01 A/B 是已核验的 pilot 输出，不重复估计。
+隔离目录：研究根下的 `charls_latent_h42_son_urban_full_20261023`，完整路径由项目回执绑定。原生 RStudio async job `c0ae878a` 共记录 21 个成员（20 A + MI01 B）；A 全部 `USABLE`，B 起点敏感性通过。Mplus 新调用为 19 次，MI01 A/B 是已核验的 pilot 输出，不重复估计。
 
 独立读取每份 `model.out`、`estimates.dat`、`tech3.dat`，重新构造参数变换、协方差和 Rubin 合并：2,814 个参数、21 个研究对比，N=2,263、社区=433，状态 `PASS_FULL_TRANSFORM_AND_RUBIN_SON_URBAN`。
 

@@ -43,11 +43,12 @@ Windows 启动正文可写成：
 ```powershell
 $ErrorActionPreference = 'Continue'
 $BatchRoot = Expand '%LOCALAPPDATA%\xdev\work\my-approved-batch'
-& 'C:\Users\LZHS\AppData\Local\Programs\Python\Python314\python.exe' -X utf8 -B `
+$Python314 = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'
+& $Python314 -X utf8 -B `
   (Join-Path $BatchRoot 'tools\durable_mplus_worker.py') run `
   --plan (Join-Path $BatchRoot 'plan.json') --work (Join-Path $BatchRoot 'run')
 $RunExit = $LASTEXITCODE
-& 'C:\Users\LZHS\AppData\Local\Programs\Python\Python314\python.exe' -X utf8 -B `
+& $Python314 -X utf8 -B `
   (Join-Path $BatchRoot 'tools\durable_mplus_worker.py') export `
   --work (Join-Path $BatchRoot 'run') --out (Join-Path $BatchRoot 'return')
 $ExportExit = $LASTEXITCODE
