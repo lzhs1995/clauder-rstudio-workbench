@@ -83,3 +83,30 @@ the selection, and do not change the model while changing the agent location.
 
 These observations justify an adapter and a distinct transport label. They do
 not establish reboot recovery, exactly-once execution, or statistical acceptance.
+
+## Preserve an accepted prefix after a coordinator I/O failure
+
+A progress publication can fail after Mplus finished. Preserve the original
+job, R owner, code/input hashes, exports and all attempt receipts. Verify that
+the original workers exited, then reconcile every registered work/guard path;
+absence of an export alone does not prove that an engine never started.
+
+The statistical skill owns validated-prefix reuse and the remaining engine
+budget. A recovery worker may use the same RStudio/ClaudeR session, but copied
+outputs keep their original R producer and MplusAutomation calls. Record a
+new recovery job only for genuinely unstarted nodes and preserve the failed
+original job. The observed recovery reused 19 complete imputations and began
+at MI20 through the same Windows RStudio and original MplusAutomation library.
+This does not establish complete-family inference or reboot recovery.
+
+Windows read handles without delete sharing can obstruct atomic progress
+replacement. Use short shared read/delete handles for observers; bounded
+writer retries belong to the statistical worker. Do not drop failed cost
+writes and continue estimation. Keep the original absolute deadline when
+starting a recovery worker so that reconnecting cannot renew time.
+
+Return compact status and SHA summaries. Passing `Get-Content -Raw` directly
+to `ConvertTo-Json` serialized extended PowerShell provider properties and
+expanded one short test reply to about 92.8 MB. `[IO.File]::ReadAllText` or an
+explicit string cast avoids that wrapper problem. Read the original durable
+result without rerunning completed tests or transferring the oversized reply.
