@@ -65,3 +65,42 @@ events and refused a duplicate queue claim with zero Mplus calls. The xdev wire
 limit separately passed five native Windows cases, including UTF-8, failure,
 unknown outcome and identical cached replies. These are control checks, not
 proof that every queued scientific family completed.
+
+## Recover a resource-held prefix
+
+For the PP-LGCM income GH7/GH15 adapter,
+[recover_rstudio_mi_prefix.py](../scripts/recover_rstudio_mi_prefix.py) checks a
+`HOLD_NO_EXPORT` result whose next stage was never started. It verifies the
+complete saved file sets, original R producer, parameter identities, covariance,
+quadrature agreement and all engine claims before preparing a new attempt under
+the existing family root. A prefix may end at GH7: retain that fit and continue
+with its own GH15 stage. A timed-out engine is not an unstarted stage.
+
+Unchanged code is linked within the same Windows volume; inputs and originals
+remain in their existing paths. Only the changed coordinator, plan, config and
+audit are new. Source helpers are immutable: replace a changed file rather than
+editing a shared hard link. This is a study-specific recovery adapter that
+requires the study's independently validated reader, not a general MI compiler.
+
+The resource-held oldest prefix passed nine stage checks and retained seven
+calls / 837.1107531 seconds. Its remaining 71-call allowance and original absolute
+deadline were preserved. The scheduling change permits at most 1,800 seconds of
+member resource waiting; the coordinator rechecks its original deadline and
+reserves a full per-engine cap before admission. Five targeted checks passed on
+Windows. Mac ran the four scheduling checks; the reader contract check was
+deferred to the existing Windows scientific environment. Preparation and queue
+receipt do not establish that the remaining estimations ran.
+
+Observed engine RSS maxima were about 70.6 MiB for gender and 74.1 MiB for the
+saved oldest prefix. They exclude R, Python, operating-system and WSL pressure;
+do not use engine RSS alone to derive a host admission floor. The queue checks
+Windows result-volume space before admitting a family (currently 1 GiB),
+independently of the Mac result-return floor. Pagefile allocation, pagefile use
+and volume free space are separate observations; a shrinking volume without an
+allocation change cannot be attributed to pagefile growth from those two samples.
+
+A shared control queue must remain responsive. A 300-second recursive disk
+scan occupied it until timeout and delayed a ready recovery receipt by about
+280 seconds. Use bounded status reads in synchronous commands and detach any
+long scan. A delayed control receipt does not imply that the already detached
+Windows work stopped, and never justifies submitting that work again.

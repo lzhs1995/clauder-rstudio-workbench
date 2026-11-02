@@ -27,3 +27,19 @@ The final acceptance must have separate states for: actual syntax/parameter mapp
 ## Delivery gate
 
 Hold publication when prose, labels, or diagnostics disagree with the executed input. Rebuild a new package namespace, include the semantic audit and calibration receipt, run the public replay without participant data, split large blobs below the observed proxy limit, and anonymously read back every part. Keep the held candidate and its error record; never overwrite it or treat a previous `LOCAL_DELIVERY_READY` file as sufficient after semantic findings.
+
+## Numerical starts in overall and class-specific blocks
+
+Track the current model block before changing a starting value. `%OVERALL%`
+is not the first known class: the same `sy ON sxiz` statement may occur in the
+overall block and again in each of the two class blocks. Initialize the class
+context as unset and change it only at an explicit `%cg#1%` or `%cg#2%` header.
+Counting all three statements as group terms incorrectly rejects a valid
+two-group input; rewriting the overall term as class 1 is also incorrect.
+
+The SD MI22 preparation used this distinction to generate two bounded,
+predeclared starting-point candidates from saved inputs and a verified
+neighbouring MI solution. Input shape after removing titles and numerical
+starts, data identity, estimator, constraints, integration, seed and stopping
+criteria were retained. Preparing these inputs makes no new estimate and does
+not turn the original timeout or 21/40 prefix into complete MI inference.
