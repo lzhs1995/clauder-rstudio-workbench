@@ -24,6 +24,10 @@ Put cross-machine transport in `cross-device-remote`, and ClaudeR session and
 async behavior in `clauder-rstudio-workbench`; do not duplicate those layers
 inside the statistical driver. See [the shared execution contract](references/rstudio-two-entry-workflow.md).
 
+Use [one family queue and bounded observation](references/queue-efficiency.md)
+to reuse existing drivers, carry closed costs forward, and keep current
+handoffs short. Engineering artifacts and test counts are not research progress.
+
 ## APIM, mediation and moderation
 
 For distinguishable-dyad APIM, APIMeM, APIMoM and b-path conditional mediation,
@@ -68,8 +72,9 @@ do not execute the estimation steps below merely to close an editorial issue.
 1. Inventory scripts, data, generated inputs, output readers and manuscript
    tables. Hash the originals. Distinguish current R specifications from
    historical `.inp` specifications before calling either a replication.
-2. Create a new local run directory outside cloud synchronization. Give each
-   script, model invocation and variant its own namespace. Repoint copies of
+2. Keep one stable family root outside cloud synchronization, with distinct
+   model/attempt state inside it and code versioned in one repository. Do not
+   copy all scripts into a new directory for every continuation. Repoint copies of
    hard-coded paths and `here()` roots explicitly; changing `getwd()` alone
    does not isolate an old analysis script.
 3. In the target R session, record `R.home()`, `.libPaths()`, package versions,
