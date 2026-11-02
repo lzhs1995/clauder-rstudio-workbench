@@ -119,6 +119,36 @@ template instead. Do not require a newly copied `inputs/` tree merely because
 the execution attempt has a new state directory. Keep readers used by an
 accepted result immutable when adding support for another recovery format.
 
+## A prospective runtime budget after two-start calibration
+
+A later income-family MI11 reached its original 240-second cap. Two fixed,
+independent starting values were then given a separate, prospectively recorded
+600-second allowance each, without changing the model or imputations. Both
+finished in a combined 1,110.8222204 engine seconds. The 140 parameters and all
+19,600 covariance entries passed the original comparison tolerances. The
+failed 240-second attempts retained their original receipts and costs.
+
+The continuation reused the 20 completed stages and the calibrated A solution;
+B remained a diagnostic duplicate, not an extra imputation. Only 59 unstarted
+stages were admitted. Their 600-second cap was declared before submission,
+while the family's remaining total allowance stayed at 16,149.5169376 seconds.
+Full GH15 and 40-imputation acceptance was still pending at this checkpoint.
+
+A result reader must check each stage against its own immutable execution
+contract. New stages use the new plan's declared cap; imported stages retain
+the cap in their hash-bound original contract and file manifest. Hard-coding
+240 for every stage rejects valid new results, whereas applying a new cap to
+old imports can wrongly rehabilitate an old timeout. Six regression cases
+passed on both Mac and Windows, covering mixed original budgets, altered
+import contracts, timeout/unknown exits and attempts to borrow a larger cap.
+This changes budget readback, not the estimator or the full-MI acceptance gate.
+
+Record the package actually loaded by the scientific R worker. The successful
+RStudio chain used an isolated MplusAutomation 1.3 library while a separate
+default Rscript library exposed 1.2. The latter is not evidence that the
+RStudio worker used 1.2, and installing a guide does not reload a running R
+namespace. Both agent entry points use the same R owner and package evidence.
+
 ## Keep status replies small
 
 PowerShell `Get-Content -Raw` may return an extended `PSObject`. Serializing
