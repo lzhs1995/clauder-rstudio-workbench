@@ -7,6 +7,13 @@ description: Use when an agent needs to connect to a live RStudio session throug
 
 This skill is the operating protocol for using ClaudeR as a live RStudio workbench from Codex, Claude Code, GitHub Copilot CLI, or another MCP-capable agent. It is not a statistics reference; combine it with an R analysis skill for modeling decisions.
 
+For an agent on another computer controlling Windows RStudio, read
+[Windows remote sessions](references/windows-remote-sessions.md). Bind the
+actual Windows RStudio identity and preserve the same scientific R driver used
+by a Windows-local agent. A local Mac session list cannot establish Windows
+session availability. Explicitly selected xdev HTTP transport retains its own
+evidence class; native-MCP-only tasks keep the native smoke gate.
+
 > **Headline capability:** async polling lets one RStudio session drive N child R worker processes at once and merge the results autonomously. See [parallel-async-fanout.md](references/parallel-async-fanout.md) and the Parallel Async Fan-out section below.
 
 ## First Reads
