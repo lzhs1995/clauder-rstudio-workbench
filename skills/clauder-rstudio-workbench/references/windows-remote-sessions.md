@@ -110,3 +110,20 @@ to `ConvertTo-Json` serialized extended PowerShell provider properties and
 expanded one short test reply to about 92.8 MB. `[IO.File]::ReadAllText` or an
 explicit string cast avoids that wrapper problem. Read the original durable
 result without rerunning completed tests or transferring the oversized reply.
+
+## Carry the same session through complete-family verification
+
+The observed recovery later finished all 40 primary imputations and 80 stages.
+The statistical reader verified output sets, hashes, budgets, full covariance
+and the old and new R producers. A separate read-only job in the same Windows
+RStudio compared pooled results with the original R functions and mitml,
+passing 354 checks without another Mplus call. Keep estimation completion,
+statistical acceptance and result transfer as separate states.
+
+The original observer recorded a terminal response and exited after 49 polls.
+Reuse that receipt rather than creating another observer or polling a legacy
+ClaudeR job after its terminal record has been removed. Once the batch has
+ended, the absence of Mplus in Task Manager is expected; the preserved R and
+engine identities establish where it ran. Result files remained on Windows
+while the Mac retained compact receipts under its capacity constraint. This
+does not establish native Mac MCP operation or completion of the wider study.
