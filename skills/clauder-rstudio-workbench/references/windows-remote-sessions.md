@@ -127,3 +127,30 @@ ended, the absence of Mplus in Task Manager is expected; the preserved R and
 engine identities establish where it ran. Result files remained on Windows
 while the Mac retained compact receipts under its capacity constraint. This
 does not establish native Mac MCP operation or completion of the wider study.
+
+## Keep orchestration smaller than the scientific work
+
+Use one stable family root, a fixed scientific driver and an explicit queue.
+The domain skill's `run_rstudio_family_queue.R` can source the same reviewed
+driver for several authorized families inside one ClaudeR async worker. Keep
+resource waits, predecessor costs, HOLD dispositions and complete-MI acceptance
+in that domain contract; do not duplicate a model scheduler in the transport.
+Both Windows-local and Mac-remote agents use this R entry.
+
+Use one append-only phase log and one background observer, normally every
+180 seconds. Retain submission claims and terminal evidence separately.
+An async child keeps the Console responsive but does not establish survival
+after the parent RStudio session closes. Direct-executable tests cannot prove
+the lifecycle or performance of the requested RStudio route.
+
+New xdev ClaudeR status responses are capped at 64 KiB before leaving Windows.
+An oversized original remains under the original Windows request directory;
+the wire reply preserves status/success and references its path, size, SHA256
+and line count with explicit output omission. Do not treat an omitted output
+as a failed or unsubmitted job. Keep full logs on Windows and observe the
+original job; explicit result collection retains its separate capacity gate.
+
+Keep current handoffs within 30 lines, put history elsewhere, and update the
+existing repository instead of cloning all scripts for every continuation.
+Tests for a specific repair and evidence of scientific progress are different
+deliverables; do not rerun passing control checks for each status report.
