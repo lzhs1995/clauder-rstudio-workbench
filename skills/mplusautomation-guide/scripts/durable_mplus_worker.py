@@ -71,9 +71,34 @@ def atomic_json(path, value, *, new=False):
         stream.write("\n")
         stream.flush()
         os.fsync(stream.fileno())
-    if new and path.exists():
-        raise Rejected("Evidence appeared while writing: " + str(path))
-    os.replace(temp, path)
+    _replace_json_snapshot(temp, path, new=new)
+
+
+def _replace_json_snapshot(temp, path, *, new=False, retry_seconds=2.0):
+    """Windows 读者可能短暂禁止 rename；只重试同一个已落盘快照。"""
+    # 无冲突的正常写入保持原快路径；仅首次可重试错误开启自己的期限。
+    deadline = None
+    delay = 0.01
+    while True:
+        # 等待期间出现的新证据和符号链接仍须拒绝；调用方原 OS 锁不变。
+        if path.is_symlink() or (new and path.exists()):
+            raise Rejected("Evidence appeared while writing: " + str(path))
+        try:
+            os.replace(temp, path)
+            return
+        except OSError as error:
+            # 仅限 Windows access/sharing/lock violation。磁盘满、其他平台权限
+            # 错误等立即保留原文件与临时快照并上抛，不能默默跳过记账。
+            if getattr(error, "winerror", None) not in {5, 32, 33}:
+                raise
+            current = time.monotonic()
+            if deadline is None:
+                deadline = current + retry_seconds
+            remaining = deadline - current
+            if remaining <= 0:
+                raise
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, 0.1)
 
 
 @contextmanager

@@ -132,10 +132,24 @@ requires separate reconciliation.
 The initial implementation passed 12 dispatch checks and, with its project
 integration, 28 scheduling/route checks. A real Windows RStudio/MplusAutomation
 run also exercised a successful Python fixture and an owned timeout, rejecting
-duplicate requests. Those two fixtures made zero real Mplus calls. An earlier
-single synthetic Mplus regression proves the base RStudio/MplusAutomation
-chain; it is not a licensed integration test of this new dispatcher or a
-completed 40-imputation family.
+duplicate requests. Those two fixtures made zero real Mplus calls.
+
+On 2026-11-02, a separate licensed synthetic regression exercised this dispatcher
+through the actual Windows RStudio, its ClaudeR child R worker, the original
+MplusAutomation 1.3 library, and the scoped supervisor. The saved process chain
+includes the real Mplus process. One engine call took 2.209266 seconds within
+its original 30-second cap; the R driver recorded 8.24 seconds. All 20 declared
+result files passed exact-set, size and SHA256 checks. The result ZIP was
+13,570 bytes and expanded to 24,232 bytes; individual input data were excluded.
+Mplus coefficients agreed with R OLS and an independent calculation from the
+original Windows data's aggregate moments at the output's printed precision.
+No model was rerun to collect this evidence. This is one licensed integration
+case, not a completed research MI family or a Mac native-MCP validation.
+
+Recreating data with the same seed on another platform did not reproduce the
+original data bytes in this check. Keep that failed comparison separate. Bind
+validation to the actual data SHA and original data's readback; a shared seed
+alone cannot establish cross-platform data identity.
 
 The two-fixture batch body took 23.18 seconds. Submission to body start took
 about 73 seconds, including asynchronous initialization, package loading and
@@ -143,3 +157,33 @@ identity checks that were not separately timed. This is a reason to amortize
 startup across a batch, not evidence of pure network latency or of a speedup
 in Mplus estimation. No controlled comparison of human development time on
 Mac and Windows was performed.
+
+## Keep computation independent of result-transfer capacity
+
+Use the current user's explicit capacity and transfer limits in the task
+contract. In the continued project the user replaced an earlier 40 GiB Mac
+floor with 25 GiB and a maximum 100 MiB result return per batch. These are
+task-specific values, not defaults for other users or permission to erase
+original results. Preserve the old contract and record its explicit override.
+
+Admission is a point-in-time observation: other applications and swap can
+reduce space while Windows computes. Continue observing the same Windows job
+when Mac headroom drops; retain its results on Windows. Before returning files,
+measure actual available capacity again, check the declared archive and
+uncompressed sizes, and reserve their combined temporary peak plus local
+verification overhead above the required floor. On APFS use the smaller of
+statvfs availability and container free space; archive logical size is not
+reclaimable physical space.
+
+Generate an immutable output-only package on Windows, including failed-stage
+diagnostics and engine cost receipts when applicable. Check the precise file
+set and hashes before packaging and after extraction. `pull-dir` is not a
+data filter. A capacity hold blocks the transfer; it does not cancel, resubmit,
+extend a cap or erase the original engine's cost. Share the verified transfer
+mechanism through `cross-device-remote` and keep scientific acceptance here.
+
+For an accepted MI prefix left by a failed progress write, follow
+[Windows progress and recovery](windows-progress-json-recovery.md). Reconcile
+the old R producer and all attempts before giving genuinely unstarted nodes a
+new recovery contract. Preserve calls, seconds and the original absolute
+deadline; copying outputs does not change their original execution route.

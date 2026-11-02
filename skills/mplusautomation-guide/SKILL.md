@@ -121,6 +121,10 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [windows-progress-json-recovery.md](references/windows-progress-json-recovery.md):
+  Windows sharing-conflict retries, verified MI prefix reuse with original R
+  producers, retained budgets/deadlines, and compact PowerShell status replies.
+
 - [engine-cost-accounting.md](references/engine-cost-accounting.md): count
   starts without exports, keep unknown exit costs open, reserve both GH stages,
   and retain runtime gates under optimized Python in either agent entry point.
