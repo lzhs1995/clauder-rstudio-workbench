@@ -154,3 +154,14 @@ Keep current handoffs within 30 lines, put history elsewhere, and update the
 existing repository instead of cloning all scripts for every continuation.
 Tests for a specific repair and evidence of scientific progress are different
 deliverables; do not rerun passing control checks for each status report.
+
+## 资源等待和控制通道（2026-11-02 补充）
+
+RStudio 接受异步队列后可能停留在资源准入，此时没有新的 Mplus 进程是正常
+状态。报告应分别给出提交回执、当前阶段及实际引擎证据；不能把 async job_id
+或 R 的正常返回当作科研模型完成。资源等待期限、历史成本和完整 MI 核验由
+mplusautomation-guide 的研究合同决定。
+
+一次共享 xdev 同步目录扫描在301秒后超时，已完成的后台恢复准备回执因此
+等待约280秒。短状态查询与完整盘点必须分开，后者放到 Windows 后台。
+两个 agent 入口继续复用原 R driver；不因控制回执延迟重提工作或改用直接 exe。
