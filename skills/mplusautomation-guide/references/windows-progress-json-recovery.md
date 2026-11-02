@@ -89,6 +89,36 @@ transfer floor. Small signed-transport receipts and hashes are not a downloaded
 result package. Recheck capacity before collection rather than re-estimating
 because results have not yet been copied.
 
+## A system-sleep interruption and multiple original producers
+
+A later oldest-family GH15 attempt recorded a timeout of about 1,870.447
+seconds. Its Windows Kernel-Power event overlapped about 1,631.536 seconds of
+system sleep. Preserve both observations: subtracting sleep afterwards does
+not turn that attempt into a successful estimate or refund its recorded cost.
+Reconcile its exit and exact input before considering a separately budgeted
+same-input recovery. That one recovery completed in 88.9319295 engine seconds.
+
+The resulting prefix had 67 stages from the earlier batch and one from the
+separate RStudio recovery worker. Keep an explicit multi-source import audit
+with each original node, output file set, R owner, configuration, terminal
+receipt and source hashes. Verify the original producers before imports and
+again at full-family readback. Do not strip an old R owner and relabel the
+copied result as an unrelated calibration. Historical non-R calibrations keep
+their historical route; a new RStudio call does not retroactively change it.
+
+Only the 12 unstarted stages were submitted next, through the same Windows
+RStudio and MplusAutomation library. They completed in 867.1568458 engine
+seconds; the R driver took 995.91 seconds. All 40 primary MI and 80 stages then
+passed the independent reader and 354 R/mitml comparisons, with zero new
+Mplus calls during readback. This measures that continuation, not a cold-start
+benchmark, unattended reboot recovery, or acceptance of all study families.
+
+For an original-machine readback, resolve each frozen GH15 template from its
+recorded source path and verify its SHA; an archived copy may use its packaged
+template instead. Do not require a newly copied `inputs/` tree merely because
+the execution attempt has a new state directory. Keep readers used by an
+accepted result immutable when adding support for another recovery format.
+
 ## Keep status replies small
 
 PowerShell `Get-Content -Raw` may return an extended `PSObject`. Serializing

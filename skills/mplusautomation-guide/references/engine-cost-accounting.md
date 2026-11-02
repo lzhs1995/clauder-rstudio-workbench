@@ -46,3 +46,21 @@ an off-diagonal covariance-only change as a rejection case.
 These rules apply to both Windows-local and Mac-remote agents using the same
 RStudio/MplusAutomation workflow. They do not change the scientific model or
 justify pooling an incomplete set of imputations.
+
+## Use the latest closed predecessor as the cumulative baseline
+
+When several family checks and recoveries have run, a previously saved
+calibration total can be stale even though that file is valid. For a new
+successor, verify the latest predecessor's plan and raw attempt receipts,
+then use `predecessor.prior_cost + predecessor.actual_new_cost`. Do not add
+only its new cost to an older calibration snapshot: that can omit an
+intervening recovery. Conversely, do not add costs already included in the
+predecessor's prior total a second time. Record the source plan/result hashes
+and the shared history scope, which may be narrower than the whole project.
+
+The successor's new-call and engine-time allowances still come from its own
+original family allowance minus that family's consumed attempts. Historical
+costs, remaining allowances and the original absolute deadline are distinct.
+System-sleep wall time remains in the original receipt; it is not an automatic
+credit. A successful same-input resource check proves only that checked stage,
+not that all later imputations will fit within the cap.

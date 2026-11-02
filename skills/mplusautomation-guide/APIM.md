@@ -16,8 +16,43 @@ Use `clauder-rstudio-workbench` for RStudio connection, async progress and trans
 - **Existing complete study templates:** read [template-preserving-workflow.md](references/template-preserving-workflow.md). Use `scripts/template_contracts.py` to inventory frozen inputs and `compile_mplus_template_bundle()` to relocate and expand the full template. Preserve equations, controls, covariances and equality labels. Expansion does not execute models or infer effect-label meanings.
 - **Authorized archived DAT/INP replay:** read [archived-replay-runtime.md](references/archived-replay-runtime.md) for separate provenance/adoption states, measured resource admission, owned Windows awake requests and readback recovery.
 - **Portable synthetic acceptance:** read [synthetic-acceptance.md](references/synthetic-acceptance.md). This verifies technical support within the tested scope, independently of a thesis's historical source or scientific conclusions.
+- **Chapter 4 reusable v2 route:** read [apim-v2-implementation-acceptance.md](references/apim-v2-implementation-acceptance.md). It documents the schema-2 configuration, multidimensional `[[init]]` expansion, APIM/APIMeM/APIMoM/b-path APIMeMoM effect mapping, native Mplus acceptance, resource coordination, and migration contract.
 
 The configuration runner supports two distinguishable members, continuous observed variables, explicit complete-case samples, actor/partner paths, mediation, moderation and b-path conditional mediation. Choose COMPLEX/MLR with a declared cluster or ML/native **row** BC bootstrap explicitly. Consult the complete support matrix before replacing a study script. Unsupported specifications need an appropriate reviewed template or a separately implemented extension.
+
+## Chapter 4 v2 reusable contract
+
+`schema_version = 2` keeps the original v1 runner intact and makes the research
+specification data-driven. `assets/example_config_v2.R` is the sanitized fixture;
+the caller changes only the data path, member-column mapping, sample names,
+equation controls, moderator declaration, probes, contrasts, equality groups,
+inference and output root. Core model code remains unchanged.
+
+The v2 path is deliberately staged:
+
+```text
+config check → isolated source snapshot → selected rows/DAT + dictionaries
+→ multidimensional [[init]] expansion → durable queue/Mplus
+→ readModels precision mapping → effect dictionary/effect CSV
+→ plot data/SVG/PNG/PDF + Word/HTML tables → independent validation
+```
+
+The grid axes are explicit (`sample`, member-specific `x/y/m/w`, constraint
+`step`). APIM and APIMeM use direct and a/b paths; APIMoM uses product paths for
+paired or shared continuous/binary/categorical moderators; APIMeMoM reports the
+conditional indirect effect through the moderated b path. Equality labels are
+compiled into Mplus and the result reader maps repeated labels by semantic
+parameter identity. Native BC intervals are read from Mplus's printed
+`CINTERVAL(BCBOOTSTRAP)` section and are never replaced by a Wald interval.
+
+Every run has its own root. Source files are hashed and copied read-only; the
+root may not overlap any source or protected directory, and aliases/hardlinks
+are rejected. Preparation, compilation, parsing and effect artifacts carry
+code/data/output bindings, so resume reuses only an identical completed stage.
+The queue admits workers from measured available RAM, commit headroom, disk and
+CPU, and can use a second slot only after a native calibration receipt. A high
+Windows memory percentage alone does not hold a job when the declared headroom
+contract is satisfied.
 
 ## Operating sequence
 

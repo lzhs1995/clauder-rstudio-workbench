@@ -104,3 +104,54 @@ scan occupied it until timeout and delayed a ready recovery receipt by about
 280 seconds. Use bounded status reads in synchronous commands and detach any
 long scan. A delayed control receipt does not imply that the already detached
 Windows work stopped, and never justifies submitting that work again.
+
+## Continue independent families without a coordinator round trip
+
+After a closed predecessor, a single ClaudeR async R worker can prepare and
+run successive approved families locally, sourcing the same scientific R
+driver each time. Persist a run claim, family order, pinned preparation code,
+per-family input/config hashes, append-only events and the original absolute
+deadline. Preparation itself makes no Mplus calls. A blocked dependent stage
+is not ready merely because another family is independent.
+
+If an independent family returns HOLD, a successor may continue only after
+the actual preceding attempt costs and exits are closed. Its preparation
+inherits the latest cumulative ledger and keeps its own remaining allowance;
+unknown costs stop admission. Preserve every failed stage, never repeat an
+already submitted family merely to advance the queue, and never pool partial
+MI. Poll one queue job at a modest interval, caching its terminal response.
+
+The observed post-sleep continuation added a 5 GiB Windows result-volume
+floor checked before every new member. This is a host-specific contract, not
+a universal Mplus requirement. It is separate from the Mac return-capacity
+floor. Available memory, commit headroom, disk and the original deadline
+still apply even when a single Mplus process has small RSS.
+
+## A successful member followed by a preparation failure
+
+Give every effective execution contract a distinct member-and-attempt path.
+Two templates in one directory must not both resolve to the same
+`EFFECTIVE_EXECUTION_CONTRACT.json`. An exclusive-write rejection protects
+the first member's evidence; removing that protection or replacing the file
+is not a recovery. Check destination uniqueness before dispatching a pair.
+
+In the SD MI39 check, A finished in 208.4248702 seconds, then B was blocked by
+this path collision before it started. Its original R call, exact export
+manifest, input identity and scientific checks were verified in place. Only
+B received the remaining one-call, 240-second allowance, under the original
+calibration deadline and through the same RStudio/MplusAutomation 1.3 route.
+B finished in 196.1790694 seconds. Both starts agreed on all 140 parameters
+and the full covariance matrix; the first fit was not estimated again.
+
+Keep the two original R owners and their separately pinned receipts when
+comparing or importing these results. Carry intervening closed family costs
+into the successor ledger exactly once. A pair agreement can release its
+declared remaining stages, but is not complete-MI pooling or proof that a
+different imputation will finish within the cap. These rules are identical
+for an agent on Windows and one controlling Windows from a Mac.
+
+The SD successor reused 77 stages and ran only the three originally unstarted
+stages, consuming 410.1106045 engine seconds. Its 40 primary imputations and
+80 stages then passed complete-file/source verification and 354 independent
+R/mitml checks. The calibration import audit retained the earlier producers;
+this acceptance does not cover the still-held son or CFPS calibrations.

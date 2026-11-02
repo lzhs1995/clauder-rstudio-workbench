@@ -1,7 +1,8 @@
 queue_call <- function(config, action, ...) {
   args <- c(config$queue_script, action, "--root", config$root, unlist(list(...)))
-  output_file <- tempfile("queue_reply_",fileext=".json")
-  error_file <- tempfile("queue_error_",fileext=".log")
+  tmpdir <- if(is.null(config$temp_dir))tempdir() else config$temp_dir
+  output_file <- tempfile("queue_reply_",tmpdir=tmpdir,fileext=".json")
+  error_file <- tempfile("queue_error_",tmpdir=tmpdir,fileext=".log")
   on.exit(unlink(c(output_file,error_file)),add=TRUE)
   status <- system2(config$python,vapply(args,shQuote,character(1)),stdout=output_file,stderr=error_file)
   if(status!=0L)stop(paste(readLines(error_file,warn=FALSE),collapse="\n"))
@@ -32,11 +33,29 @@ queue_worker <- function(config_file, worker_id, progress=function(...)NULL) {
       temporary <- file.path(dirname(task$input),"tmp")
       dir.create(temporary,showWarnings=FALSE)
       Sys.setenv(TMPDIR=temporary,TMP=temporary,TEMP=temporary)
+      monitor<-NULL
+      if(isTRUE(config$apim_v2)) {
+        stopifnot(!file.exists('monitor.stop'),!file.exists('resource_measurement.json'))
+        monitor<-processx::process$new(config$python,c(
+          file.path(dirname(config$queue_script),'apim_resource_monitor.py'),'--pid',as.character(Sys.getpid()),
+          '--created',format(as.numeric(ps::ps_create_time(ps::ps_handle())),scientific=FALSE,digits=16),
+          '--folder',getwd(),'--engine-sha256',digest::digest(config$mplus,algo='sha256',file=TRUE)),
+          stdout='resource_monitor.log',stderr='resource_monitor_error.log',cleanup=FALSE)
+        deadline<-Sys.time()+30
+        while(!file.exists('monitor.ready')&&monitor$is_alive()&&Sys.time()<deadline)Sys.sleep(.1)
+        stopifnot(file.exists('monitor.ready'),monitor$is_alive())
+      }
       error <- tryCatch({
         MplusAutomation::runModels(target=basename(task$input),Mplus_command=config$mplus,
-          killOnFail=FALSE,logFile="mplus_execution.log",quiet=TRUE)
+          killOnFail=FALSE,logFile="mplus_execution.log",quiet=TRUE,
+          replaceOutfile=if(isTRUE(config$apim_v2))'never' else 'always')
         NULL
       },error=function(e)conditionMessage(e))
+      if(!is.null(monitor)) {
+        writeLines('MplusAutomation returned', 'monitor.stop')
+        monitor$wait(timeout=30000)
+        stopifnot(!monitor$is_alive(),monitor$get_exit_status()==0L)
+      }
       setwd(old)
       result <- queue_call(config,"finish","--worker",worker_id,"--task",task$id,"--output",task$output,
         if(!is.null(error))c("--r-error",error) else character())
