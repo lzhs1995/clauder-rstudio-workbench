@@ -62,6 +62,37 @@ Source pattern: original Windows PP-LGCM requirements and plan from September 8,
 and the author's November 2 correction and two-entry clarification. Shared
 examples contain no private participant data, personal paths or licenses.
 
+## Bind the original package in each R worker
+
+An asynchronous R worker can resolve a different package library from the main
+RStudio session. In the PP-LGCM readback, the default Windows library contained
+MplusAutomation 1.2 and the original project library contained 1.3. `runModels`
+had the same function hash; `readModels` and `mplusModeler` differed. Readback of
+one saved success and one original timeout produced identical parameter tables,
+which does not establish equivalence of the whole packages or all outputs.
+
+The optional batch driver's `mplusautomation` configuration binds `library`,
+`version`, `file_sha256` for `DESCRIPTION`, `R/MplusAutomation.rdb` and
+`R/MplusAutomation.rdx`, and `function_sha256` for `runModels`, `readModels` and
+`mplusModeler`. Derive these values from the intended installed library before
+submission; package version alone is insufficient. Function hashes use SHA256
+over `paste(deparse(function_object), collapse="\n")`, without R serialization.
+
+`bind_mplusautomation_library()` checks the files, loads that library, and checks
+the actual namespace and functions before creating the coordinator. It refuses
+a worker that already loaded another library, preserving that namespace; start
+a fresh ClaudeR async worker for the corrected configuration. Do not unload the
+user's active namespace or reinstall packages merely to fix path selection.
+Worker receipts retain the actual package path and hashes. Dependency packages
+are outside this limited parity check.
+
+Six Windows checks exercised the original library and rejected an already-loaded
+alternate, an incorrect version, a changed file hash, a changed function hash and
+a missing contract. They made no Mplus calls. The adapter also publishes local
+JSON requests only after a complete write, using an exclusive same-directory
+hard link on APFS/NTFS; an interrupted `.part` stays available for reconciliation.
+This atomic publication is not a claim of full power-loss recovery.
+
 ## Optional adapter for an existing bounded batch
 
 [run_rstudio_mplus_batch.R](../scripts/run_rstudio_mplus_batch.R) keeps one

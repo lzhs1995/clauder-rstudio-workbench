@@ -27,9 +27,19 @@ def read(path):
 
 
 def write_new(path, value):
-    with Path(path).open("x", encoding="utf-8") as stream:
+    path = Path(path)
+    if path.exists():
+        raise FileExistsError(path)
+    # R 与 Python 并行观察同一请求；发布前必须写完，且不可覆盖已有回执。
+    temporary = path.with_name(path.name + ".part")
+    with temporary.open("x", encoding="utf-8") as stream:
         json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
         stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    # 同目录硬链接在 APFS / NTFS 上原子发布且拒绝已有目标；中断 .part 保留供核查。
+    os.link(temporary, path)
+    temporary.unlink()
 
 
 def now():

@@ -1,11 +1,69 @@
 # 同一 Windows RStudio/ClaudeR 入口：R 持有 MplusAutomation，Python 只负责原调度和 cap。
 # 先 source 本文件，再调用 run_rstudio_mplus_batch(config_file)。不在加载时运行模型。
+bind_mplusautomation_library <- function(contract) {
+  # 切换 agent 或异步 worker 不能悄悄切换原研究的包；拒绝卸载正在用的命名空间。
+  stopifnot(is.list(contract), is.character(contract$library),
+            length(contract$library) == 1L, nzchar(contract$library),
+            is.character(contract$version), length(contract$version) == 1L,
+            is.list(contract$file_sha256), is.list(contract$function_sha256))
+  stopifnot(requireNamespace("digest", quietly = TRUE))
+  canonical <- function(path) {
+    value <- normalizePath(path, winslash = "/", mustWork = TRUE)
+    if (.Platform$OS.type == "windows") tolower(value) else value
+  }
+  library_path <- normalizePath(contract$library, winslash = "/", mustWork = TRUE)
+  package_path <- file.path(library_path, "MplusAutomation")
+  expected_files <- c("DESCRIPTION", "R/MplusAutomation.rdb", "R/MplusAutomation.rdx")
+  expected_functions <- c("runModels", "readModels", "mplusModeler")
+  stopifnot(setequal(names(contract$file_sha256), expected_files),
+            setequal(names(contract$function_sha256), expected_functions))
+  check_files <- function() {
+    values <- setNames(lapply(expected_files, function(name) {
+      digest::digest(file.path(package_path, name), file = TRUE, algo = "sha256")
+    }), expected_files)
+    for (name in expected_files) {
+      if (!identical(values[[name]], contract$file_sha256[[name]])) {
+        stop("原 MplusAutomation 包文件改变: ", name)
+      }
+    }
+    values
+  }
+  file_hashes <- check_files()
+  if ("MplusAutomation" %in% loadedNamespaces()) {
+    namespace <- asNamespace("MplusAutomation")
+    if (!identical(canonical(getNamespaceInfo(namespace, "path")), canonical(package_path))) {
+      stop("当前 R worker 已加载其他 MplusAutomation 库；保留会话，使用新异步 worker")
+    }
+  } else {
+    old_paths <- .libPaths()
+    on.exit(.libPaths(old_paths), add = TRUE)
+    .libPaths(unique(c(library_path, old_paths)))
+    namespace <- loadNamespace("MplusAutomation", lib.loc = library_path)
+  }
+  version <- as.character(getNamespaceVersion(namespace))
+  if (!identical(version, contract$version)) stop("MplusAutomation 原版本不匹配")
+  function_hashes <- setNames(lapply(expected_functions, function(name) {
+    digest::digest(paste(deparse(get(name, envir = namespace)), collapse = "\n"),
+                   algo = "sha256", serialize = FALSE)
+  }), expected_functions)
+  for (name in expected_functions) {
+    if (!identical(function_hashes[[name]], contract$function_sha256[[name]])) {
+      stop("MplusAutomation 已加载函数与原合同不符: ", name)
+    }
+  }
+  check_files()
+  list(version = version, path = normalizePath(getNamespaceInfo(namespace, "path"), winslash = "/"),
+       library = library_path, file_sha256 = file_hashes,
+       function_sha256 = function_hashes, dependencies_compared = FALSE)
+}
+
 run_rstudio_mplus_batch <- function(config_file) {
   stopifnot(.Platform$OS.type == "windows")
-  requireNamespace("jsonlite"); requireNamespace("ps"); requireNamespace("processx")
-  requireNamespace("digest"); requireNamespace("MplusAutomation")
+  stopifnot(requireNamespace("jsonlite", quietly = TRUE), requireNamespace("ps", quietly = TRUE),
+            requireNamespace("processx", quietly = TRUE), requireNamespace("digest", quietly = TRUE))
   config <- jsonlite::fromJSON(config_file, simplifyVector = FALSE)
   stopifnot(identical(config$schema, "rstudio-mplus-batch-driver/1"))
+  package <- bind_mplusautomation_library(config$mplusautomation)
   sha <- function(path) digest::digest(path, file = TRUE, algo = "sha256")
   write_once <- function(value, path) {
     stopifnot(!file.exists(path))
@@ -48,8 +106,9 @@ run_rstudio_mplus_batch <- function(config_file) {
                 rstudio_pid = ps::ps_pid(studio),
                 rstudio_created = as.numeric(ps::ps_create_time(studio)),
                 R_version = R.version.string,
-                MplusAutomation = as.character(utils::packageVersion("MplusAutomation")),
-                MplusAutomation_path = find.package("MplusAutomation"),
+                MplusAutomation = package$version,
+                MplusAutomation_path = package$path,
+                MplusAutomation_contract = package,
                 config_sha256 = sha(config_file))
   write_once(owner, file.path(channel, "R_OWNER.json"))
   say("BATCH_START", "RStudio R worker starts the original batch coordinator")

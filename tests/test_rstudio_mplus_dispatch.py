@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -36,6 +37,47 @@ class DispatchTests(unittest.TestCase):
 
     def prepare(self):
         return d.prepare_request(self.channel, self.contract, self.work, self.output, self.root)
+
+    def test_slow_writer_never_exposes_partial_request(self):
+        target = self.root / "concurrent.json"
+        entered, finish = threading.Event(), threading.Event()
+        original_dump = json.dump
+        errors = []
+
+        def slow_dump(value, stream, **kwargs):
+            stream.write(" ")
+            stream.flush()
+            entered.set()
+            if not finish.wait(5):
+                raise TimeoutError("test reader did not finish")
+            original_dump(value, stream, **kwargs)
+
+        def publish():
+            try:
+                d.write_new(target, {"complete": True})
+            except Exception as error:
+                errors.append(error)
+
+        with patch.object(d.json, "dump", side_effect=slow_dump):
+            writer = threading.Thread(target=publish)
+            writer.start()
+            try:
+                self.assertTrue(entered.wait(5))
+                self.assertFalse(target.exists())
+            finally:
+                finish.set()
+                writer.join(5)
+        self.assertFalse(writer.is_alive())
+        self.assertFalse(errors)
+        self.assertEqual(d.read(target), {"complete": True})
+
+    def test_publication_never_replaces_an_existing_receipt(self):
+        target = self.root / "original.json"
+        d.write_new(target, {"original": 1})
+        before = target.read_bytes()
+        with self.assertRaises(FileExistsError):
+            d.write_new(target, {"replacement": 2})
+        self.assertEqual(target.read_bytes(), before)
 
     def complete_fixture(self, state="EXITED"):
         request_path = self.prepare()
