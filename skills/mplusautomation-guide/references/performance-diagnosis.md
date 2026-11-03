@@ -368,3 +368,30 @@ actual installed-function inspection, unchanged source hashes, raw outputs,
 TECH8 records for the completed probes, sampled resources and independent
 verification. Original source directories remained untouched. No live-output
 forwarding launcher was implemented or validated in this case.
+
+## Inspect the complete optimizer trace before changing the solver
+
+A later Windows RStudio/MplusAutomation run reached its declared 600-second
+limit after 1,059 iterations. Its trace contained 1,057 EM rows, one Fisher
+Scoring row and one Quasi-Newton row. Reading only the final EM rows would
+have missed the acceleration that had already occurred. Repeating that input
+with an explicit EMA label is not an evidenced improvement.
+
+The final printed likelihood changes were zero at the trace's display
+precision, while the largest printed derivative was about `1.2e-5` against
+the requested `MCONVERGENCE=1e-6`. Rounded zero changes do not prove that the
+gradient criterion passed, and a slow numerical tail is different from a
+remote connection failure. The original timeout and engine cost remain part
+of the record.
+
+The [Mplus ANALYSIS reference](https://www.statmodel.com/HTML_UG/chapter16V8.htm)
+distinguishes the integration setting from the optimization method and
+describes EM, EMA, FS and direct observed-data optimization (ODLL). Check
+the actual model/version support before adopting an alternative. A bounded
+solver comparison must preserve the data, model, parameter mapping, starts,
+integration accuracy and scientific acceptance tolerances; declare the new
+attempt and budget before launching it through the same RStudio driver.
+Do not relax a stopping rule merely to obtain a normal terminal message.
+Accept results only after the original admissibility, complete parameter/
+covariance, likelihood and independent-start checks. A prepared alternative
+or an input-parser rejection is not evidence of a faster valid fit.

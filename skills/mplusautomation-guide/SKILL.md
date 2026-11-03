@@ -1,6 +1,6 @@
 ---
 name: mplusautomation-guide
-description: Use when running or reproducing Mplus models from R with MplusAutomation, including APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
+description: Use when running or reproducing Mplus models from R with MplusAutomation, including Mac-to-Windows xdev execution, APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
 ---
 
 # MplusAutomation Guide
@@ -17,6 +17,18 @@ Use MplusAutomation as the R interface and licensed Mplus as the estimation
 engine. For a requested ClaudeR workflow, first use the sibling
 `clauder-rstudio-workbench` skill to bind RStudio and prove the actual agent
 tools. An offline Rscript run does not establish that chain.
+
+Maintain one Windows RStudio scientific workflow with two agent entry points:
+an agent running on Windows, or a Mac agent controlling the same Windows
+RStudio through `cross-device-remote`. Both use the same R drivers,
+MplusAutomation calls, model specifications, budgets and output acceptance.
+Put cross-machine transport in `cross-device-remote`, and ClaudeR session and
+async behavior in `clauder-rstudio-workbench`; do not duplicate those layers
+inside the statistical driver. See [the shared execution contract](references/rstudio-two-entry-workflow.md).
+
+Use [one family queue and bounded observation](references/queue-efficiency.md)
+to reuse existing drivers, carry closed costs forward, and keep current
+handoffs short. Engineering artifacts and test counts are not research progress.
 
 ## APIM, mediation and moderation
 
@@ -53,6 +65,21 @@ disk, CPU and owned Mplus descendants. A second slot is enabled only after a
 native calibration receipt; high memory percentage alone does not create an
 indefinite wait when measured headroom satisfies the contract.
 
+## Mac 控制 Windows
+
+当 Mplus 仅安装在 Windows 时，Mac 负责代码、审阅与结果核验，通过
+`cross-device-remote` 的唯一入口 `xdev` 在 Windows 运行引擎。
+先读 [跨机接续与实测效率](references/mac-windows-remote.md)：它说明单次提交、
+原任务恢复、两端耗时、技能版本合并和 PP-LGCM 的当前科学边界。
+显式设置 `MPLUS_COMMAND`；`run_mplus_model()` 默认读取该值，显式 `command=` 优先。
+批处理通过不代表 RStudio/ClaudeR 界面链通过，也不自动恢复已延期的研究家族。
+需要在 Mac 退出后接续批次时，用 [可接续客户端](references/durable-remote-client.md)
+的 submit / reconcile / wait / collect 入口；同一状态目录只提交一次，并保留实际分阶段计时。
+已有基准输出的复现批次可用 [Windows 批次执行器](references/durable-windows-worker.md)：
+独立监督进程延续原 cap，永久调用记录防止重复启动；中断后先核原进程、输出与累计预算。
+取回前在 Windows 用该执行器的 `export` 生成仅含声明输出与日志的新目录，外层
+`return_dir` 指向此目录，个体输入副本留在 Windows；`collect` 本身不会过滤数据。
+
 ## Windows Mplus优先资源执行
 
 启动模型或处理内存/速度问题时，先读 [Mplus优先资源流程](references/mplus-priority-resource-workflow.md)。使用轻量监控、已授权回收、按进程限制诊断BLAS线程和证据约束的并发调度；区分启动阻塞、CPU瓶颈与换页，保留模型规格和原有准入合同。Windows paging 计数只作诊断，不能用单项计数新增任意硬门槛；用实测增量、commit 和 Windows 可用内存决定并发。
@@ -67,8 +94,9 @@ do not execute the estimation steps below merely to close an editorial issue.
 1. Inventory scripts, data, generated inputs, output readers and manuscript
    tables. Hash the originals. Distinguish current R specifications from
    historical `.inp` specifications before calling either a replication.
-2. Create a new local run directory outside cloud synchronization. Give each
-   script, model invocation and variant its own namespace. Repoint copies of
+2. Keep one stable family root outside cloud synchronization, with distinct
+   model/attempt state inside it and code versioned in one repository. Do not
+   copy all scripts into a new directory for every continuation. Repoint copies of
    hard-coded paths and `here()` roots explicitly; changing `getwd()` alone
    does not isolate an old analysis script.
 3. In the target R session, record `R.home()`, `.libPaths()`, package versions,
@@ -120,6 +148,31 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 ## Resources
 
+- [windows-progress-json-recovery.md](references/windows-progress-json-recovery.md):
+  Windows sharing-conflict retries, verified MI prefix reuse with original R
+  producers, retained budgets/deadlines, and compact PowerShell status replies.
+
+- [engine-cost-accounting.md](references/engine-cost-accounting.md): count
+  starts without exports, keep unknown exit costs open, reserve both GH stages,
+  and retain runtime gates under optimized Python in either agent entry point.
+
+- [durable-windows-worker.md](references/durable-windows-worker.md)：
+  Windows 原目录恢复、独立引擎监督、永久预算和实际进程退出判断；
+  与 Mac 客户端分工，原始保存输出复现与新增科研模型保持各自范围。
+- [remote-longtask-evidence.md](references/remote-longtask-evidence.md):
+  a verified 20-member remote batch, actual interruption costs, the extra orphan
+  rerun, PowerShell wrapper encoding, and limits of long-task reliability claims.
+- [remote-output-acceptance.md](references/remote-output-acceptance.md):
+  independent saved-batch verification after remote execution, negative controls
+  for stale or non-normal output, and recovery of engines whose controller exited.
+  The independent `orphan_output_guard.py` records qualified adoptions separately;
+  it never reruns a member or invents an unknown engine exit code.
+
+- [charls-son-urban-full-mi-20261023.md](references/charls-son-urban-full-mi-20261023.md):
+  the original Windows 20-MI provenance repair and complete independent readback,
+  restored from its unmerged historical guide branch. Keep C3/C4 semantics,
+  predictor-matrix checks, GH07-to-GH15 start identity and the inference boundary.
+
 - [apim-v2-implementation-acceptance.md](references/apim-v2-implementation-acceptance.md): Chapter 4 schema-2 workflow, model/effect mapping, isolated template route, native acceptance matrix and migration boundary.
 - [example_config_v2.R](assets/example_config_v2.R), `scripts/apim_v2_config.R`, `scripts/apim_v2_models.R` and `scripts/apim_v2_runtime.R`: configurable APIM/APIMeM/APIMoM/b-path APIMeMoM pipeline with genuine multidimensional `[[init]]` expansion.
 - `scripts/validate_apim_v2_native.py` and `scripts/validate_benchmark.py`: independent source-artifact formula/output-binding and queue-overlap validation.
@@ -132,12 +185,47 @@ do not execute the estimation steps below merely to close an editorial issue.
   conditional Gaussian model has an equivalent known-class representation;
   calibrate all parameters and robust covariance before using it, and keep
   faster computation separate from admissibility and complete MI inference.
-- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md): actual-input semantic checks after group/control migration, zero mixed-cluster diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
+- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md):
+  actual-input semantic checks after group/control migration, zero mixed-cluster
+  diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
+
+- [artifact_manifest.py](scripts/artifact_manifest.py): build and verify complete
+  result-package hashes without self-reference. Pin the manifest hash outside
+  the package; byte integrity is separate from numerical validation.
 
 - [charls-roster-missingness.md](references/charls-roster-missingness.md):
   verify child/household crosswalks before within-family contrasts, distinguish
   structural absence from missing responses, and prepare scoped moderation inputs
   without treating additive MI or a complete-case pilot as full inference.
+
+- [charls-factor-score-pilot.md](references/charls-factor-score-pilot.md):
+  use a bounded, explicitly approximate FSCORES route only after latent-income
+  timeout, with correct SAVEDATA syntax, resource gating, and RStudio recovery
+  evidence. Historical income wording is clarified by the current estimand
+  boundary in the cross-machine reference.
+
+- [charls-gender-edu-full-mi.md](references/charls-gender-edu-full-mi.md):
+  native RStudio recovery, WSL/Windows path boundaries, readback-only repair, and a full 20-member latent working-MI family.
+- [charls-oldest-edu-full-mi.md](references/charls-oldest-edu-full-mi.md):
+  a second full CHARLS H4.2 family showing the native `C:/` contract repair,
+  durable progress versus stale MCP status, serialized Mplus admission, and
+  public readback boundaries.
+- [charls-son-edu-full-mi.md](references/charls-son-edu-full-mi.md):
+  a third full CHARLS H4.2 family documenting the precompiled-directory
+  `FileExistsError`, clean retry admission, stale async progress, the MI
+  auxiliary export gate, and independent Rubin verification.
+- [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
+  avoid duplicate first-stage MI fits, reject stale-input output reuse, and
+  distinguish score-regression arithmetic from complete latent inference.
+
+- [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md):
+  freeze CHARLS baseline control identities, household roster missingness, and MI
+  admission gates before submitting a migrated model.
+
+- [rstudio-foreground-diagnostic-recovery.md](references/rstudio-foreground-diagnostic-recovery.md):
+  recover bounded native RStudio/ClaudeR calls after foreground diagnostic
+  stalls without restarting workers or duplicating Mplus submissions; preserve
+  the distinction between observed timing and an established cause.
 
 - [bounded-research-reopening.md](references/bounded-research-reopening.md):
   resume author-approved mechanism research after scoped closeout, reuse prior

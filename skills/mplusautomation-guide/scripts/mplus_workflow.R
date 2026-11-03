@@ -34,7 +34,7 @@ validate_mplus_output <- function(path, expected_imputations = NULL) {
     reasons=reasons,warnings=trimws(warnings),requested=requested,completed=completed,path=path)
 }
 
-run_mplus_model <- function(object, run_root, model_id, command = "", expected_imputations = NULL) {
+run_mplus_model <- function(object, run_root, model_id, command = Sys.getenv("MPLUS_COMMAND", ""), expected_imputations = NULL) {
   stopifnot(requireNamespace("MplusAutomation",quietly=TRUE),requireNamespace("jsonlite",quietly=TRUE),requireNamespace("digest",quietly=TRUE))
   if(length(run_root)!=1L || !nzchar(run_root))stop("An explicit run root is required")
   if(length(model_id)!=1L || !grepl("^[A-Za-z0-9][A-Za-z0-9_-]*$",model_id))stop("Use a simple unique model ID")

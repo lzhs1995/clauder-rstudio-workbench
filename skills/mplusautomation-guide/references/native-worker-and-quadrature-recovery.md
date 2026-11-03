@@ -165,6 +165,49 @@ preserve the frozen model/numerical contract when deciding the next change.
 
 The same-batch aggregate evidence is published at [charls_latent_interaction_models_delivery_20261019](https://github.com/lzhs1995/PP-lcgm-paper/tree/579c7a4f73948cbc7b5ef5167fa2b72e7a2a5495/charls_latent_interaction_models_delivery_20261019). `RUNTIME_RECOVERY.md` and `RUNTIME_RECOVERY_EVIDENCE.json` preserve the sequence; the model packages separately identify complete working-MI families and any stopped families. Original CFPS moderation coverage and full H4 remain incomplete.
 
+## Read the integration rule, not a filename
+
+`INTEGRATION=30` selects Mplus's default STANDARD rectangular/trapezoid rule.
+It does not select Gauss-Hermite. Use `INTEGRATION=GAUSSHERMITE(30)` when that
+is the declared rule, and verify the method, point count, adaptive setting
+and optimization algorithm in both the actual input and output. Historical
+identifiers such as `GH30` or `Q30` are not evidence of those settings. Keep
+their original bytes and record the discrepancy separately. The
+[Mplus ANALYSIS reference](https://www.statmodel.com/HTML_UG/chapter16V8.htm)
+defines these as distinct integration settings.
+
+A bounded 2026-11-03 CFPS check illustrates why the distinction matters.
+It concerned only the observed-Z0, fixed-residual-SY, MI01 sensitivity model
+with 134 parameters and household-clustered MLR. A conditional-Gaussian
+initializer matched an independent R likelihood and passed 268 coordinate
+derivative checks for the original two starts. It supplied starting values;
+it did not replace Mplus estimates, robust covariance or full-MI inference.
+
+With those starts, STANDARD30/60 and ODLL still ended with nonzero observed
+scores. Gauss-Hermite30 with ODLL reduced the reported SX score discrepancy
+but still failed the unchanged `MCONVERGENCE=1e-6` gate. One final declared
+trial used Gauss-Hermite30 with the original default EM optimizer. A and B
+both terminated normally in two EM iterations, using 18.207155 and 18.251538
+engine seconds. The output reported EMA and GAUSSHERMITE/30. The retained
+criteria were `CONVERGENCE=1e-8`, `MCONVERGENCE=1e-6`, `LOGCRITERION=1e-7`
+and `RLOGCRITERION=1e-11`; neither the data/model nor these gates were relaxed.
+
+The original R reader accepted all 134 parameters and the full covariance
+comparison. Maximum A/B parameter difference was about 5.2e-7 reference SE;
+relative covariance eigenvalues ranged from 0.9999877 to 1.0000282. A separate
+saved-output R audit verified both actual calls to MplusAutomation 1.3,
+normal termination, original criteria, input/output hashes and agreement
+with the independent exact likelihood. The same script can be sourced by a
+Windows agent or by a Mac agent through the bound Windows RStudio session.
+
+This is an accepted numerical calibration of that one sensitivity model,
+not completion of the original latent-IZ/free-SY model, new MI or full CFPS/H4.
+It does not imply Gauss-Hermite or EM is universally faster. Keep every failed
+attempt and its cost, declare each changed numerical setting before running,
+and bound the number of calibration trials. An engine exit code of zero or
+an external optimizer's stationary point cannot replace Mplus's normal
+termination and the original statistical acceptance checks.
+
 ## Recover startup and observation without duplicating estimation
 
 A later CHARLS latent H4.2 batch supplied three distinct failure cases. Keep
@@ -243,3 +286,37 @@ are seconds; process wait/poll timeouts may use milliseconds. A unit conversion
 mistake can silently remove the intended bound.
 
 The preserved full-family status is `COMPLETE_20_MI_WORKING_H42_FAMILY`. Twenty main estimates and one independent-start check were verified from saved parameters and robust covariance; the extracted public packet was replayed without participant data or new estimation. The [fixed public evidence packet](https://github.com/lzhs1995/PP-lcgm-paper/tree/6c56e309630081dadbfc69f0006db82516a22d13/charls_latent_h42_sd_edu_delivery_20261020) contains the actual source, aggregate results and recovery record. This remains one CHARLS contact-frequency SD-by-education working family; original CFPS complete moderation and full H4 are not established by it.
+
+## Complete a family after imputation-specific initialization
+
+The CFPS observed-Z0, fixed-SY sensitivity subsequently completed all ten
+original imputations. Reusing the accepted MI01 parameter vector alone had
+timed out on MI02. A bounded conditional-Gaussian initializer used each
+imputation's own unchanged data; a previous information matrix served only
+as a numerical preconditioner. It did not reuse fitted coefficients as that
+imputation's estimate, redraw imputations, or change MLR, GH30, constraints
+or the original strict stopping criteria.
+
+MI01 was retained without another Mplus call. MI02 used two original source
+starts after independent initialization; MI03–10 each received its own
+initialized vector. Ten new Mplus calls through Windows RStudio/ClaudeR and
+MplusAutomation 1.3 consumed 200.954147 engine seconds. This excludes numerical
+initialization, R reading and pooling, transport and earlier failed attempts.
+The CFPS continuation ledger retained 39 calls and 4,010.247962 engine seconds.
+These figures do not constitute a controlled comparison of agent locations.
+
+A separate R job re-read raw inputs, outputs, TECH1 and TECH3, verified all
+ten data identities and likelihoods, and recomputed all 134 parameters' full
+Rubin covariance, path tables and conditional slopes. All 189 checks passed;
+the audit made no Mplus calls. Windows-local and Mac-remote agents use the
+same scientific driver and acceptance logic. Result artifacts stayed on Windows
+while the Mac result-return capacity requirement was unmet.
+
+A further saved-point diagnostic found a negative positive-direction SY
+residual score at all ten zero-residual solutions. Analytic scores agreed with
+two finite-difference step sizes and the original likelihood kernel. This
+describes a local direction with other parameters fixed, not a reoptimized
+profile, global optimality proof, identification theorem or null effect.
+It supplies no reason to repeat the unchanged unsuccessful free-SY fits.
+The accepted ten-member result remains a strong-constraint sensitivity;
+original latent IZ/SZ moderation and complete H4 are separate open questions.
