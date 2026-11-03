@@ -185,18 +185,9 @@ do not execute the estimation steps below merely to close an editorial issue.
   conditional Gaussian model has an equivalent known-class representation;
   calibrate all parameters and robust covariance before using it, and keep
   faster computation separate from admissibility and complete MI inference.
-- [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md): actual-input semantic checks after group/control migration, zero mixed-cluster diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
-
 - [interaction-template-semantic-audit.md](references/interaction-template-semantic-audit.md):
   actual-input semantic checks after group/control migration, zero mixed-cluster
   diagnostics, duplicate-submission recovery, bounded calibration, and corrected delivery.
-
-- [charls-factor-score-pilot.md](references/charls-factor-score-pilot.md),
-  [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md),
-  and [rstudio-foreground-diagnostic-recovery.md](references/rstudio-foreground-diagnostic-recovery.md):
-  preserved Windows-local lessons on bounded factor-score trials, control/MI
-  identity, and recovery after foreground diagnostics. Historical income wording
-  is clarified by the current estimand boundary in the cross-machine reference.
 
 - [artifact_manifest.py](scripts/artifact_manifest.py): build and verify complete
   result-package hashes without self-reference. Pin the manifest hash outside
@@ -206,6 +197,35 @@ do not execute the estimation steps below merely to close an editorial issue.
   verify child/household crosswalks before within-family contrasts, distinguish
   structural absence from missing responses, and prepare scoped moderation inputs
   without treating additive MI or a complete-case pilot as full inference.
+
+- [charls-factor-score-pilot.md](references/charls-factor-score-pilot.md):
+  use a bounded, explicitly approximate FSCORES route only after latent-income
+  timeout, with correct SAVEDATA syntax, resource gating, and RStudio recovery
+  evidence. Historical income wording is clarified by the current estimand
+  boundary in the cross-machine reference.
+
+- [charls-gender-edu-full-mi.md](references/charls-gender-edu-full-mi.md):
+  native RStudio recovery, WSL/Windows path boundaries, readback-only repair, and a full 20-member latent working-MI family.
+- [charls-oldest-edu-full-mi.md](references/charls-oldest-edu-full-mi.md):
+  a second full CHARLS H4.2 family showing the native `C:/` contract repair,
+  durable progress versus stale MCP status, serialized Mplus admission, and
+  public readback boundaries.
+- [charls-son-edu-full-mi.md](references/charls-son-edu-full-mi.md):
+  a third full CHARLS H4.2 family documenting the precompiled-directory
+  `FileExistsError`, clean retry admission, stale async progress, the MI
+  auxiliary export gate, and independent Rubin verification.
+- [charls-two-stage-income-sensitivity.md](references/charls-two-stage-income-sensitivity.md):
+  avoid duplicate first-stage MI fits, reject stale-input output reuse, and
+  distinguish score-regression arithmetic from complete latent inference.
+
+- [charls-baseline-control-contract.md](references/charls-baseline-control-contract.md):
+  freeze CHARLS baseline control identities, household roster missingness, and MI
+  admission gates before submitting a migrated model.
+
+- [rstudio-foreground-diagnostic-recovery.md](references/rstudio-foreground-diagnostic-recovery.md):
+  recover bounded native RStudio/ClaudeR calls after foreground diagnostic
+  stalls without restarting workers or duplicating Mplus submissions; preserve
+  the distinction between observed timing and an established cause.
 
 - [bounded-research-reopening.md](references/bounded-research-reopening.md):
   resume author-approved mechanism research after scoped closeout, reuse prior
