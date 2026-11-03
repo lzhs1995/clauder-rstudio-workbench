@@ -168,8 +168,10 @@ apim_v2_effects <- function(config,m,prep,c) {
   e$member_source<-config$members[e$source];e$member_target<-config$members[e$target]
   e$member_via<-ifelse(is.na(e$via),'',config$members[e$via])
   e$reference_condition<-if(is.null(m$w))'not_applicable' else 'analysis_W_equals_zero; categorical_reference_levels'
-  e$display_label<-paste(e$kind,paste0(e$member_source,' → ',e$member_target),
-    ifelse(is.na(e$via),'',paste0(' via ',e$member_via)),e$probe)
+  # conditional_a 是 X→M 的第一阶段条件斜率，没有 Y 端；显示为 X → M。
+  e$display_label<-ifelse(is.na(e$target),paste(e$kind,paste0(e$member_source,' → ',e$member_via),e$probe),
+    paste(e$kind,paste0(e$member_source,' → ',e$member_target),
+    ifelse(is.na(e$via),'',paste0(' via ',e$member_via)),e$probe))
   write.csv(e,file.path(c$folder,'effects.csv'),row.names=FALSE);saveRDS(e,file.path(c$folder,'effects.rds'))
   e
 }
@@ -179,7 +181,7 @@ apim_v2_render <- function(config,plan,e) {
   if(!requireNamespace('ggplot2',quietly=TRUE))stop('Missing ggplot2')
   plots<-list();figdir<-file.path(plan$root,'figures')
   for(id in unique(e$model_id)) {
-    d<-e[e$model_id==id&e$kind%in%c('simple_slope','conditional_indirect','conditional_total'),,drop=FALSE]
+    d<-e[e$model_id==id&e$kind%in%c('conditional_a','simple_slope','conditional_indirect','conditional_total'),,drop=FALSE]
     if(!nrow(d))next
     m<-plan$models[[id]];d$scenario<-factor(d$probe,levels=names(m$probes))
     d$path<-paste(d$member_source,d$member_via,d$member_target,sep=' → ')

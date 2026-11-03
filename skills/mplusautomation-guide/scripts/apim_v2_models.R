@@ -86,11 +86,18 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
   apim_v2_assert(!length(intersect(control_cols,c(m$x,m$y,m$m,m$w$columns))),'Controls overlap focal variables; specify their existing path instead')
   for(i in seq_along(control_cols))add(control_cols[i],sprintf('k%03d',i),'control','control',as.numeric(selected[[control_cols[i]]]))
   for(eq in names(m$controls))control_alias[[eq]]<-unname(column_alias[m$controls[[eq]]])
-  products<-list()
-  if(length(w_alias))for(k in 1:2)for(h in seq_along(w_alias)) {
+  # products 进 y 方程（APIMoM 的 x×W、APIMeMoM b 路径的 m×W）；a_products 进 m 方程（APIMeMoM a 路径的 x×W）。
+  products<-list();a_products<-list()
+  stages<-apim_v2_default(m$moderated_paths,'b')
+  if(length(w_alias)&&(m$family=='APIMoM'||grepl('b',stages)))for(k in 1:2)for(h in seq_along(w_alias)) {
     pred<-paste0(if(m$family=='APIMoM')'x' else 'm',k)
     alias<-sprintf('p%03d',length(products)+1L);d[[alias]]<-d[[pred]]*d[[w_alias[h]]]
     products[[length(products)+1L]]<-list(alias=alias,pred=pred,k=k,h=h,w=w_alias[h])
+  }
+  if(length(w_alias)&&m$family=='APIMeMoM'&&grepl('a',stages))for(k in 1:2)for(h in seq_along(w_alias)) {
+    pred<-paste0('x',k)
+    alias<-sprintf('p%03d',length(products)+length(a_products)+1L);d[[alias]]<-d[[pred]]*d[[w_alias[h]]]
+    a_products[[length(a_products)+1L]]<-list(alias=alias,pred=pred,k=k,h=h,w=w_alias[h])
   }
   stopifnot(all(is.finite(as.matrix(d))),all(nchar(names(d))<=8))
   MplusAutomation::prepareMplusData(d,filename=file.path(folder,'data.dat'),inpfile=file.path(folder,'data_block.inp'),
@@ -99,6 +106,7 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
   write.csv(data.frame(excluded,reason=rep('missing_required_variable',nrow(excluded))),file.path(folder,'excluded_rows.csv'),row.names=FALSE)
   write.csv(do.call(rbind,dictionary),file.path(folder,'variable_dictionary.csv'),row.names=FALSE)
   if(length(products))write.csv(do.call(rbind,lapply(products,as.data.frame)),file.path(folder,'product_dictionary.csv'),row.names=FALSE)
+  if(length(a_products))write.csv(do.call(rbind,lapply(a_products,as.data.frame)),file.path(folder,'product_dictionary_a.csv'),row.names=FALSE)
   apim_json(moments,file.path(folder,'transform.json'))
   apim_json(list(raw=m$probes,analysis=probe_values,contrasts=m$contrasts),file.path(folder,'probe_dictionary.json'))
   if(archived) apim_json(list(mode='archived_dat',source_snapshot_sha256=config$data_expected_sha256,
@@ -107,17 +115,21 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
     source_bytes_preserved=TRUE,adapter='character-read/explicit-column-alias/MplusAutomation-format'),
     file.path(folder,'archived_dat_receipt.json'))
   list(data=d,N=nrow(d),clusters=length(unique(d$cid)),excluded=nrow(excluded),moments=moments,
-    controls=control_alias,w_alias=w_alias,products=products,probes=probe_values,selected_sha256=apim_sha(file.path(folder,'selected_rows.csv'),TRUE))
+    controls=control_alias,w_alias=w_alias,products=products,a_products=a_products,probes=probe_values,selected_sha256=apim_sha(file.path(folder,'selected_rows.csv'),TRUE))
 }
 
 apim_v2_model <- function(m,prep) {
   med<-m$family%in%c('APIMeM','APIMeMoM');mod<-length(prep$w_alias)>0
+  # ymod：y 方程有乘积项（APIMoM 或 b 路径）；amod：m 方程有乘积项（a 路径）。旧 prepared.rds 没有 a_products，按 b 路径处理。
+  a_products<-apim_v2_default(prep$a_products,list())
+  ymod<-mod&&length(prep$products)>0;amod<-mod&&length(a_products)>0
   paths<-list();add_path<-function(key,target,pred)paths[[key]]<<-list(target=target,pred=pred,label=key)
   for(j in 1:2)for(k in 1:2) {
     add_path(paste0('c',j,k),paste0('y',j),paste0('x',k))
     if(med){add_path(paste0('a',j,k),paste0('m',j),paste0('x',k));add_path(paste0('b',j,k),paste0('y',j),paste0('m',k))}
   }
-  if(mod)for(j in 1:2)for(p in prep$products)add_path(paste0('z',j,p$k,p$h),paste0('y',j),p$alias)
+  if(ymod)for(j in 1:2)for(p in prep$products)add_path(paste0('z',j,p$k,p$h),paste0('y',j),p$alias)
+  if(amod)for(v in 1:2)for(p in a_products)add_path(paste0('u',v,p$k,p$h),paste0('m',v),p$alias)
   grouped<-character()
   for(group in m$equal) {
     apim_v2_assert(is.character(group)&&length(group)>=2&&!anyDuplicated(group)&&all(group%in%names(paths)),'Unknown equality path group')
@@ -127,7 +139,9 @@ apim_v2_model <- function(m,prep) {
   }
   lines<-vapply(paths,function(p)sprintf('%s ON %s (%s);',p$target,p$pred,p$label),character(1))
   for(eq in names(prep$controls))for(p in prep$controls[[eq]])lines<-c(lines,sprintf('%s ON %s;',eq,p))
-  if(mod)for(j in 1:2)for(p in prep$w_alias)lines<-c(lines,sprintf('y%d ON %s;',j,p))
+  # W 主效应只进含乘积项的方程（a→m 方程、b→y 方程、ab→两处）。
+  if(ymod)for(j in 1:2)for(p in prep$w_alias)lines<-c(lines,sprintf('y%d ON %s;',j,p))
+  if(amod)for(v in 1:2)for(p in prep$w_alias)lines<-c(lines,sprintf('m%d ON %s;',v,p))
   lines<-c(lines,'y1 WITH y2;',if(med)'m1 WITH m2;')
   for(cov in m$covariances) {
     apim_v2_assert(is.character(cov)&&length(cov)==2&&!anyDuplicated(cov)&&all(cov%in%names(prep$data))&&!'cid'%in%cov,'Invalid explicit covariance aliases')
@@ -146,8 +160,17 @@ apim_v2_model <- function(m,prep) {
   }
   slope<-function(j,k,probe) {
     base<-coefficient(paste0(if(med)'b' else 'c',j,k));values<-prep$probes[[probe]]
+    if(!ymod)return(base)
     paste(c(base,vapply(seq_along(values),function(h)sprintf('%s*(%.15g)',coefficient(paste0('z',j,k,h)),values[h]),character(1))),collapse=' + ')
   }
+  # 第一阶段条件斜率：a{v}{k} + Σh u{v}{k}h·W_h。只与 X 成员 k、M 成员 v 和探测点有关，与 Y 无关，单独定义一次。
+  aslope<-function(v,k,probe) {
+    values<-prep$probes[[probe]]
+    paste(c(coefficient(paste0('a',v,k)),vapply(seq_along(values),function(h)sprintf('%s*(%.15g)',coefficient(paste0('u',v,k,h)),values[h]),character(1))),collapse=' + ')
+  }
+  cond_a<-list()
+  if(amod)for(k in 1:2)for(v in 1:2)for(pr in names(prep$probes))
+    cond_a[[paste(v,k,pr)]]<-derived(paste0('conditional_a_x',k,'_m',v,'_',pr),aslope(v,k,pr),'conditional_a',k,v,NA_integer_,pr)
   for(j in 1:2)for(k in 1:2) {
     direct<-derived(paste0('direct_x',k,'_y',j),coefficient(paste0('c',j,k)),'direct',k,NA_integer_,j)
     if(med) {
@@ -157,11 +180,12 @@ apim_v2_model <- function(m,prep) {
       derived(paste0('total_x',k,'_y',j),paste(c(direct,indirect),collapse=' + '),'total',k,NA_integer_,j)
     }
     if(mod)for(pr in names(prep$probes)) {
-      sl<-derived(paste0('slope_',k,'_',j,'_',pr),slope(j,k,pr),'simple_slope',k,NA_integer_,j,pr)
+      # y 方程不被调节（纯 a 路径）时，b 不随 W 变，不另列 simple_slope。
+      if(ymod)sl<-derived(paste0('slope_',k,'_',j,'_',pr),slope(j,k,pr),'simple_slope',k,NA_integer_,j,pr)
       if(med) {
         ci<-character()
         for(v in 1:2)ci<-c(ci,derived(paste0('conditional_x',k,'_m',v,'_y',j,'_',pr),
-          sprintf('%s*(%s)',coefficient(paste0('a',v,k)),slope(j,v,pr)),'conditional_indirect',k,v,j,pr))
+          sprintf('%s*(%s)',if(amod)cond_a[[paste(v,k,pr)]] else coefficient(paste0('a',v,k)),slope(j,v,pr)),'conditional_indirect',k,v,j,pr))
         derived(paste0('conditional_total_x',k,'_y',j,'_',pr),paste(c(direct,ci),collapse=' + '),'conditional_total',k,NA_integer_,j,pr)
       }
     }

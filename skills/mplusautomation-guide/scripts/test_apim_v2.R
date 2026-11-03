@@ -35,6 +35,41 @@ test_apim_v2 <- function(skill_root,test_root,engine,python) {
   check('multidimensional_native_expansion',length(run2$compiled)==4L)
   counts<-vapply(run2$compiled,function(c)readRDS(file.path(c$folder,'prepared.rds'))$N,integer(1))
   check('sample_specific_N',setequal(unique(counts),c(400L,200L)))
+  # a 路径/a+b 路径调节中介：乘积项进 m 方程，W 主效应只进含乘积项的方程；默认 b 与显式 b 编译结果相同。
+  bad<-cfg;bad$designs$apimom_cont$moderated_paths<-'a';check('moderated_paths_outside_apimemom_rejected',fails(plan_apim_workflow(bad)))
+  bad<-cfg;bad$designs$apimemom_cont$moderated_paths<-'c';check('moderated_paths_unknown_rejected',fails(plan_apim_workflow(bad)))
+  cfg3<-cfg;cfg3$output_dir<-file.path(test_root,'runs','apath');base<-cfg$designs$apimemom_cont
+  cfg3$designs<-list(b_default=base,b_explicit=modifyList(base,list(moderated_paths='b')),
+    a_cont=modifyList(base,list(moderated_paths='a')),ab_cat=modifyList(cfg$designs$apimemom_category,list(moderated_paths='ab')))
+  run3<-run_apim_workflow(cfg3,stages=c('check','prepare','compile'))
+  ids3<-names(run3$compiled);byd<-function(d)run3$compiled[[ids3[startsWith(ids3,paste0(d,'_'))]]]
+  inp<-function(d)toupper(readLines(byd(d)$input,warn=FALSE))
+  has<-function(x,pattern)any(grepl(pattern,x))
+  check('apath_default_b_identical',identical(inp('b_default')[-1],inp('b_explicit')[-1]))
+  a<-inp('a_cont');ab<-inp('ab_cat')
+  check('apath_products_in_mediator_equation',has(a,'^\\s*M1 ON P[0-9]{3} \\(U1')&&has(a,'^\\s*M2 ON W1;')&&
+    !has(a,'^\\s*Y1 ON W')&&!has(a,'\\(Z[0-9]'))
+  check('abpath_products_in_both_equations',has(ab,'^\\s*M1 ON P[0-9]{3} \\(U1')&&has(ab,'^\\s*Y2 ON P[0-9]{3} \\(Z2')&&
+    has(ab,'^\\s*M1 ON W1D1;')&&has(ab,'^\\s*Y1 ON W1D2;'))
+  ea<-byd('a_cont')$effects;eab<-byd('ab_cat')$effects
+  check('apath_effect_kinds',all(c('conditional_a','conditional_indirect','conditional_total','conditional_contrast')%in%ea$kind)&&!'simple_slope'%in%ea$kind)
+  check('abpath_effect_kinds',all(c('conditional_a','simple_slope','conditional_indirect','conditional_total')%in%eab$kind))
+  # 公式恒等：给路径标签赋确定值，按 MODEL CONSTRAINT 顺序求值，与手算 (a+Σu·W)(b+Σz·W) 比较。
+  formula_ok<-function(d,stage) {
+    c3<-byd(d);prep<-readRDS(file.path(c3$folder,'prepared.rds'));env<-new.env()
+    labs<-unique(c3$paths$label);for(i in seq_along(labs))assign(labs[i],sin(i)+.5,env)
+    for(i in seq_len(nrow(c3$effects)))assign(tolower(c3$effects$label[i]),eval(parse(text=c3$effects$expression[i]),env),env)
+    g<-function(n)get(n,env);ok<-TRUE
+    for(pr in names(prep$probes))for(j in 1:2)for(k in 1:2)for(v in 1:2) {
+      w<-prep$probes[[pr]];h<-seq_along(w)
+      ca<-g(paste0('a',v,k))+if(grepl('a',stage))sum(vapply(h,function(i)g(paste0('u',v,k,i)),0)*w) else 0
+      cb<-g(paste0('b',j,v))+if(grepl('b',stage))sum(vapply(h,function(i)g(paste0('z',j,v,i)),0)*w) else 0
+      row<-c3$effects[c3$effects$effect_id==paste0('conditional_x',k,'_m',v,'_y',j,'_',pr),]
+      ok<-ok&&nrow(row)==1&&abs(g(tolower(row$label))-ca*cb)<1e-12
+    }
+    ok
+  }
+  check('apath_formula_identity',formula_ok('a_cont','a')&&formula_ok('ab_cat','ab')&&formula_ok('b_default','b'))
   # 归档 DAT 只允许逐字节快照与显式列声明；适配器另存原始字节并留下回执。
   archived<-file.path(fixture,'data_archived.dat')
   raw_archived<-read.csv(data,check.names=FALSE,stringsAsFactors=FALSE)
