@@ -184,7 +184,9 @@ apim_v2_render <- function(config,plan,e) {
     d<-e[e$model_id==id&e$kind%in%c('conditional_a','simple_slope','conditional_indirect','conditional_total'),,drop=FALSE]
     if(!nrow(d))next
     m<-plan$models[[id]];d$scenario<-factor(d$probe,levels=names(m$probes))
-    d$path<-paste(d$member_source,d$member_via,d$member_target,sep=' → ')
+    # 第一阶段条件斜率止于中介，不把不存在的 Y 端显示成 NA。
+    d$path<-ifelse(d$kind=='conditional_a',paste(d$member_source,d$member_via,sep=' → '),
+      paste(d$member_source,d$member_via,d$member_target,sep=' → '))
     d<-d[order(d$kind,d$path,d$scenario),,drop=FALSE]
     p<-ggplot2::ggplot(d,ggplot2::aes(x=scenario,y=estimate,group=path,color=path))+
       ggplot2::geom_point(position=ggplot2::position_dodge(.3))+
