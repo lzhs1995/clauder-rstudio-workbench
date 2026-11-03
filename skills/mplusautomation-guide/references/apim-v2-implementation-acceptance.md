@@ -87,8 +87,10 @@ differences).
 The `a`/`ab` tests check product placement, W main effects, effect kinds and
 the MODEL CONSTRAINT formula identity under assigned path values, and a mutated
 formula is caught. Native Windows Mplus synthetic acceptance of `a` and `ab`
-(MLR and row BC) is in progress. Until its receipt is recorded here, treat
-`a`/`ab` as compile-verified only.
+(MLR and row BC, n = 400, one model per root, serial) passes; see the native
+acceptance record below. The synthetic data place a true 0.25 x-by-W product in
+each mediator equation; the `a` MLR fit recovers both product coefficients
+within three standard errors.
 
 ## Native acceptance record
 
@@ -103,6 +105,8 @@ The isolated acceptance roots contain the full artifacts and hashes:
 | complete supplied `[[init]]` template | 2 | native fit and independent validation PASS |
 | one-slot benchmark | 4 | 4/4 native fits; no overlap |
 | two-slot benchmark | 4 | 4/4 native fits; two measured overlap pairs |
+| APIMeMoM `moderated_paths = "a"`, MLR / row BC | 1 + 1 | native fit (BC 1,000/1,000 draws), parse/effects/independent validation PASS, 72 effects each |
+| APIMeMoM `moderated_paths = "ab"`, MLR / row BC | 1 + 1 | native fit (BC 1,000/1,000 draws), parse/effects/independent validation PASS, 84 effects each |
 
 The four 10-model roots each pass independent formula/output-binding validation
 for 296 effects. The complete-template root passes 8 effects. The benchmark

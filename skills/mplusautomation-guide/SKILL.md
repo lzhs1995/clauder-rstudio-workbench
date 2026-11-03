@@ -51,7 +51,7 @@ Set `schema_version = 2` and use `assets/example_config_v2.R`; changing the
 data path, member order, source names, samples, controls, probes or inference
 does not require editing the model compiler. The route explicitly covers
 APIM, APIMeM, APIMoM and APIMeMoM (`moderated_paths` b by default, or a/ab,
-compile-verified with native acceptance pending), true multidimensional
+with native synthetic acceptance), true multidimensional
 `[[init]]` expansion, equality labels, paired/shared continuous or categorical W,
 Mplus-native row BC intervals, staged cache/resume, and R-side effect/table/
 figure generation. A complete existing template is passed through the
