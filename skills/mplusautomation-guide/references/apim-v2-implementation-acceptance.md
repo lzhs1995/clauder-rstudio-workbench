@@ -37,7 +37,7 @@ The implementation then performs these stages:
    maps means/variances and covariance identities by semantic keys. For native
    row BC, requested/completed draws and the printed BC endpoints are retained.
 6. **Effects and presentation.** The effect dictionary names direct, indirect,
-   total, simple-slope, conditional-indirect, conditional-total and contrast
+   total, simple-slope, conditional-a, conditional-indirect, conditional-total and contrast
    expressions. `effects.csv`/RDS is produced before SVG/PNG/PDF conditional
    figures and Word/HTML tables. The display layer never filters effects by
    significance.
@@ -57,8 +57,38 @@ bootstrap contract and does not claim cluster-bootstrap inference.
 
 The moderator implementation covers paired continuous W, shared binary W and
 shared categorical W with explicit treatment coding and K−1 products. The
-current acceptance scope is moderation of the b path in APIMeM/APIMeMoM;
-a-path and a+b-path moderation require a separately reviewed extension.
+native acceptance matrix above covers moderation of the b path in APIMeMoM.
+
+## APIMeMoM moderated paths
+
+An APIMeMoM design may set `moderated_paths` to `"b"` (default), `"a"` or
+`"ab"`; any other family that sets the field is rejected at check time.
+
+| Value | Products (equation, path label) | W main effects | Conditional effects |
+| --- | --- | --- | --- |
+| `b` | m_k × W_h in y_j, `z{j}{k}{h}` | y equations | `simple_slope`; indirect a × b(W) |
+| `a` | x_k × W_h in m_v, `u{v}{k}{h}` | m equations | `conditional_a`; indirect a(W) × b |
+| `ab` | both sets | y and m equations | both kinds; indirect a(W) × b(W) |
+
+Here a(W) = a{v}{k} + Σh u{v}{k}h·W_h is defined once per X member, M member
+and probe (kind `conditional_a`, no Y target), and b(W) = b{j}{v} + Σh
+z{j}{v}h·W_h. The conditional indirect effect expands their product, so under
+`ab` it is not a single index of moderated mediation. The direct effect c is not
+moderated, and the conditional total effect is c plus the conditional indirect
+effects. Without b-path products no `simple_slope` is listed. Contrasts are
+differences between probe-specific conditional indirect effects. The a-path
+products are recorded in `product_dictionary_a.csv`; the default `b` output
+files are unchanged.
+
+Acceptance status: the compile-level contract tests pass. With the default `b`,
+the INP, `data.dat`, path, product and effect dictionaries of the example
+configuration are byte-identical to main 33ab350 (10 models, 46 files, 0
+differences).
+The `a`/`ab` tests check product placement, W main effects, effect kinds and
+the MODEL CONSTRAINT formula identity under assigned path values, and a mutated
+formula is caught. Native Windows Mplus synthetic acceptance of `a` and `ab`
+(MLR and row BC) is in progress. Until its receipt is recorded here, treat
+`a`/`ab` as compile-verified only.
 
 ## Native acceptance record
 

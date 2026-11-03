@@ -46,6 +46,8 @@ example_apim_config_v2 <- function(data,output_dir,engine,python,renamed=FALSE,i
     designs=list(apim=build('APIM',constrained=TRUE),apimem=build('APIMeM',constrained=TRUE),
       apimom_cont=build('APIMoM','continuous'),apimom_binary=build('APIMoM','binary'),apimom_category=build('APIMoM','categorical'),
       apimemom_cont=build('APIMeMoM','continuous'),apimemom_binary=build('APIMeMoM','binary'),apimemom_category=build('APIMeMoM','categorical')),
+    # APIMeMoM 设计可另设 moderated_paths='a'（x×W 进 m 方程）或 'ab'（a、b 两段都调节），不设即 'b'；
+    # 例：modifyList(build('APIMeMoM','continuous'),list(moderated_paths='a'))。其他模型族设此字段会被拒绝。
     # 16 GiB Windows主机的实测准入默认：保留0.75 GiB，单槽候选增量0.55 GiB；
     # 正式并发必须先由resource_measurement.json校准，不按静态峰值臆测。
     resource=list(ram_reserve_gib=.75,incremental_peak_gib=.55,commit_required_gib=.7,disk_required_gib=10),
