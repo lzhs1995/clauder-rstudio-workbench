@@ -49,6 +49,25 @@ after all mapping and numerical checks pass. Otherwise a failed model can leave
 partially trusted rows in a seemingly complete file. Write source hashes once per
 model rather than rehashing a large RESULTS file for every parameter.
 
+## Check large-denominator-df F tails across runtimes
+
+When a pooled D1 test has very small relative missing information, its denominator
+df can exceed 1e10. A saved-result replay on macOS with SciPy 1.16.3 produced
+`f.sf(0.293524755847745, 3, 11541765180.5765) = 0.8301128480529693`,
+whereas Windows R 4.5.2 `pf(..., lower.tail=FALSE)` returned
+`0.8301129735074473`. Preserve the failed numerical check; do not loosen its
+tolerance, change MI membership or rerun Mplus to fix a distribution routine.
+
+For these finite positive inputs, the equivalent expression
+`betaincc(d1/2, d2/2, d1*F/(d2+d1*F))` matched R within 2e-15 across the
+three observed D1 tests. `1-f.cdf(...)` also lost precision in one case, so it
+is not a universal replacement. Verify the actual df range and tail against an
+independent runtime before adoption; this observation does not establish accuracy
+for every parameter regime. Recheck the original full covariance, Rubin pooling,
+contrasts and frozen-family multiplicity adjustment separately. This applies to
+both Windows-local and Mac-remote agents; engine and scientific specifications
+remain the same.
+
 ## Freeze the family before adjustment
 
 Build the effect inventory from the actual INP equations and declared research
