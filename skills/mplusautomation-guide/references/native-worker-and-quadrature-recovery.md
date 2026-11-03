@@ -286,3 +286,37 @@ are seconds; process wait/poll timeouts may use milliseconds. A unit conversion
 mistake can silently remove the intended bound.
 
 The preserved full-family status is `COMPLETE_20_MI_WORKING_H42_FAMILY`. Twenty main estimates and one independent-start check were verified from saved parameters and robust covariance; the extracted public packet was replayed without participant data or new estimation. The [fixed public evidence packet](https://github.com/lzhs1995/PP-lcgm-paper/tree/6c56e309630081dadbfc69f0006db82516a22d13/charls_latent_h42_sd_edu_delivery_20261020) contains the actual source, aggregate results and recovery record. This remains one CHARLS contact-frequency SD-by-education working family; original CFPS complete moderation and full H4 are not established by it.
+
+## Complete a family after imputation-specific initialization
+
+The CFPS observed-Z0, fixed-SY sensitivity subsequently completed all ten
+original imputations. Reusing the accepted MI01 parameter vector alone had
+timed out on MI02. A bounded conditional-Gaussian initializer used each
+imputation's own unchanged data; a previous information matrix served only
+as a numerical preconditioner. It did not reuse fitted coefficients as that
+imputation's estimate, redraw imputations, or change MLR, GH30, constraints
+or the original strict stopping criteria.
+
+MI01 was retained without another Mplus call. MI02 used two original source
+starts after independent initialization; MI03–10 each received its own
+initialized vector. Ten new Mplus calls through Windows RStudio/ClaudeR and
+MplusAutomation 1.3 consumed 200.954147 engine seconds. This excludes numerical
+initialization, R reading and pooling, transport and earlier failed attempts.
+The CFPS continuation ledger retained 39 calls and 4,010.247962 engine seconds.
+These figures do not constitute a controlled comparison of agent locations.
+
+A separate R job re-read raw inputs, outputs, TECH1 and TECH3, verified all
+ten data identities and likelihoods, and recomputed all 134 parameters' full
+Rubin covariance, path tables and conditional slopes. All 189 checks passed;
+the audit made no Mplus calls. Windows-local and Mac-remote agents use the
+same scientific driver and acceptance logic. Result artifacts stayed on Windows
+while the Mac result-return capacity requirement was unmet.
+
+A further saved-point diagnostic found a negative positive-direction SY
+residual score at all ten zero-residual solutions. Analytic scores agreed with
+two finite-difference step sizes and the original likelihood kernel. This
+describes a local direction with other parameters fixed, not a reoptimized
+profile, global optimality proof, identification theorem or null effect.
+It supplies no reason to repeat the unchanged unsuccessful free-SY fits.
+The accepted ten-member result remains a strong-constraint sensitivity;
+original latent IZ/SZ moderation and complete H4 are separate open questions.

@@ -179,3 +179,11 @@ The CFPS MI01 calibration was later accepted independently; its bounded
 quadrature/optimizer lesson is in
 [native-worker-and-quadrature-recovery.md](native-worker-and-quadrature-recovery.md).
 It does not authorize a new imputation family or erase prior failed costs.
+
+The separately registered CFPS continuation later completed ten original
+imputations and passed 189 independent R checks. Its ten additional Mplus calls
+took 200.954147 seconds; the prior MI02 timeout and every earlier calibration
+remain in the 39-call/4,010.247962-second ledger. Imputation-specific numerical
+initialization is described in the same reference. Do not charge only engine
+time when assessing total workflow efficiency, or interpret a successful
+strong-constraint sensitivity as completion of the original unrestricted study.
