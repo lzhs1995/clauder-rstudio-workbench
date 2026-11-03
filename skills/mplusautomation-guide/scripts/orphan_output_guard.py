@@ -41,6 +41,13 @@ def process_state(marker, directory, engine):
         if abs(actual_created - created) > 1e-3:
             return {"state": "EXITED", "reason": "recorded PID has been reused",
                     "current_process_created": actual_created}
+        # Windows已退出进程可因未关闭的句柄继续可查询；先做零等待终态检查。
+        try:
+            proc.wait(timeout=0)
+        except psutil.TimeoutExpired:
+            pass
+        else:
+            return {"state": "EXITED", "reason": "recorded process has terminated"}
         if canonical(proc.exe()) != canonical(engine) or canonical(proc.cwd()) != canonical(directory):
             return {"state": "UNKNOWN", "reason": "live PID executable or working directory differs"}
         if "model.inp" not in [Path(arg).name.lower() for arg in proc.cmdline()[1:]]:
@@ -121,6 +128,12 @@ def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=
                     **details, "comparison": checked["compare"], "pins": pins}
         if marker is None:
             raise Rejected("Saved output lacks an original engine-start record")
+        if cap_seconds is None:
+            cap_seconds = job.get("cap_seconds")
+            if (isinstance(cap_seconds, bool) or not isinstance(cap_seconds, (float, int))
+                    or not math.isfinite(cap_seconds) or cap_seconds <= 0):
+                raise Rejected("Missing or invalid original engine cap")
+        details["cap_seconds"] = cap_seconds
         # 当前输入相同不能补造启动前来源记录。旧薄回执保持待审，不自动重算。
         if marker.get("inputs") != runtime:
             raise Rejected("Engine-start record lacks the exact original runtime input hashes")
@@ -142,7 +155,7 @@ def assess_member(source, work, member, engine, tolerance=1e-6, provenance_only=
             if int(new_pin["mtime_ns"]) / 1e9 + 2 < created:
                 raise Rejected("Saved output predates the recorded engine start: " + name)
             # 只作超过期限的下界证据；不能拿文件时间差推断精确耗时或剩余预算。
-            if cap_seconds is not None and int(new_pin["mtime_ns"]) / 1e9 - created > cap_seconds:
+            if int(new_pin["mtime_ns"]) / 1e9 - created > cap_seconds:
                 raise Rejected("Orphan output was written after its original cap: " + name)
             comparison[name] = {"original_sha256": old_pin["sha256"], "saved_sha256": new_pin["sha256"]}
             if name == "model.out":

@@ -80,6 +80,19 @@ class ReadbackTests(unittest.TestCase):
         self.save_receipt()
         self.assertEqual(self.result()["status"], "REVIEW_REQUIRED")
 
+    def test_error_summary_overrides_matching_normal_outputs(self):
+        for summary, expected in (
+                (b"0 ERROR(S) FOUND IN THE INPUT INSTRUCTIONS", "BATCH_OUTPUTS_VERIFIED"),
+                (b"1 ERROR(S) FOUND IN THE INPUT INSTRUCTIONS", "REVIEW_REQUIRED"),
+                (b"12 ERROR(S) FOUND IN THE\n INPUT INSTRUCTIONS", "REVIEW_REQUIRED")):
+            with self.subTest(summary=summary):
+                content = b"THE MODEL ESTIMATION TERMINATED NORMALLY\n" + summary + b"\n"
+                for folder in (self.src, self.dst):
+                    (folder / "model.out").write_bytes(content)
+                self.receipt["compare"]["model.out"]["sha_new"] = digest(self.dst / "model.out")
+                self.save_receipt()
+                self.assertEqual(self.result()["status"], expected)
+
     def test_output_changed_after_receipt_is_rejected(self):
         (self.dst / "estimates.dat").write_bytes(b"999\n")
         self.assertEqual(self.result()["status"], "REVIEW_REQUIRED")

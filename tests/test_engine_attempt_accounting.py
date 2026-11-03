@@ -36,6 +36,25 @@ class CostTests(unittest.TestCase):
         result = costs.totals([self.inspect()])
         self.assertEqual(costs.require_closed_budget(result), (0, 0))
 
+    def test_dangling_evidence_cannot_reopen_zero_cost_budget(self):
+        for name in ("CLAIM.json", "ENGINE_STARTED.json", "ENGINE_RECEIPT.json",
+                     "RSTUDIO_REQUEST_CLAIM.json"):
+            with self.subTest(name=name):
+                path = self.work / name
+                try:
+                    path.symlink_to(self.root / "missing-receipt")
+                except OSError as error:
+                    self.skipTest(f"Symlinks unavailable: {error}")
+                try:
+                    item = self.inspect()
+                    self.assertFalse(item["accounting_complete"])
+                    self.assertNotEqual(item["state"], "NO_START_EVIDENCE")
+                    with self.assertRaises(ValueError):
+                        costs.require_closed_budget(costs.totals([item]))
+                    self.assertTrue(path.is_symlink())
+                finally:
+                    path.unlink()
+
     def test_direct_and_guard_terminal_receipts_without_export_are_counted(self):
         for relative in (".", "guard"):
             with self.subTest(relative=relative):

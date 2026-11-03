@@ -41,7 +41,7 @@ def inspect_attempt(member, work, output, cap_seconds, evidence_root=None):
         for name in names:
             path = root / name
             try:
-                if not path.exists():
+                if not (path.exists() or path.is_symlink()):
                     continue
                 if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
                     raise ValueError("成本回执必须是小型普通文件")

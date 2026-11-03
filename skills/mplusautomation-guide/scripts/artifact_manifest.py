@@ -22,7 +22,11 @@ def file_digest(path):
     if path.is_symlink():
         raise ValueError(f"Symlink is not an archived regular file: {path.name}")
     path_before = path.stat(follow_symlinks=False)
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if not stat.S_ISREG(path_before.st_mode):
+        raise ValueError("Manifest payload must be a regular file")
+    # 非阻塞打开也覆盖检查后被替换成FIFO的情况；普通文件读取语义不变。
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0))
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as stream:
         before = os.fstat(stream.fileno())

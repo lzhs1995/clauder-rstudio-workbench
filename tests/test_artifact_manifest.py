@@ -1,7 +1,10 @@
 """可移植结果包的自引用、字节改动和文件集变化必须被真实拒绝。"""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -77,6 +80,21 @@ class ArtifactManifestTests(unittest.TestCase):
             self.skipTest(f"Symlinks unavailable: {error}")
         with self.assertRaises(ValueError):
             self.make()
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX named pipe")
+    def test_fifo_without_writer_is_rejected_without_blocking(self):
+        for operation in ("build", "verify"):
+            with self.subTest(operation=operation):
+                root = self.root / operation
+                root.mkdir()
+                (root / "payload.txt").write_text("synthetic payload")
+                if operation == "verify":
+                    MODULE.build(root)
+                os.mkfifo(root / "stream")
+                result = subprocess.run([sys.executable, str(SCRIPT), operation, str(root)],
+                                        capture_output=True, text=True, timeout=3)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("regular file", json.loads(result.stdout)["error"])
 
     def test_stable_windows_stat_and_fstat_ctime_difference(self):
         original = MODULE.os.fstat

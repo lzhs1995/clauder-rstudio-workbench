@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import Mock, patch
 
 SCRIPTS = Path(os.environ.get("ORPHAN_GUARD_SCRIPTS",
                              Path(__file__).resolve().parents[1] / "skills/mplusautomation-guide/scripts"))
@@ -188,6 +189,48 @@ class OrphanGuardTests(unittest.TestCase):
     def test_output_must_terminate_normally(self):
         (self.dst / "model.out").write_bytes(b"Mplus VERSION 9\n*** ERROR\n")
         self.assertEqual(self.adopt()["decision"], "HOLD")
+
+    def test_matching_error_summaries_prevent_orphan_adoption(self):
+        content = (b"THE MODEL ESTIMATION TERMINATED NORMALLY\n"
+                   b"1 ERROR(S) FOUND IN THE INPUT INSTRUCTIONS\n")
+        for folder in (self.src, self.dst):
+            (folder / "model.out").write_bytes(content)
+        self.assertEqual(self.adopt()["decision"], "HOLD")
+        self.assertFalse((self.work / "recovery_adoptions").exists())
+
+    def test_default_original_job_cap_rejects_late_orphan_outputs(self):
+        self.marker["created"] = time.time() - 300
+        dump(self.dst / "ENGINE_STARTED.json", self.marker)
+        result = self.adopt()
+        self.assertEqual(result["decision"], "HOLD", result)
+        self.assertIn("original cap", result["reason"])
+        self.assertFalse((self.work / "recovery_adoptions").exists())
+
+    def test_missing_or_invalid_default_cap_cannot_authorize_adoption(self):
+        for cap in (None, 0, -1, True, "240", float("inf")):
+            with self.subTest(cap=cap):
+                dump(self.src / "job.json", {"hashes": self.inputs, "cap_seconds": cap})
+                result = self.adopt()
+                self.assertEqual(result["decision"], "HOLD", result)
+                self.assertFalse((self.work / "recovery_adoptions").exists())
+
+    def test_queryable_exited_process_does_not_require_live_metadata(self):
+        proc = Mock()
+        proc.create_time.return_value = self.marker["created"]
+        proc.wait.return_value = 0
+        proc.exe.side_effect = AssertionError("Exited executable must not be queried")
+        proc.cwd.side_effect = AssertionError("Exited cwd must not be queried")
+        with patch("psutil.Process", return_value=proc):
+            result = guard.process_state(self.marker, self.dst, sys.executable)
+        self.assertEqual(result["state"], "EXITED", result)
+
+    @unittest.skipUnless(os.name == "nt", "Windows retained process-handle behavior")
+    def test_windows_exited_child_with_retained_handle_is_terminal(self):
+        import psutil
+        with self.active_fixture() as process:
+            marker = {"pid": process.pid, "created": psutil.Process(process.pid).create_time()}
+        # Popen仍持有Windows进程句柄；此时不能靠PID仍可查询判定RUNNING。
+        self.assertEqual(guard.process_state(marker, self.dst, sys.executable)["state"], "EXITED")
 
     def test_nonfinite_numeric_output_refused(self):
         for value in (b"NaN 0.25\n", b"1.0e999 0.25\n", b"bad 1.25 0.25\n", b""):

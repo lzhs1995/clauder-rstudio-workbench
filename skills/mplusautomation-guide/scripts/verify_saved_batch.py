@@ -21,6 +21,8 @@ NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
 DATE_LINE = re.compile(r"\s*\d{2}/\d{2}/\d{4}\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s*\Z", re.I)
 TIME_LINE = re.compile(r"\s*(?:Beginning Time|Ending Time|Elapsed Time):")
 NORMAL = "THE MODEL ESTIMATION TERMINATED NORMALLY"
+ERROR_SUMMARY = re.compile(
+    r"\b(\d+)\s+ERROR\(S\)\s+FOUND\s+IN\s+THE\s+INPUT\s+INSTRUCTIONS\b", re.I)
 OUTPUTS = ("model.out", "estimates.dat", "tech3.dat")
 
 
@@ -70,10 +72,12 @@ def safe_name(value):
 
 def normalized_out(data):
     # 只排除已声明的时钟行；不消除拟合结果、警告、模型语义或数值差异。
-    lines = data.decode("latin-1").splitlines()
+    text = data.decode("latin-1")
+    lines = text.splitlines()
     normal = sum(line.strip() == NORMAL for line in lines)
-    errors = [line for line in lines if re.match(r"\s*\*{3}\s*ERROR\b", line)]
-    if normal != 1 or errors:
+    errors = [line for line in lines if re.match(r"\s*\*{3}\s*ERROR\b", line, re.I)]
+    positive_summary = any(int(match.group(1)) > 0 for match in ERROR_SUMMARY.finditer(text))
+    if normal != 1 or errors or positive_summary:
         raise Rejected("Output lacks one normal termination or contains an Mplus ERROR")
     return [line for line in lines if not DATE_LINE.fullmatch(line) and not TIME_LINE.match(line)]
 
