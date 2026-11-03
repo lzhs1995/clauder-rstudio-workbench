@@ -6,7 +6,7 @@ the `son` within-family contrast and baseline education (`C3`) in the latent
 
 ## Contract and result
 
-- Isolated root: `C:/Users/LZHS/pp_lgcm_review/charls_latent_h42_son_edu_full_20261022`.
+- Isolated root example: `C:/research/pp_lgcm_review/charls_latent_h42_son_edu_full_20261022` (substitute the local research root).
 - N=2263, communities=433, education counts 1773/490.
 - Twenty A working-MI members plus one MI01 B start sensitivity; one Mplus
   process at a time; 21 real engine calls.

@@ -4,7 +4,7 @@ This reference records the 2026-10-22 Windows run of a second CHARLS H4.2 branch
 
 ## Contract and result
 
-- Isolated root: `C:/Users/LZHS/pp_lgcm_review/charls_latent_h42_oldest_edu_full_20261022`.
+- Isolated root example: `C:/research/pp_lgcm_review/charls_latent_h42_oldest_edu_full_20261022` (substitute the local research root).
 - N=2397, communities=433, 20 A working-MI members plus one MI01 B start sensitivity.
 - One Mplus process at a time; 21 real Mplus calls; all 20 A members had usable normal termination and complete readback.
 - Independent verification reconstructed 2,814 parameters, 21 contrasts, the full robust covariance transform, and Rubin pooling.
