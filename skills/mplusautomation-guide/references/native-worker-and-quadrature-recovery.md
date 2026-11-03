@@ -165,6 +165,49 @@ preserve the frozen model/numerical contract when deciding the next change.
 
 The same-batch aggregate evidence is published at [charls_latent_interaction_models_delivery_20261019](https://github.com/lzhs1995/PP-lcgm-paper/tree/579c7a4f73948cbc7b5ef5167fa2b72e7a2a5495/charls_latent_interaction_models_delivery_20261019). `RUNTIME_RECOVERY.md` and `RUNTIME_RECOVERY_EVIDENCE.json` preserve the sequence; the model packages separately identify complete working-MI families and any stopped families. Original CFPS moderation coverage and full H4 remain incomplete.
 
+## Read the integration rule, not a filename
+
+`INTEGRATION=30` selects Mplus's default STANDARD rectangular/trapezoid rule.
+It does not select Gauss-Hermite. Use `INTEGRATION=GAUSSHERMITE(30)` when that
+is the declared rule, and verify the method, point count, adaptive setting
+and optimization algorithm in both the actual input and output. Historical
+identifiers such as `GH30` or `Q30` are not evidence of those settings. Keep
+their original bytes and record the discrepancy separately. The
+[Mplus ANALYSIS reference](https://www.statmodel.com/HTML_UG/chapter16V8.htm)
+defines these as distinct integration settings.
+
+A bounded 2026-11-03 CFPS check illustrates why the distinction matters.
+It concerned only the observed-Z0, fixed-residual-SY, MI01 sensitivity model
+with 134 parameters and household-clustered MLR. A conditional-Gaussian
+initializer matched an independent R likelihood and passed 268 coordinate
+derivative checks for the original two starts. It supplied starting values;
+it did not replace Mplus estimates, robust covariance or full-MI inference.
+
+With those starts, STANDARD30/60 and ODLL still ended with nonzero observed
+scores. Gauss-Hermite30 with ODLL reduced the reported SX score discrepancy
+but still failed the unchanged `MCONVERGENCE=1e-6` gate. One final declared
+trial used Gauss-Hermite30 with the original default EM optimizer. A and B
+both terminated normally in two EM iterations, using 18.207155 and 18.251538
+engine seconds. The output reported EMA and GAUSSHERMITE/30. The retained
+criteria were `CONVERGENCE=1e-8`, `MCONVERGENCE=1e-6`, `LOGCRITERION=1e-7`
+and `RLOGCRITERION=1e-11`; neither the data/model nor these gates were relaxed.
+
+The original R reader accepted all 134 parameters and the full covariance
+comparison. Maximum A/B parameter difference was about 5.2e-7 reference SE;
+relative covariance eigenvalues ranged from 0.9999877 to 1.0000282. A separate
+saved-output R audit verified both actual calls to MplusAutomation 1.3,
+normal termination, original criteria, input/output hashes and agreement
+with the independent exact likelihood. The same script can be sourced by a
+Windows agent or by a Mac agent through the bound Windows RStudio session.
+
+This is an accepted numerical calibration of that one sensitivity model,
+not completion of the original latent-IZ/free-SY model, new MI or full CFPS/H4.
+It does not imply Gauss-Hermite or EM is universally faster. Keep every failed
+attempt and its cost, declare each changed numerical setting before running,
+and bound the number of calibration trials. An engine exit code of zero or
+an external optimizer's stationary point cannot replace Mplus's normal
+termination and the original statistical acceptance checks.
+
 ## Recover startup and observation without duplicating estimation
 
 A later CHARLS latent H4.2 batch supplied three distinct failure cases. Keep

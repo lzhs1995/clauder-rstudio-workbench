@@ -154,4 +154,28 @@ The SD successor reused 77 stages and ran only the three originally unstarted
 stages, consuming 410.1106045 engine seconds. Its 40 primary imputations and
 80 stages then passed complete-file/source verification and 354 independent
 R/mitml checks. The calibration import audit retained the earlier producers;
-this acceptance does not cover the still-held son or CFPS calibrations.
+that acceptance did not cover the separate son or CFPS calibrations.
+
+## Completed income queue: 2026-11-03
+
+The son continuation subsequently retained 21 verified stages and completed
+the remaining 59 through the same Windows RStudio/ClaudeR/MplusAutomation 1.3
+driver. All four income families (gender, oldest, SD and son) now have 40
+primary imputations, 80 stages and independent R pooling acceptance. Each
+full-family check covered 354 assertions. The 12-family CHARLS H4.2 resource
+summary separately passed 148 checks; original CFPS moderation and full H4
+are not established by that summary.
+
+The final son segment used 6,703.5815702 engine seconds over 7,263.353105
+seconds between its first and last stage boundaries: 92.29% engine wall-time
+share. This includes local dispatch/readback overhead within those boundaries.
+It excludes earlier tool development, calibration and failed attempts; it is
+neither CPU utilization nor a controlled Mac-versus-Windows-local comparison.
+Report those other costs separately instead of extrapolating this one segment
+to the whole project. Results stayed on Windows while the Mac return-capacity
+condition was unmet.
+
+The CFPS MI01 calibration was later accepted independently; its bounded
+quadrature/optimizer lesson is in
+[native-worker-and-quadrature-recovery.md](native-worker-and-quadrature-recovery.md).
+It does not authorize a new imputation family or erase prior failed costs.

@@ -53,6 +53,13 @@
 
 ## 测量与选择
 
+2026-11-03 已有真实 RStudio 长批次证据：son 最后59阶段保留同一个Windows
+RStudio/ClaudeR/MplusAutomation 1.3链路，新增引擎6703.5815702秒、阶段边界墙钟
+7263.353105秒，引擎占92.29%。这不是CPU利用率，也未计此前工具开发、失败和校准
+时间；没有Windows本机agent对照，不能声称远程比本机快。其余细节见
+[队列效率与最终核收](queue-efficiency.md#completed-income-queue-2026-11-03)。
+下面三组小模型保留原先完整往返的测量口径，不与该长批次直接作加速比。
+
 2026-11-01 在同一 Windows Mplus 9 / R 4.5.2 / MplusAutomation 1.2 上，
 完成三组配对：每组 helper 合成回归，然后以完全相同 INP/DAT 直接运行 Mplus。
 六个估计均正常终止，每对三行参数的估计与标准误差为零。
@@ -114,3 +121,8 @@ PowerShell 5.1 使用 ZipArchiveMode 前须加载 `System.IO.Compression` 和
 的辅助乘积项，以及 GH07 终值核验后的 GH15 起点。既有输出的复核不会新增
 家族覆盖。CFPS 原四项调节完整推断与完整 H4 仍未完成；超时不等于零效应，
 基础设施修复不授权重跑原样失败规格或延长研究预算。
+
+2026-11-03 接续结果：四个收入分组家族均已完成40MI/80阶段及独立R合并，
+H4.2资源汇总从8/12补齐至12/12并通过148项汇总检查。CFPS观测Z0、固定SY的
+MI01两起点数值校准也已通过，见[积分规则与优化器核验](native-worker-and-quadrature-recovery.md#read-the-integration-rule-not-a-filename)。
+这两项都不等于CFPS原四项调节完整推断或完整H4；保留原估计对象和条件工作MI边界。
