@@ -168,6 +168,14 @@ def live_guardian(claim, work, member):
         args = proc.cmdline()
         if (os.path.normcase(str(Path(proc.exe()).resolve())) != os.path.normcase(str(Path(claim["exe"]).resolve()))
                 or "guardian" not in args or str(work) not in args or member not in args):
+            # 退出中的原进程在终态前可短暂读出空 cmdline/exe；有界等原 PID，仍活才判身份不符。
+            try:
+                proc.wait(timeout=.2)
+            except psutil.TimeoutExpired:
+                if process_finished(proc):
+                    return False
+            else:
+                return False
             raise Rejected("Live guardian identity differs")
         return not process_finished(proc)
     except psutil.NoSuchProcess:

@@ -230,6 +230,36 @@ class DurableMplusWorkerTests(unittest.TestCase):
             self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
         proc.wait(timeout=5)
 
+    def test_guardian_empty_identity_during_exit_is_reobserved(self):
+        # 复现 CI 竞态：终态前一瞬 cmdline 读成空列表，原进程随即退出，不应判身份不符。
+        release, ready = self.root / "empty-identity-release", self.root / "empty-identity-ready"
+        code = "from pathlib import Path\nimport sys,time\nPath(sys.argv[2]).touch()\nwhile not Path(sys.argv[1]).exists():time.sleep(.01)\n"
+        proc = self.child([sys.executable, "-c", code, str(release), str(ready), "guardian", str(self.work), self.members[0]], "empty-identity")
+        self.wait_path(ready)
+        observed = psutil.Process(proc.pid)
+        claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
+        def exiting_empty(_process):
+            release.touch()
+            return []
+        with mock.patch.object(psutil.Process, "cmdline", exiting_empty):
+            self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
+        proc.wait(timeout=5)
+
+    def test_live_guardian_with_other_identity_is_rejected(self):
+        # 负对照：同 PID 与创建时间但命令不是原 guardian，且进程仍活，必须拒绝。
+        release, ready = self.root / "other-identity-release", self.root / "other-identity-ready"
+        code = "from pathlib import Path\nimport sys,time\nPath(sys.argv[2]).touch()\nwhile not Path(sys.argv[1]).exists():time.sleep(.01)\n"
+        proc = self.child([sys.executable, "-c", code, str(release), str(ready), "other"], "other-identity")
+        self.wait_path(ready)
+        observed = psutil.Process(proc.pid)
+        claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
+        try:
+            with self.assertRaisesRegex(worker.Rejected, "Live guardian identity differs"):
+                worker.live_guardian(claim, self.work, self.members[0])
+        finally:
+            release.touch()
+            proc.wait(timeout=5)
+
     def test_second_coordinator_cannot_change_running_batch(self):
         self.configure(members=1, settings={"wait_before": True})
         first = self.launch_worker()
