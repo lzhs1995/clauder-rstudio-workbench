@@ -103,9 +103,13 @@ plan_apim_workflow <- function(config) {
   models<-list();grids<-list()
   for(did in names(config$designs)) {
     d<-config$designs[[did]]
-    apim_v2_fields(d,c('family','x','y','m','w','samples','steps','controls','covariances','probes','contrasts','probes_by_w','contrasts_by_w','testing_family','execute'),paste('design',did))
+    apim_v2_fields(d,c('family','x','y','m','w','samples','steps','controls','covariances','probes','contrasts','probes_by_w','contrasts_by_w','testing_family','execute','moderated_paths'),paste('design',did))
     apim_v2_assert(d$family%in%c('APIM','APIMeM','APIMoM','APIMeMoM'),'Unsupported family')
     med<-d$family%in%c('APIMeM','APIMeMoM');mod<-d$family%in%c('APIMoM','APIMeMoM')
+    # 调节中介的被调节路径：b（第二阶段，默认，与既有行为一致）、a（第一阶段）或 ab（两阶段）；其他家族不接受该字段。
+    if(identical(d$family,'APIMeMoM'))apim_v2_assert(is.null(d$moderated_paths)||
+      (is.character(d$moderated_paths)&&length(d$moderated_paths)==1&&d$moderated_paths%in%c('a','b','ab')),'moderated_paths must be a, b or ab')
+    else apim_v2_assert(is.null(d$moderated_paths),'moderated_paths applies to APIMeMoM only')
     apim_v2_pairs(d$x,'x');apim_v2_pairs(d$y,'y')
     if(med)apim_v2_pairs(d$m,'m') else apim_v2_assert(is.null(d$m),'Unexpected mediator')
     if(mod){apim_v2_names(d$w,'w');invisible(lapply(d$w,apim_v2_validate_w))}else apim_v2_assert(is.null(d$w),'Unexpected moderator')
@@ -127,6 +131,7 @@ plan_apim_workflow <- function(config) {
         probes=if(mod)apim_v2_default(d$probes_by_w[[names(d$w)[g$w]]],d$probes) else NULL,
         contrasts=if(mod)apim_v2_default(d$contrasts_by_w[[names(d$w)[g$w]]],d$contrasts) else NULL,
         testing_family=d$testing_family,axes=g,execute=is.null(d$execute)||id%in%d$execute)
+      if(identical(d$family,'APIMeMoM'))mm$moderated_paths<-apim_v2_default(d$moderated_paths,'b')
       required<-c(mm$x,mm$y,mm$m,mm$w$columns)
       apim_v2_assert(!anyDuplicated(required),'X/M/W/Y columns must be distinct; declare shared moderator once')
       if(mod) {

@@ -24,6 +24,12 @@ moderated. If both a and b are moderated, expand their product; the derivative i
 not generally a single constant index. Read the actual MODEL CONSTRAINT formula
 before naming a parameter an index of moderated mediation.
 
+In the v2 runner, APIMeMoM `moderated_paths` selects `"b"` (default, m×W in the
+y equations), `"a"` (x×W in the m equations, conditional a(W) × b) or `"ab"`
+(both, a(W) × b(W)); the direct path stays unmoderated. See
+[the v2 acceptance record](apim-v2-implementation-acceptance.md) for labels and
+the current acceptance status.
+
 Continuous moderator values, binary effect codes and reference groups must match
 the template and postprocessing. Preserve intended 90/95/99 percent interval
 levels. Keep bootstrap CI decisions distinct from normal-theory Wald p-values.

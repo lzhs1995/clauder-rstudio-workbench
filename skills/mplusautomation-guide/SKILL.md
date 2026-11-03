@@ -32,7 +32,7 @@ handoffs short. Engineering artifacts and test counts are not research progress.
 
 ## APIM, mediation and moderation
 
-For distinguishable-dyad APIM, APIMeM, APIMoM and b-path conditional mediation,
+For distinguishable-dyad APIM, APIMeM, APIMoM and conditional mediation (b, a or a+b path),
 start with [the APIM operating guide](APIM.md). It routes new data through
 `workflow.R` and complete existing `[[init]]` templates through the template
 preserving compiler. Keep each route's inference and supported-scope contract.
@@ -50,8 +50,9 @@ For the reusable Chapter 4 contract, read
 Set `schema_version = 2` and use `assets/example_config_v2.R`; changing the
 data path, member order, source names, samples, controls, probes or inference
 does not require editing the model compiler. The route explicitly covers
-APIM, APIMeM, APIMoM and b-path APIMeMoM, true multidimensional `[[init]]`
-expansion, equality labels, paired/shared continuous or categorical W,
+APIM, APIMeM, APIMoM and APIMeMoM (`moderated_paths` b by default, or a/ab,
+with native synthetic acceptance), true multidimensional
+`[[init]]` expansion, equality labels, paired/shared continuous or categorical W,
 Mplus-native row BC intervals, staged cache/resume, and R-side effect/table/
 figure generation. A complete existing template is passed through the
 template-preserving compiler with a declared hash and complete expected-file
@@ -174,7 +175,7 @@ do not execute the estimation steps below merely to close an editorial issue.
   predictor-matrix checks, GH07-to-GH15 start identity and the inference boundary.
 
 - [apim-v2-implementation-acceptance.md](references/apim-v2-implementation-acceptance.md): Chapter 4 schema-2 workflow, model/effect mapping, isolated template route, native acceptance matrix and migration boundary.
-- [example_config_v2.R](assets/example_config_v2.R), `scripts/apim_v2_config.R`, `scripts/apim_v2_models.R` and `scripts/apim_v2_runtime.R`: configurable APIM/APIMeM/APIMoM/b-path APIMeMoM pipeline with genuine multidimensional `[[init]]` expansion.
+- [example_config_v2.R](assets/example_config_v2.R), `scripts/apim_v2_config.R`, `scripts/apim_v2_models.R` and `scripts/apim_v2_runtime.R`: configurable APIM/APIMeM/APIMoM/APIMeMoM (b, a or a+b moderated paths) pipeline with genuine multidimensional `[[init]]` expansion.
 - `scripts/validate_apim_v2_native.py` and `scripts/validate_benchmark.py`: independent source-artifact formula/output-binding and queue-overlap validation.
 
 - [native-worker-and-quadrature-recovery.md](references/native-worker-and-quadrature-recovery.md): bind native Rterm/Rscript jobs by identity, separate startup and estimation failures, preserve free-format outputs, and calibrate quadrature before complete-MI inference.
