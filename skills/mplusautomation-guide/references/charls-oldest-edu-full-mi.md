@@ -8,7 +8,7 @@ This reference records the 2026-10-22 Windows run of a second CHARLS H4.2 branch
 - N=2397, communities=433, 20 A working-MI members plus one MI01 B start sensitivity.
 - One Mplus process at a time; 21 real Mplus calls; all 20 A members had usable normal termination and complete readback.
 - Independent verification reconstructed 2,814 parameters, 21 contrasts, the full robust covariance transform, and Rubin pooling.
-- Primary `SY:SXIZ` education group difference: −0.107926, 95% CI [−0.378970, 0.163118], p=.435137; planned 12-test Bonferroni value=1.
+- Keep the primary `SY:SXIZ` education-group estimate, interval, raw p-value and planned-family adjustment in the local study evidence, under the logical name `CHARLS_OLDEST_EDU_FULL_MI_PRIMARY_CONTRAST`. Bind that name to the exact pooling receipt and source hashes in the study manifest.
 - Scientific receipt must keep `original_CFPS_four_complete=false` and `full_H4_complete=false`. A complete CHARLS family is not complete four-family moderation or complete H4.
 
 ## Recovery sequence that matters

@@ -13,9 +13,10 @@ the `son` within-family contrast and baseline education (`C3`) in the latent
 - Every A member and MI01 B had usable normal termination. Independent
   verification reconstructed 2,814 parameters, 21 contrasts, the full
   covariance transform and Rubin pooling.
-- Primary `SY:SXIZ` education-group difference: −0.0406886792, 95% CI
-  [−0.3110330142, 0.2296556558], p=.7680030152; planned 12-test Bonferroni
-  value=1.
+- Keep the primary `SY:SXIZ` education-group estimate, interval, raw p-value
+  and planned-family adjustment in the local study evidence, under the logical
+  name `CHARLS_SON_EDU_FULL_MI_PRIMARY_CONTRAST`. Bind that name to the exact
+  pooling receipt and source hashes in the study manifest.
 - Keep `original_CFPS_four_complete=false` and `full_H4_complete=false`.
   This is one completed CHARLS family, not complete four-family moderation or
   complete H4.
