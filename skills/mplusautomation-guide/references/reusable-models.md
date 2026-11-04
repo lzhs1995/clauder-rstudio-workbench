@@ -52,3 +52,11 @@ parameter identities, estimates and standard errors, not only file counts.
 Use a third altered data set to confirm that the mapper actually uses new
 values. This establishes the mapping/execution path, not validity of another
 study's model or manuscript equivalence.
+
+`scripts/test_other_growth_compile_20261105.R` runs this check without Mplus:
+renamed and reordered sources must give byte-identical INP and DAT files, and
+changed values must change the DAT file but not the INP. It runs in the family
+CI workflow. `scripts/test_other_growth_native_20261105.R` repeats it with Mplus
+on an approved Windows window and compares parameter identities, estimates and
+standard errors; until that run, the registry records native evidence as
+pending.

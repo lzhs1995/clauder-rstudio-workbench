@@ -53,7 +53,9 @@
       "entry_functions": [
         "scripts/model_mapping.R:mplus_from_mapping",
         "scripts/mplus_workflow.R:run_mplus_model",
-        "scripts/growth_time_basis.R:growth_time_basis"
+        "scripts/growth_time_basis.R:growth_time_basis",
+        "scripts/growth_time_basis.R:growth_model_syntax",
+        "scripts/growth_time_basis.R:check_growth_statements"
       ],
       "config_example": null,
       "docs": [
@@ -315,6 +317,25 @@
       ],
       "needs_mplus": false,
       "ci": "mplus-ch5-synthetic.yml"
+    },
+    "other_growth_compile": {
+      "path": "scripts/test_other_growth_compile_20261105.R",
+      "lang": "R",
+      "function": "test_other_growth_compile",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "other_growth_native": {
+      "path": "scripts/test_other_growth_native_20261105.R",
+      "lang": "R",
+      "function": "test_other_growth_native",
+      "args": [],
+      "needs_mplus": true,
+      "ci": null
     }
   },
   "families": {
@@ -929,7 +950,7 @@
     "OTHER_GROWTH": {
       "aliases": [],
       "label_zh": "其他增长模型",
-      "summary": "手写 MODEL 的 mplusObject 加换名映射；不规则时间载荷。",
+      "summary": "手写 ANALYSIS 的 mplusObject 加换名映射；不规则时间载荷由 growth_model_syntax() 写成 Mplus 增长语句。",
       "routes": [
         "mplus_object_mapping"
       ],
@@ -942,13 +963,18 @@
         "references/cross-dataset-migration.md"
       ],
       "acceptance_doc": "references/reusable-models.md",
-      "tests": [],
+      "tests": [
+        "other_growth_compile",
+        "other_growth_native"
+      ],
       "evidence": {
         "synthetic_compile": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "other_growth_compile"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "原生运行包已备好（线性、二次、分段及换名换序/改值复用核对共 5 个模型），等 Windows 窗口用 scripts/test_other_growth_native_20261105.R 运行"
         },
         "real_data_swap": {
           "status": "not_started"
@@ -959,11 +985,14 @@
       },
       "freshness_files": [
         "scripts/model_mapping.R",
-        "scripts/growth_time_basis.R"
+        "scripts/growth_time_basis.R",
+        "scripts/mplus_workflow.R"
       ],
       "thesis_refs": [],
       "gaps": [
-        "mplus_from_mapping 与 growth_time_basis 没有测试；后者没有调用者"
+        "原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）",
+        "growth_model_syntax() 只写单一过程的增长因子；并行过程、协变量、分类结果仍需手写 MODEL",
+        "真实数据换源未排期"
       ]
     }
   }

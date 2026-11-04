@@ -57,7 +57,7 @@ whitelisted real-data receipts. After editing `families.json`, run
 | LTA | doc_only | pass* | — | — | readback | [lta-workflow.md](references/lta-workflow.md) |
 | MS_LTA | doc_only | pass* | — | — | readback | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
 | PP_LGCM | doc_only | —* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
-| OTHER_GROWTH | template | — | — | — | n/a | [reusable-models.md](references/reusable-models.md) |
+| OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
 
 `*`: the evidence has a stated limit; see [family-registry.md](references/family-registry.md).
 <!-- family-registry:end -->

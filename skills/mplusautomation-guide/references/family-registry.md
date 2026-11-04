@@ -32,7 +32,7 @@ For changing data sources or variables, follow
 | LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | MS_LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | PP_LGCM | doc_only | external_project, template_bundle | —* | — | pending* | pending |
-| OTHER_GROWTH | template | mplus_object_mapping | — | — | — | n/a |
+| OTHER_GROWTH | template | mplus_object_mapping | pass | pending* | — | n/a |
 
 ## APIM
 
@@ -236,17 +236,20 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 
 ## OTHER_GROWTH
 
-其他增长模型：手写 MODEL 的 mplusObject 加换名映射；不规则时间载荷。
+其他增长模型：手写 ANALYSIS 的 mplusObject 加换名映射；不规则时间载荷由 growth_model_syntax() 写成 Mplus 增长语句。
 
 - Data formats: in_memory
-- Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`
+- Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`
 - Docs: [reusable-models.md](reusable-models.md), [cross-dataset-migration.md](cross-dataset-migration.md)
 - Acceptance: [reusable-models.md](reusable-models.md)
-- synthetic_compile: not_started
-- native_synthetic: not_started
+- Tests: `scripts/test_other_growth_compile_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_other_growth_native_20261105.R` (needs Mplus)
+- synthetic_compile: pass; source `other_growth_compile`
+- native_synthetic: pending; 原生运行包已备好（线性、二次、分段及换名换序/改值复用核对共 5 个模型），等 Windows 窗口用 scripts/test_other_growth_native_20261105.R 运行
 - real_data_swap: not_started
 - historical_replay: not_applicable
-- Gap: mplus_from_mapping 与 growth_time_basis 没有测试；后者没有调用者
+- Gap: 原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）
+- Gap: growth_model_syntax() 只写单一过程的增长因子；并行过程、协变量、分类结果仍需手写 MODEL
+- Gap: 真实数据换源未排期
 
 ## Shared layers
 
