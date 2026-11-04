@@ -135,14 +135,12 @@ pooling checks passed; pooling through Windows RStudio/ClaudeR added no Mplus
 calls. MI02–20 each used one GH15 run with the frozen shared MI01 A15 start;
 MI01's four-point calibration does not establish a global optimum for every MI.
 
-For the registered scalar target `d2 = BETA:SY:IXSZ`, the primary estimate was
-`-0.04556940235` (SE `0.06465047472`, 95% interval
-`[-0.1722820044, 0.0811431997]`, raw p `0.4808986287`). With complete-data df
-437, the Barnard–Rubin sensitivity gave pooled df `435.0000026`, interval
-`[-0.1726355419, 0.0814967372]` and raw p `0.4812758435`. Target MCSE/SE was
-`0.0012212133`; the maximum across all 127 parameters was `0.0226355545`.
-This conditional estimate does not establish absence of an association. At
-this snapshot, M1's joint test and M2's scalar test completed 2/12 registered
+The registered scalar target, its primary and Barnard–Rubin sensitivity
+estimates, intervals, raw p-values and MCSE/SE ratios were independently
+reconciled against the saved study artifacts. Retain those numerical results
+in the study evidence; the reusable guide records the execution and acceptance
+method. A nonsignificant result does not establish absence of an association.
+At this snapshot, M1's joint test and M2's scalar test completed 2/12 registered
 tests; no final Holm adjustment was computed. Partial calibration of M4 does
 not count as full-MI completion. The working-MI and CFPS limitations above
 still apply.
