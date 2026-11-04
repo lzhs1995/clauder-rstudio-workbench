@@ -76,8 +76,13 @@
       ]
     },
     "mplus_object_syntax": {
-      "label": "mplusObject()/mplusModeler() 语法生成（第七章历史入口）",
-      "entry_functions": [],
+      "label": "mplusObject()/mplusModeler() 语法生成（第七章混合模型；显式规格，不是通用编译器）",
+      "entry_functions": [
+        "scripts/ch7_mixture_syntax.R:ch7_mixture_object",
+        "scripts/ch7_mixture_tools.R:ch7_classify_inp",
+        "scripts/ch7_mixture_tools.R:ch7_enumeration_table",
+        "scripts/ch7_mixture_tools.R:ch7_step3_binding"
+      ],
       "config_example": null,
       "docs": [
         "references/chapter7-source-variable-contract-20261104.md",
@@ -312,7 +317,8 @@
       "lang": "R",
       "function": "test_ch7_mixture_family",
       "args": [
-        "out_dir"
+        "out_dir",
+        "skill_root"
       ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml",
@@ -382,6 +388,17 @@
       ],
       "needs_mplus": true,
       "ci": null
+    },
+    "ch7_mixture_tools": {
+      "path": "scripts/test_ch7_mixture_tools_20261105.R",
+      "lang": "R",
+      "function": "test_ch7_mixture_tools",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
     }
   },
   "families": {
@@ -808,7 +825,7 @@
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "doc_only",
+      "code_status": "template",
       "data_formats": [
         "csv",
         "archived_dat"
@@ -820,7 +837,8 @@
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
-        "ch7_mixture_compile"
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -840,13 +858,16 @@
         }
       },
       "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
         "scripts/test_ch7_mixture_family_20261105.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "合成编译测试内的语法生成器还没有抽成可复用入口；没有类别枚举汇总与读出器"
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选"
       ]
     },
     "LTA": {
@@ -857,7 +878,7 @@
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "doc_only",
+      "code_status": "template",
       "data_formats": [
         "csv",
         "archived_dat"
@@ -869,7 +890,8 @@
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
-        "ch7_mixture_compile"
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -889,13 +911,16 @@
         }
       },
       "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
         "scripts/test_ch7_mixture_family_20261105.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "Step-1 存盘到 Step-3 输入的哈希绑定没有实现"
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表"
       ]
     },
     "MS_LTA": {
@@ -909,7 +934,7 @@
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "doc_only",
+      "code_status": "template",
       "data_formats": [
         "csv",
         "archived_dat"
@@ -921,7 +946,8 @@
       ],
       "acceptance_doc": "references/ms-lta-workflow.md",
       "tests": [
-        "ch7_mixture_compile"
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -941,13 +967,17 @@
         }
       },
       "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
         "scripts/test_ch7_mixture_family_20261105.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "没有从 INP 判定家族的语法分类器；流量图脚本在 skill 外"
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明",
+        "流量图（sankeyNetwork）在作者的第七章 R 脚本里，未收进 skill：只找到嵌在大脚本中的绘图段，没有独立脚本"
       ]
     },
     "PP_LGCM": {
