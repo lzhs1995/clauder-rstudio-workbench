@@ -9,6 +9,14 @@
 - 两者的共同输出是潜类别、后验概率、most-likely class、类别比例和模型拟合指标。
 - 不要把 LPA 的类别编号当作有序等级；类别编号只是软件内部标签，最终解释必须依赖条件均值/概率和理论含义。
 
+第七章的历史目录虽命名为 LPA，实际 24 个单期模型使用混合指标：
+`closz`、`esupz`、`isupz`、`opp5z` 四个连续指标，以及 `edwc`、`idwc`
+两个 `CATEGORICAL` 指标，各带对应波次后缀。原 `DEFINE` 先将后二者置 0，
+再分别按 `edw < esup*1`、`idw < isup*1` 赋值 1。复现时以实际
+`USEVARIABLES`、`CATEGORICAL`、`DEFINE` 和数据字典为准，不能把该目录当成
+六个全连续指标模型。更换变量须同时核原尺度、标准化、阈值方向和缺失处理；
+详见[换源与换变量合同](chapter7-source-variable-contract-20261104.md)。
+
 ## 2. 类别数枚举
 
 逐步估计 1 至 K 个类别，并记录：
@@ -23,8 +31,13 @@
 
 ## 3. MplusAutomation 结构
 
-推荐把模型写成 `[[init]]` 模板，再由 `createModels(templatefile)` 展开。当前
-MplusAutomation 1.2 的本机 `formals(createModels)` 只有一个参数
+先识别实际生成入口。第七章本轮核查的 24 个单期模型与核心纵向模型来自
+作者 R 脚本中的 `mplusObject()` / `mplusModeler()`；`[[init]]` 是可用的
+另一种生成方式，不能据此改写历史来源。保留原 R 区块、生成参数和实际
+`.inp` 的对应关系；旧大脚本中的安装、删除、清空和写回动作不能整体执行。
+
+新批量模板可用 `[[init]]`，再由 `createModels(templatefile)` 展开。此前
+已核验的 MplusAutomation 1.2 本机 `formals(createModels)` 只有一个参数
 `templatefile`；它读取模板文件、解析一个且仅一个 `[[init]]`/`[[/init]]`
 区段，并把生成的 `.inp` 写到 `outputDirectory`。`createModels()` 返回
 `NULL`，所以必须用文件清单和内容检查来验收生成结果。`replaceOutfile` 是
@@ -98,15 +111,34 @@ MplusAutomation vignette 的 `[[init]]`、`filename`、`outputDirectory` 模板
 
 第七章的 LPA 主要用于描述类别及其概率变化。后续转移机制的主要估计来自 LTA/MS-LTA 和 R-side logistic，而不是把单期 LPA 结果误当作转移结果。
 
+`readModels()` 的 `class_counts` 中，`modelEstimated`、`posteriorProb`
+与 `mostLikely` 是不同口径。导出长表时保留口径、潜变量、类别、计数/比例、
+原 `.out` SHA256；不能把三组相加，也不能用一组替代另一组。先在同一
+口径内检查比例和，再做显式类别映射。仅以类别数字对齐或仅比较 BIC 无法
+证明跨运行类别含义一致。
+
+归档表格还可能含派生显示值：第七章历史 aBIC 表存在从已打印舍入的 LL
+重新计算的路径。应分别核 Mplus 原输出值、R 派生公式和最终显示精度，
+不能把显示差异直接归因估计错误。比较合同见
+[第七章复现映射](chapter7-replay-map.md)。
+
 ## 5. 验收清单
 
 - [ ] 每个 K 的 `.inp`、`.out`、savedata 和 receipt 可追溯；
+- [ ] 连续/分类指标和 `DEFINE` 与原规格一致，生成入口有证据；
 - [ ] 类别编号已完成跨期语义对齐；
 - [ ] 每个类别都有条件均值/概率和样本比例；
+- [ ] 类别比例口径单独保存，原值、派生值和显示值分别验收；
 - [ ] Entropy、后验概率和最小类别规模符合预设门槛；
 - [ ] 明确说明 Entropy 是后验分类不确定性的摘要，不是逐人分类准确率，也不会自动校正 most-likely class 硬分类回归的测量误差；
 - [ ] 图、表和正文引用同一类别映射；
 - [ ] 任何硬分类回归都明确记录分类误差局限。
+
+第七章归档中，部分六类模型和自由测量模型已有标准误/一阶导数矩阵诊断；
+另有极端 logit 被固定的记录。`readModels()` 可能把这些信息放在 `errors`
+字段，即使原输出含正常结束文字。复盘应保留原文字、位置与输出 SHA，不为
+获得 clean pass 而改 starts、约束或样本。R 解析成功、新鲜引擎运行成功和
+科学推断可用性分别报告。
 
 ## 参考来源状态
 
