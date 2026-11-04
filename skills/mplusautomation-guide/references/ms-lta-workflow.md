@@ -40,7 +40,7 @@ q1629 的实际语法含 `G(2)`、`G#1` movers 和 `G#2` stayers，且为两期�
 2026-11-04 的归档核查另定位到四波
 `MS_lta_inv_3step_16_22_ref.cat.4_no_change.inp`：
 `G(2) c1(4) c2(4) c3(4) c4(4)`、N=3586、STARTS=0，Step-3 DAT
-为 3586×286。其归档 LL=-16782.011、BIC=33915.967；stayer 用有限
+为 3586×286。归档 LL/BIC 见本机证据（逻辑名：四波 MS-LTA 归档读回）；stayer 用有限
 `-10/+20` logit 逼近不转移。本轮对该文件的读取与重绘是
 `ARCHIVED_READBACK_ONLY`，不新增四波 Mplus 估计成功的声明。
 
