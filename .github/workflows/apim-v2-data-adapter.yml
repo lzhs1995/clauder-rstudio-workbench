@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install process admission dependency
+        run: python -m pip install psutil
       - name: Install XQuartz for macOS template compilation
         if: runner.os == 'macOS'
         # MplusAutomation 的模板编译会加载 tcltk，macOS R 需要 X11 动态库。
@@ -37,6 +39,10 @@ jobs:
             any::digest
             any::jsonlite
             any::ps
+            any::ggplot2
+            any::officer
+            any::flextable
+            any::svglite
       - name: Synthetic DTA/CSV and APIM regression contracts
         shell: Rscript {0}
         run: |
@@ -52,3 +58,7 @@ jobs:
           test_apim_v2(skill, file.path(evidence, 'v2'), engine, python)
           source(file.path(skill, 'scripts/test_workflow_contract.R'))
           test_apim_contract(file.path(skill, 'scripts'), file.path(evidence, 'v1'), engine, python)
+          source(file.path(skill, 'scripts/test_charls_apim_swap.R'))
+          test_charls_apim_swap(skill, file.path(evidence, 'charls'), engine, python)
+      - name: CHARLS Windows admission synthetic regressions
+        run: python -m unittest discover -s skills/mplusautomation-guide/scripts -p test_charls_swap_windows_runner.py -v
