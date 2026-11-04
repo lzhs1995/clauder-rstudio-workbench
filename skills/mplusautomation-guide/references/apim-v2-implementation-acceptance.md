@@ -7,7 +7,8 @@ replace unresolved historical data provenance.
 ## Reusable workflow
 
 The v2 runner is selected by `schema_version = 2` in `run_apim_workflow()`.
-The caller supplies a CSV (or an explicitly hashed archived DAT), row and
+The caller supplies a CSV, a Stata `.dta` file through
+[the data adapter](apim-v2-data-adapter.md), or an explicitly hashed archived DAT, row and
 cluster identifiers, two ordered member columns, sample filters, complete-case
 policy, transformations, equation controls, equality groups, moderator
 declarations, probes/contrasts, inference and an isolated output root.
