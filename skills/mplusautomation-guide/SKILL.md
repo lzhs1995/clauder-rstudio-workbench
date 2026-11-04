@@ -99,6 +99,11 @@ codes explicitly. The adapter preserves source snapshots and records aggregate
 conversion counts; it does not infer spouse links, measurement equivalence,
 historical sample identity, or scientific acceptance from successful I/O.
 
+For Stata raw DTA-to-CSV/DAT chains, read
+[Stata raw-chain reproducibility](references/stata-raw-chain-reproducibility.md)
+before replaying or diagnosing differences in actor selection, complete-case
+membership, or archive values.
+
 The v2 source boundary is strict: original sources remain read-only, every run
 uses a disjoint root and byte-hashed snapshot, and aliases/hardlinks are
 rejected. `scripts/apim_v2_io.py`, `mplus_queue.py` and
