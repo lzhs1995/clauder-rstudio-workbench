@@ -29,7 +29,14 @@
 
 仅凭某一个信息准则选 K 不够。第七章实际采用“统计拟合 + 分类质量 + 类别规模 + 理论可解释性”的联合判据。历史 acceptance 记录保留了 time1 的六类选择、time2–time4 的四类选择；论文最终为跨期 LTA 的可比性采用四类测量结构。这是“历史单期选择”和“最终纵向规格”两个不同决策，不能把最终四类改写成“四个时间点只估计了四类”，也不能用枚举 1–6 的范围掩盖该分歧。
 
+`scripts/ch7_mixture_tools.R` 的 `ch7_enumeration_table(paths, min_class_prop, min_entropy)` 读同一组数据、同一个类别变量的各 K `.out`，
+汇总上述 1–4 项（含最优 LL 是否复现）和各准则的单列标记，并在 `attr(, "selection")` 写明不代选 K。
+输入不一致（类别变量、USEVARIABLES、样本量不同或 K 重复）时直接报错。第 5 项和最终取舍仍由研究者记录。
+
 ## 3. MplusAutomation 结构
+
+新规格可用 `scripts/ch7_mixture_syntax.R` 的 `ch7_mixture_object()`：按显式指标、类别数、不变性与 Step-3
+分类误差写 `mplusObject`，第七章合成编译测试即调用它。它不选变量类型、不读研究文件。
 
 先识别实际生成入口。第七章本轮核查的 24 个单期模型与核心纵向模型来自
 作者 R 脚本中的 `mplusObject()` / `mplusModeler()`；`[[init]]` 是可用的

@@ -1,6 +1,8 @@
 # 第七章合成编译合同：只生成INP/DAT，不读取研究文件或调用Mplus。
 # 独立运行：Rscript test_ch7_mixture_family_20261105.R <新的证据目录>
-test_ch7_mixture_family <- function(output_dir) {
+# 语法由 scripts/ch7_mixture_syntax.R 生成；本文件独立解析写出的 INP/DAT 作验收依据。
+test_ch7_mixture_family <- function(output_dir, skill_root) {
+  source(file.path(normalizePath(skill_root, winslash = '/'), 'scripts/ch7_mixture_syntax.R'), local = TRUE)
   for (pkg in c('MplusAutomation', 'digest', 'jsonlite')) {
     if (!requireNamespace(pkg, quietly = TRUE)) stop('Missing package: ', pkg)
   }
@@ -23,7 +25,12 @@ test_ch7_mixture_family <- function(output_dir) {
           print = FALSE, where = ns)
   }
   on.exit(for (fun in c('runModels', 'detectMplus')) untrace(fun, where = ns), add = TRUE)
-  reject('engine_guard_blocks_runModels', MplusAutomation::runModels())
+  # 断言拦截信息本身：没装 Mplus 时 runModels 本来就会报错，只查"有报错"不能证明拦截生效。
+  guard <- function(expr) tryCatch({ force(expr); '' }, error = conditionMessage)
+  check('engine_guard_blocks_runModels',
+        identical(guard(MplusAutomation::runModels()), 'ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI'))
+  check('engine_guard_blocks_detectMplus',
+        identical(guard(MplusAutomation::detectMplus()), 'ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI'))
 
   # 所有数值仅为固定种子的合成设计，不从论文结果或个人记录取得。
   set.seed(7105L)
@@ -45,78 +52,24 @@ test_ch7_mixture_family <- function(output_dir) {
   # 误分类矩阵是另行声明的合成输入，不是Step-1估计，也不授予端到端血缘。
   error_probability <- rbind(c(.82,.11,.07), c(.13,.78,.09), c(.08,.17,.75))
   check('synthetic_error_matrix_rows', all(abs(rowSums(error_probability) - 1) < 1e-12))
-  fixed_logits <- log(error_probability[, 1:2] / error_probability[, 3])
-  fmt <- function(x) sprintf('%.12f', x)
   specs <- c(unlist(lapply(1:4, function(t) paste0('lpa_t', t, '_k', 1:3))),
              'lta_invariant', 'lta_free', 'mslta_invariant', 'lta_step3', 'mslta_step3')
-  wrap <- function(x) paste(unlist(lapply(x, strwrap, width=80L)), collapse='\n')
 
-  # 生成器只服务本测试的明确小型规格，不宣称是任意数据通用编译器。
+  # 生成器在 scripts/ch7_mixture_syntax.R（ch7_mixture_object）；这里只把角色映射成显式规格。
   build <- function(id, data, mapping) {
     getv <- function(role) unname(mapping[role])
-    lpa <- grepl('^lpa_', id)
     step3 <- grepl('step3$', id)
-    ms <- grepl('^mslta', id)
-    invariant <- id != 'lta_free'
-    if (lpa) {
-      t <- as.integer(sub('lpa_t([1-4])_.*', '\\1', id))
-      k <- as.integer(sub('.*_k', '', id))
-      used <- getv(paste0('t', t, c('x1','x2','x3','x4','b1','b2')))
-      categorical <- getv(paste0('t', t, c('b1','b2')))
-      classes <- paste0('c(', k, ')')
-      body <- c('%OVERALL%', paste0(getv(paste0('t', t, 'x', 1:4)), collapse = ' '))
-      body[2] <- paste0(body[2], ';')
-      for (j in seq_len(k)) body <- c(body, paste0('%c#',j,'%'),
-        paste0('[',paste(getv(paste0('t',t,'x',1:4)),collapse=' '),'];'),
-        paste0('[',paste0(getv(paste0('t',t,'b',1:2)),'$1',collapse=' '),'];'))
-    } else {
-      k <- 3L
-      used <- getv(if (step3) nominal_roles else roles)
-      categorical <- if (step3) character() else getv(roles[grepl('b',roles)])
-      classes <- paste(c(if (ms) 'g(2)', paste0('c',1:4,'(3)')), collapse = ' ')
-      body <- c('%OVERALL%', 'c2 ON c1;', 'c3 ON c2;', 'c4 ON c3;')
-      if (ms) {
-        body <- c(body, 'c1 ON g;', 'MODEL g:', '%g#1%',
-                  '[c2#1 c2#2];', '[c3#1 c3#2];', '[c4#1 c4#2];',
-                  'c2 ON c1;', 'c3 ON c2;', 'c4 ON c3;', '%g#2%')
-        # 有限logit逼近stayer对角线，不能宣称精确概率0/1。
-        for (t in 2:4) body <- c(body,
-          sprintf('[c%d#1@-10 c%d#2@-10];',t,t),
-          sprintf('c%d#1 ON c%d#1@20 c%d#2@0;',t,t-1,t-1),
-          sprintf('c%d#2 ON c%d#1@0 c%d#2@20;',t,t-1,t-1))
-      }
-      for (t in 1:4) {
-        body <- c(body, paste0('MODEL c',t,':'))
-        for (j in 1:3) {
-          body <- c(body, paste0('%c',t,'#',j,'%'))
-          if (step3) {
-            body <- c(body, paste0('[',getv(paste0('n',t)),'#',1:2,'@',fmt(fixed_logits[j,]),'];'))
-          } else {
-            for (a in 1:6) {
-              variable <- getv(paste0('t',t,if (a<=4) paste0('x',a) else paste0('b',a-4)))
-              label <- paste0(if (invariant) 'm' else paste0('w',t), 'k',j,'i',a)
-              body <- c(body, paste0('[',variable,if (a>4) '$1','] (',label,');'))
-            }
-          }
-        }
-      }
-    }
-    source_roles <- if (step3) nominal_roles else roles
-    kept <- names(data)[names(data) %in% getv(source_roles)]
-    dataset <- data[, kept, drop = FALSE]
-    variable <- c(paste0('USEVARIABLES = ',paste(used,collapse=' '),';'),
-                  paste0(if (step3) 'NOMINAL' else 'CATEGORICAL',' = ',
-                         paste(if (step3) used else categorical,collapse=' '),';'),
-                  paste0('CLASSES = ',classes,';'))
-    define <- if (step3) NULL else paste0('CENTER ',paste(getv(source_roles[grepl('x',source_roles)]),collapse=' '),' (GRANDMEAN);')
-    object <- MplusAutomation::mplusObject(TITLE=paste0('Synthetic compile ',id,';'),
-      VARIABLE=wrap(variable), DEFINE=if(is.null(define))NULL else wrap(define),
-      ANALYSIS=paste('TYPE = MIXTURE;', 'ESTIMATOR = MLR;',
-                     if (step3) 'STARTS = 0;' else 'STARTS = 20 5;',
-                     'PROCESSORS = 1;', sep='\n'), MODEL=paste(body,collapse='\n'),
-      OUTPUT='TECH1 TECH8;', SAVEDATA='FILE = posterior.dat; SAVE = CPROBABILITIES;',
-      rdata=dataset, usevariables=names(dataset), autov=FALSE, quiet=TRUE)
-    list(object=object, data=dataset)
+    family <- if (grepl('^lpa_', id)) 'lpa' else if (grepl('^mslta', id)) 'mslta' else 'lta'
+    keep <- getv(if (step3) nominal_roles else roles)
+    title <- paste0('Synthetic compile ', id, ';')
+    if (step3) return(ch7_mixture_object(data, family, classes = 3L, keep = keep, title = title,
+      step3 = list(nominal = getv(nominal_roles), error = error_probability)))
+    waves <- if (family == 'lpa') list(getv(paste0('t', sub('lpa_t([1-4])_.*', '\\1', id), c('x1','x2','x3','x4','b1','b2'))))
+             else lapply(1:4, function(t) getv(paste0('t', t, c('x1','x2','x3','x4','b1','b2'))))
+    classes <- if (family == 'lpa') as.integer(sub('.*_k', '', id)) else 3L
+    ch7_mixture_object(data, family, waves = waves, categorical = intersect(getv(roles[grepl('b', roles)]), unlist(waves)),
+      classes = classes, invariant = id != 'lta_free', center = getv(roles[grepl('x', roles)]),
+      keep = keep, title = title)
   }
 
   normalize <- function(x) tolower(gsub('\\s+', ' ', trimws(x)))
@@ -344,5 +297,7 @@ test_ch7_mixture_family <- function(output_dir) {
 if (sys.nframe()==0L) {
   args<-commandArgs(trailingOnly=TRUE)
   if(length(args)!=1L)stop('Usage: Rscript test_ch7_mixture_family_20261105.R <fresh-output-dir>')
-  test_ch7_mixture_family(args[[1]])
+  # skill 根：本脚本位于 scripts/ 下
+  file_arg<-grep('^--file=',commandArgs(FALSE),value=TRUE)
+  test_ch7_mixture_family(args[[1]],file.path(dirname(sub('^--file=','',file_arg[[1]])),'..'))
 }

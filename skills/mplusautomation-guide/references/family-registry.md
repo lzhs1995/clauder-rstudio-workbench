@@ -28,9 +28,9 @@ For changing data sources or variables, follow
 | MED | template | template_bundle | pass* | pending* | pending* | readback* |
 | MOD | configurable | r_glm_moderation | pass* | n/a* | pending* | pass* |
 | MODMED | template | template_bundle | pass* | pending* | pending* | readback* |
-| LPA_LCA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
-| LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
-| MS_LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
+| LPA_LCA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
+| LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
+| MS_LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | PP_LGCM | doc_only | external_project, template_bundle | —* | — | pending* | pending |
 | OTHER_GROWTH | template | mplus_object_mapping | pass | pending* | — | n/a |
 
@@ -167,34 +167,36 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 
 - Aliases: LPA, LCA
 - Data formats: csv, archived_dat
-- Route `mplus_object_syntax`: no entry function
+- Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml)
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
 - native_synthetic: not_started
 - real_data_swap: not_started
 - historical_replay: archived_readback_only; source `references/chapter7-replay-map.md`
 - Thesis: 第七章
-- Gap: 合成编译测试内的语法生成器还没有抽成可复用入口；没有类别枚举汇总与读出器
+- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
+- Gap: 类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选
 
 ## LTA
 
 潜转变分析：测量不变、转移概率与三步法 Step-3。
 
 - Data formats: csv, archived_dat
-- Route `mplus_object_syntax`: no entry function
+- Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml)
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
 - native_synthetic: not_started
 - real_data_swap: not_started
 - historical_replay: archived_readback_only; source `references/chapter7-replay-map.md`
 - Thesis: 第七章
-- Gap: Step-1 存盘到 Step-3 输入的哈希绑定没有实现
+- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
+- Gap: Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表
 
 ## MS_LTA
 
@@ -202,17 +204,19 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 
 - Aliases: MS-LTA, mover-stayer LTA
 - Data formats: csv, archived_dat
-- Route `mplus_object_syntax`: no entry function
+- Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
 - Acceptance: [ms-lta-workflow.md](ms-lta-workflow.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml)
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
 - native_synthetic: not_started
 - real_data_swap: not_started
 - historical_replay: archived_readback_only; source `references/chapter7-replay-map.md`
 - Thesis: 第七章
-- Gap: 没有从 INP 判定家族的语法分类器；流量图脚本在 skill 外
+- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
+- Gap: stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明
+- Gap: 流量图（sankeyNetwork）在作者的第七章 R 脚本里，未收进 skill：只找到嵌在大脚本中的绘图段，没有独立脚本
 
 ## PP_LGCM
 
