@@ -59,6 +59,15 @@ RStudio/ClaudeR/MplusAutomation 1.3链路，新增引擎6703.5815702秒、阶段
 时间；没有Windows本机agent对照，不能声称远程比本机快。其余细节见
 [队列效率与最终核收](queue-efficiency.md#completed-income-queue-2026-11-03)。
 
+2026-11-04 的 M1 后续19份MI在同一个Windows ClaudeR异步R worker内，经
+MplusAutomation 1.3完成。提交回执绑定真实RStudio父进程、rsession出生时间和
+端口，每份保留R调用及确认退出的引擎回执。这证明Mac经xdev访问Windows本机
+HTTP的链路；`native_mcp_verified=false`，不等于原生Mac MCP验收，也没有新增
+Windows本机agent对照。其聚合包347件、4,747,463字节，经整包及逐文件SHA、
+字节和精确文件集合核验；data.dat留Windows。跨机层负责身份、原job恢复与回传，
+科学层仍由两种agent入口共用。批内90.74%与先导7.31%的不同计时窗口见
+[分开报告批次和校准耗时](queue-efficiency.md#separate-batch-throughput-from-calibration-time)。
+
 2026-11-04 的 CFPS H4.2 六个独立首尝试，经 xdev 提交回执 `3063` 进入同一
 Windows RStudio/ClaudeR 异步 R 链。原 `R_OWNER.json` 记录 RStudio PID 42264、
 rsession PID 33684、R worker PID 28872；`R_MPLUSAUTOMATION_CALL.json` 固定

@@ -66,6 +66,25 @@ limit separately passed five native Windows cases, including UTF-8, failure,
 unknown outcome and identical cached replies. These are control checks, not
 proof that every queued scientific family completed.
 
+## Separate batch throughput from calibration time
+
+The 2026-11-04 M1 continuation completed 19 new imputations in one Windows
+RStudio/ClaudeR async R worker, reusing accepted MI01. The observed Taipei
+16:50:48–17:14:11 batch window was 1,403 seconds; confirmed Mplus elapsed time
+was 1,273.1365357 seconds, or 90.74%. Its preceding five-call pilot used
+204.6378507 engine seconds between the first claim at 16:00:43 and the final
+numerical comparison at 16:47:20.912: 2,797.912 seconds, or 7.31%. Neither
+ratio is CPU utilization, a Mac-versus-Windows speedup or whole-day efficiency.
+
+The pilot intervals include retrieval, independent readback, start/input
+preparation and staged calibration admission; the evidence does not isolate
+pure network delay. Batch completion to the final pooling audit took another
+916.979 seconds. Report these windows separately. Prepare reusable inputs and
+readback work while an earlier point runs, retain the required numerical gates,
+then dispatch an admitted full-MI batch once rather than making each MI a
+cross-device round trip. The associated scientific checks are documented in
+[latent-product-full-mi.md](latent-product-full-mi.md).
+
 ## Recover a resource-held prefix
 
 For the PP-LGCM income GH7/GH15 adapter,

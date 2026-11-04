@@ -157,6 +157,10 @@ do not execute the estimation steps below merely to close an editorial issue.
   starts without exports, keep unknown exit costs open, reserve both GH stages,
   and retain runtime gates under optimized Python in either agent entry point.
 
+- [latent-product-full-mi.md](references/latent-product-full-mi.md): correlated
+  latent-product propagation, semantic full-covariance calibration, complete-MI
+  Rubin/D1 inference and the verified M1 versus calibrated-only M2 boundary.
+
 - [durable-windows-worker.md](references/durable-windows-worker.md)：
   Windows 原目录恢复、独立引擎监督、永久预算和实际进程退出判断；
   与 Mac 客户端分工，原始保存输出复现与新增科研模型保持各自范围。
