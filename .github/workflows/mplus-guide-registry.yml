@@ -1,0 +1,44 @@
+name: mplus-guide registry
+
+# 家族注册表、生成视图、真实数据回执与公开边界的检查；只需 Python 标准库。
+on:
+  pull_request:
+    paths:
+      - skills/mplusautomation-guide/**
+      - .github/workflows/mplus-guide-registry.yml
+      - .github/scripts/public_boundary_scan.py
+  push:
+    branches: [main]
+    paths:
+      - skills/mplusautomation-guide/**
+      - .github/workflows/mplus-guide-registry.yml
+      - .github/scripts/public_boundary_scan.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Registry unit tests
+        run: python -m unittest tests.test_mplus_family_registry -v
+      - name: Registry, generated views and real-data receipts
+        # 回执过期只发警告（发布前另用 --strict）
+        run: python skills/mplusautomation-guide/scripts/family_registry.py check --github
+      - name: Queue admission contract
+        working-directory: skills/mplusautomation-guide/scripts
+        run: python -m unittest test_rstudio_queue_admission -v
+      - name: Public boundary scan of added lines (warning only)
+        if: github.event_name == 'pull_request'
+        run: >-
+          python .github/scripts/public_boundary_scan.py
+          "${{ github.event.pull_request.base.sha }}" HEAD
+          --path skills/mplusautomation-guide --github
