@@ -52,3 +52,15 @@ jobs:
           test_apim_v2(skill, file.path(evidence, 'v2'), engine, python)
           source(file.path(skill, 'scripts/test_workflow_contract.R'))
           test_apim_contract(file.path(skill, 'scripts'), file.path(evidence, 'v1'), engine, python)
+      - name: Synthetic Chapter 7 mixture family compilation
+        if: runner.os == 'Linux'
+        # 第七章仅复用 Ubuntu 一格；只生成合成 INP/DAT，不启动 Mplus。
+        run: Rscript skills/mplusautomation-guide/scripts/test_ch7_mixture_family_20261105.R "$RUNNER_TEMP/ch7-mixture-synthetic-ci"
+      - name: Upload Chapter 7 synthetic compilation evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch7-mixture-synthetic-ci
+          path: ${{ runner.temp }}/ch7-mixture-synthetic-ci
+          if-no-files-found: warn
+          retention-days: 7
