@@ -25,9 +25,9 @@ For changing data sources or variables, follow
 | APIMeM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
 | APIMoM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | — | pass* |
 | APIMeMoM | configurable | apim_v2_config, template_bundle, archived_replay | pass | pass* | — | pass* |
-| MED | none | template_bundle | — | — | — | pending* |
-| MOD | none | template_bundle | — | — | — | pending* |
-| MODMED | none | template_bundle | — | — | — | pending* |
+| MED | template | template_bundle | pass* | — | pending* | readback* |
+| MOD | doc_only | template_bundle | pass* | n/a* | pending* | pass* |
+| MODMED | template | template_bundle | pass* | — | pending* | readback* |
 | LPA_LCA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | MS_LTA | doc_only | mplus_object_syntax, template_bundle | pass* | — | — | readback |
@@ -115,12 +115,16 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: mediation
 - Data formats: csv, dta
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- synthetic_compile: not_started
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
+- Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml)
+- synthetic_compile: pass; source `ch5_mediation_moderation_synthetic`; 合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛
 - native_synthetic: not_started
-- real_data_swap: not_started
-- historical_replay: pending; 第五章复现进行中
+- real_data_swap: pending; 第五章 Mplus 分层重估等待 Windows 计算窗口
+- historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
-- Gap: skill 内尚无文档、模板与测试
+- Gap: 合成模板只覆盖二值 M、Y 的反事实分解；连续线性乘积中介没有单独的合成模板
+- Gap: 模板尚未在 Mplus 引擎上跑过合成数据
 
 ## MOD
 
@@ -129,12 +133,16 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: moderation
 - Data formats: csv, dta
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- synthetic_compile: not_started
-- native_synthetic: not_started
-- real_data_swap: not_started
-- historical_replay: pending; 第五章复现进行中
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
+- Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml)
+- synthetic_compile: pass; source `ch5_mediation_moderation_synthetic`; 合成数据：R 拟合、效应编码、聚类 HC0 协方差与控制集合规则，不调用 Mplus
+- native_synthetic: not_applicable; 静态调节只在 R 中拟合，没有 Mplus 引擎步骤
+- real_data_swap: pending; 尚无白名单换源回执
+- historical_replay: pass; source `references/chapter5-replay-map.md`; 在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致
 - Thesis: 第五章
-- Gap: skill 内尚无文档、模板与测试
+- Gap: 第五章静态调节在 R 中用 glm 加聚类稳健协方差拟合；注册表登记的 template_bundle 路线不对应该实现，R 拟合尚无注册路线
+- Gap: 简单斜率只在文档中说明，没有可复用的绘图入口
 
 ## MODMED
 
@@ -143,12 +151,16 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: moderated mediation
 - Data formats: csv, dta
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- synthetic_compile: not_started
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
+- Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml)
+- synthetic_compile: pass; source `ch5_mediation_moderation_synthetic`; 合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛
 - native_synthetic: not_started
-- real_data_swap: not_started
-- historical_replay: pending; 第五章复现进行中
+- real_data_swap: pending; 第五章 Mplus 分层重估等待 Windows 计算窗口
+- historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
-- Gap: skill 内尚无文档、模板与测试
+- Gap: 合成模板只覆盖连续 W；三分类 W 的效应编码取值与子样本量常量没有合成模板
+- Gap: 模板尚未在 Mplus 引擎上跑过合成数据
 
 ## LPA_LCA
 
