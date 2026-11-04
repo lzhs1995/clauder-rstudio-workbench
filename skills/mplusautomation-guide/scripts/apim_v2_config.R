@@ -67,11 +67,12 @@ plan_apim_workflow <- function(config) {
   apim_v2_assert(identical(as.integer(config$schema_version),2L),'Unsupported schema_version')
   apim_v2_fields(config,c('schema_version','data','output_dir','engine','python','row_id','cluster','members',
     'missing','missing_policy','samples','transform','designs','inference','bootstrap','resource','protected_roots',
-    'execution','presentation','testing','template_bundles','data_mode','data_columns','data_expected_sha256'), 'config')
+    'execution','presentation','testing','template_bundles','data_mode','data_columns','data_expected_sha256',
+    'column_map','missing_codes'), 'config')
   needed<-c('data','output_dir','engine','python','row_id','cluster','members','missing','missing_policy','samples','transform','designs','inference','resource')
   apim_v2_assert(all(needed%in%names(config)),paste('Missing config fields:',paste(setdiff(needed,names(config)),collapse=',')))
   apim_v2_assert(identical(config$missing_policy,'complete_case'),'Only explicit complete_case is implemented for new data')
-  apim_v2_assert(apim_v2_default(config$data_mode,'csv')%in%c('csv','archived_dat'),'Unsupported data mode')
+  apim_v2_assert(apim_v2_default(config$data_mode,'csv')%in%c('csv','dta','archived_dat'),'Unsupported data mode')
   apim_v2_assert(file.exists(config$engine)&&file.exists(config$python),'Resolve engine and native Python explicitly')
   apim_v2_assert(length(config$members)==2&&!anyDuplicated(config$members),'Declare two distinguishable member labels')
   apim_v2_assert(length(config$row_id)==1&&length(config$cluster)==1,'One record ID and one cluster ID required')
@@ -159,7 +160,7 @@ plan_apim_workflow <- function(config) {
     }
   }
   # 检查所有源列；此步骤只读取，不生成DAT、不创建运行目录。
-  if(apim_v2_default(config$data_mode,'csv')=='csv')cols<-names(read.csv(config$data,nrows=0,check.names=FALSE)) else cols<-config$data_columns
+  cols<-apim_v2_source_columns(config)
   for(m in models)apim_v2_assert(all(c(config$row_id,config$cluster,m$x,m$y,m$m,m$w$columns,unlist(m$controls),
     names(config$samples[[m$sample]]$filter))%in%cols),paste('Missing source column in',m$id))
   list(schema_version=2L,root=root,source_sha256=apim_sha(config$data,TRUE),models=models,grids=grids,

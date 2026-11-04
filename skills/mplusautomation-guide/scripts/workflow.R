@@ -310,5 +310,5 @@ run_apim_workflow <- function(config, stages=c('check','prepare','compile','fit'
 }
 
 # v2为显式选择的扩展入口；v1默认语义保持不变。
-for(apim_module in c('apim_v2_config.R','apim_v2_models.R','apim_v2_runtime.R'))
+for(apim_module in c('apim_v2_config.R','apim_v2_data_adapter.R','apim_v2_models.R','apim_v2_runtime.R'))
   source(file.path(apim_script_dir,apim_module),local=TRUE)
