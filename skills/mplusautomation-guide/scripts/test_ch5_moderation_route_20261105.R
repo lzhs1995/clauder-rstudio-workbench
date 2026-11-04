@@ -31,7 +31,16 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
   m <- ch5_fit_moderation_spec(base, d)
   ref <- ch5_fit_moderation(yc ~ ma + w + ma:w + xa + c1 + c2, d, cluster = 'cl')
   check('fit_equals_handwritten_formula', max(abs(coef(m$fit) - coef(ref$fit)[names(coef(m$fit))])) < 1e-12)
-  s <- ch5_simple_slopes(m)
+  # 形参不得带默认值；带默认值时 missing() 仍为 TRUE，单靠报错负例抓不到
+  check('slopes_level_has_no_default', identical(formals(ch5_simple_slopes)$level, quote(expr = )))
+  reject('slopes_level_required', ch5_simple_slopes(m))
+  reject('slopes_level_range', ch5_simple_slopes(m, level = 95))
+  s <- ch5_simple_slopes(m, level = 0.95)
+  check('slopes_level_column', identical(unique(s$level), 0.95))
+  s90 <- ch5_simple_slopes(m, level = 0.90)
+  q95 <- qnorm(.975); q90 <- qnorm(.95)
+  check('slopes_interval_matches_level', max(abs((s$upper - s$estimate) - q95 * s$se)) < 1e-12 &&
+          max(abs((s90$upper - s90$estimate) - q90 * s90$se)) < 1e-12)
   shift_ok <- vapply(seq_along(base$probes), function(i) {
     dd <- d; dd$w <- dd$w - base$probes[i]
     r <- ch5_fit_moderation(yc ~ ma + w + ma:w + xa + c1 + c2, dd, cluster = 'cl')
@@ -43,7 +52,7 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
 
   # 3. 三分类调节：第 k 类的简单斜率等于以 k 为参照类的处理编码重拟合的主效应
   mc_ <- ch5_fit_moderation_spec(cat_spec, d)
-  sc <- ch5_simple_slopes(mc_)
+  sc <- ch5_simple_slopes(mc_, level = 0.90)
   cat_ok <- vapply(seq_along(cat_spec$level_order), function(k) {
     dd <- d; dd$wf <- stats::relevel(factor(dd$wcat), ref = as.character(cat_spec$level_order[k]))
     r <- ch5_fit_moderation(ycc ~ mc + wf + mc:wf + xc + c1 + c2, dd, cluster = 'cl')
@@ -54,7 +63,7 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
 
   # 4. logit：OR 列与 exp(斜率) 一致
   lb <- modifyList(base, list(outcome = 'ya', focal = 'xa', moderator = 'w', controls = c('c1', 'c2'), family = 'binomial'))
-  sl <- ch5_simple_slopes(ch5_fit_moderation_spec(lb, d))
+  sl <- ch5_simple_slopes(ch5_fit_moderation_spec(lb, d), level = 0.95)
   check('logit_or_columns', max(abs(sl$odds_ratio - exp(sl$estimate))) < 1e-12 && all(sl$or_lower < sl$or_upper))
 
   # 5. 绘图入口：文件非空，返回的绘制数据等于斜率表
@@ -63,8 +72,10 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
     pd <- ch5_plot_simple_slopes(sc, f, xlab = 'W category')
     check(paste0('plot_', ext, '_written'), file.exists(f) && file.info(f)$size > 1000)
     check(paste0('plot_', ext, '_data_equals_table'), isTRUE(all.equal(pd$estimate, sc$estimate)))
+    check(paste0('plot_', ext, '_ylab_states_level'), grepl('(90% CI)', attr(pd, 'ylab'), fixed = TRUE))
   }
   reject('plot_format_checked', ch5_plot_simple_slopes(sc, file.path(output_dir, 'x.gif')))
+  reject('plot_requires_level_column', ch5_plot_simple_slopes(sc[, names(sc) != 'level'], file.path(output_dir, 'nolevel.pdf')))
   utils::write.csv(sc, file.path(output_dir, 'categorical_slopes.csv'), row.names = FALSE)
   jsonlite::write_json(list(test = 'test_ch5_moderation_route', status = 'PASS', checks = length(checks), engine_calls = 0L),
                        file.path(output_dir, 'receipt.json'), auto_unbox = TRUE, pretty = TRUE)

@@ -47,7 +47,10 @@ ch5_fit_moderation_spec <- function(spec, data) {
 }
 
 # 简单斜率：slope = b_focal + Σ g_k b_int_k，Var = g' V g（g 含协方差项）
-ch5_simple_slopes <- function(m, level = 0.90) {
+# level 必须显式给出（第五章同时用 0.95 与 0.90 两档，不设默认值）
+ch5_simple_slopes <- function(m, level) {
+  if (missing(level)) stop('level must be given explicitly, e.g. 0.95')
+  if (!is.numeric(level) || length(level) != 1L || !is.finite(level) || level <= 0 || level >= 1) stop('level must be a single number in (0, 1)')
   spec <- m$spec; b <- stats::coef(m$fit); V <- m$vcov
   ints <- paste0(spec$focal, ':', m$wterms)
   if (spec$moderator_type == 'continuous') {
@@ -60,15 +63,19 @@ ch5_simple_slopes <- function(m, level = 0.90) {
   se <- sqrt(rowSums((G %*% V[idx, idx]) * G))
   z <- est / se; q <- stats::qnorm(1 - (1 - level) / 2)
   out <- data.frame(moderator_value = lab, estimate = est, se = se, z = z, p = 2 * stats::pnorm(-abs(z)),
-                    lower = est - q * se, upper = est + q * se, stringsAsFactors = FALSE)
+                    level = level, lower = est - q * se, upper = est + q * se, stringsAsFactors = FALSE)
   if (spec$family == 'binomial') {
     out$odds_ratio <- exp(est); out$or_lower <- exp(out$lower); out$or_upper <- exp(out$upper)
   }
   out
 }
 
-# 简单斜率图（base graphics，pdf/png/svg 由扩展名决定）；返回实际绘制的数据
+# 简单斜率图（base graphics，pdf/png/svg 由扩展名决定）；y 轴标签写明置信水平；返回实际绘制的数据
 ch5_plot_simple_slopes <- function(slopes, file, xlab = 'moderator', ylab = 'simple slope') {
+  lv <- unique(slopes$level)
+  if (length(lv) != 1L || !is.finite(lv)) stop('slopes must carry one confidence level in column level')
+  ci_label <- paste0(format(100 * lv, trim = TRUE), '% CI')
+  ylab <- paste0(ylab, ' (', ci_label, ')')
   dev <- switch(tolower(tools::file_ext(file)), pdf = grDevices::pdf, png = grDevices::png,
                 svg = grDevices::svg, stop('Unsupported plot format'))
   if (identical(dev, grDevices::png)) dev(file, width = 1500, height = 1200, res = 300) else dev(file, width = 5, height = 4)
@@ -79,5 +86,7 @@ ch5_plot_simple_slopes <- function(slopes, file, xlab = 'moderator', ylab = 'sim
   graphics::axis(1, at = x, labels = slopes$moderator_value)
   graphics::arrows(x, slopes$lower, x, slopes$upper, angle = 90, code = 3, length = .05)
   graphics::abline(h = 0, lty = 2)
-  invisible(slopes[, c('moderator_value', 'estimate', 'lower', 'upper')])
+  pd <- slopes[, c('moderator_value', 'estimate', 'lower', 'upper', 'level')]
+  attr(pd, 'ylab') <- ylab
+  invisible(pd)
 }
