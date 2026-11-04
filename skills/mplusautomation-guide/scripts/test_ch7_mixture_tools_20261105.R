@@ -65,7 +65,12 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
     trace(fun, tracer = quote(stop("ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI")), print = FALSE, where = ns)
   }
   on.exit(for (fun in c("runModels", "detectMplus")) untrace(fun, where = ns), add = TRUE)
-  reject("engine_guard_blocks_runModels", MplusAutomation::runModels())
+  # 断言拦截信息本身：没装 Mplus 时 runModels 本来就会报错，只查"有报错"不能证明拦截生效。
+  guard <- function(expr) tryCatch({ force(expr); "" }, error = conditionMessage)
+  check("engine_guard_blocks_runModels",
+        identical(guard(MplusAutomation::runModels()), "ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI"))
+  check("engine_guard_blocks_detectMplus",
+        identical(guard(MplusAutomation::detectMplus()), "ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI"))
   compile <- function(label, built) {
     folder <- file.path(output_dir, label); dir.create(folder, recursive = TRUE); prior <- getwd()
     tryCatch({

@@ -25,7 +25,12 @@ test_ch7_mixture_family <- function(output_dir, skill_root) {
           print = FALSE, where = ns)
   }
   on.exit(for (fun in c('runModels', 'detectMplus')) untrace(fun, where = ns), add = TRUE)
-  reject('engine_guard_blocks_runModels', MplusAutomation::runModels())
+  # 断言拦截信息本身：没装 Mplus 时 runModels 本来就会报错，只查"有报错"不能证明拦截生效。
+  guard <- function(expr) tryCatch({ force(expr); '' }, error = conditionMessage)
+  check('engine_guard_blocks_runModels',
+        identical(guard(MplusAutomation::runModels()), 'ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI'))
+  check('engine_guard_blocks_detectMplus',
+        identical(guard(MplusAutomation::detectMplus()), 'ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI'))
 
   # 所有数值仅为固定种子的合成设计，不从论文结果或个人记录取得。
   set.seed(7105L)
