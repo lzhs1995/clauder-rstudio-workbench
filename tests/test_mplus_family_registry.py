@@ -135,6 +135,24 @@ class ReceiptWhitelistTests(unittest.TestCase):
         receipt["evidence_logical_name"] = LOCAL_PATH
         self.assertTrue(any("local absolute path" in e for e in registry.validate_receipt(receipt)))
 
+    def test_any_absolute_path_shape_rejected_in_receipts(self):
+        for value in ("/opt/study/real.dta", "~/study/real.dta", "see /tmp/run/out.csv", "\\\\nas01\\study\\real.dta"):
+            receipt = _good_receipt()
+            receipt["evidence_logical_name"] = value
+            self.assertTrue(any("local absolute path" in e for e in registry.validate_receipt(receipt)), value)
+        for value in ("ch4 apim / CHARLS swap", "w1/charls_apim_swap"):
+            receipt = _good_receipt()
+            receipt["evidence_logical_name"] = value
+            self.assertEqual(registry.validate_receipt(receipt), [], value)
+        receipt = _good_receipt()
+        receipt["platform"] = {"os": "macOS 15/arm64", "r": "4.5.2", "mplus": "9"}
+        self.assertEqual(registry.validate_receipt(receipt), [])
+
+    def test_template_refuses_family_without_freshness_files(self):
+        with self.assertRaises(ValueError):
+            registry.receipt_template(registry.load(), "MED", "CFPS", "template_bundle")
+        self.assertEqual(registry.main(["receipt-template", "MED", "CFPS", "template_bundle"]), 1)
+
     def test_nested_payload_rejected_in_every_allowed_field(self):
         # REVIEW-PR80-001 R1：允许的字段里塞对象或数组，也不能带出估计值或 ID（合成值）
         payload = {"estimates": [0.31], "individual_id": "SYNTHETIC_TEST_ID"}
@@ -166,6 +184,7 @@ class ReceiptWhitelistTests(unittest.TestCase):
                              (lambda r: r.update(column_names=["x1", "x1"]), "must not repeat"),
                              (lambda r: r.update(missing_by_column={"z9": 1}), "not in column_names"),
                              (lambda r: r.update(missing_by_column={"x1": 121}), "exceeds rows"),
+                             (lambda r: r.pop("column_names"), "missing_by_column requires column_names"),
                              (lambda r: r["comparisons"].update(max_abs_diff=float("nan")), "finite"),
                              (lambda r: r["comparisons"].update(max_abs_diff=-1), "finite"),
                              (lambda r: r["comparisons"].pop("verdict"), "comparisons must be an object")]:
@@ -332,6 +351,13 @@ class StrictGateCliTests(unittest.TestCase):
                 '    steps:\n      - run: echo "no tests executed"\n# run_family_ci_tests.R\n')
         self.assertRejected(self.run_case(workflow_text=noop), "does not invoke")
 
+    def test_job_level_if_false_rejected(self):
+        # RULING-PR80-001 第 1 项：job 级 if: false 的 workflow 必须被 strict 拒绝
+        disabled = ("name: synthetic disabled job\non: workflow_dispatch\njobs:\n  synthetic:\n    if: false\n"
+                    "    runs-on: ubuntu-latest\n    steps:\n      - run: Rscript skills/mplusautomation-guide/scripts/"
+                    "run_family_ci_tests.R mplus-guide-family-tests.yml out\n")
+        self.assertRejected(self.run_case(workflow_text=disabled), "does not invoke")
+
 
 class WorkflowInvocationTests(unittest.TestCase):
     WORKFLOW = "mplus-guide-family-tests.yml"
@@ -350,6 +376,26 @@ class WorkflowInvocationTests(unittest.TestCase):
         folded = self.RUNNER.replace(" mplus-guide", "\n          mplus-guide")
         self.assertTrue(self.invokes(f"      - run: >-\n          {folded}\n"))
         self.assertTrue(self.invokes("      - run: python -m unittest test_rstudio_queue_admission -v\n", self.py_test))
+        # Windows 风格路径在任何平台上判断一致
+        windows_style = 'Rscript "skills\\mplusautomation-guide\\scripts\\run_family_ci_tests.R" mplus-guide-family-tests.yml out'
+        self.assertTrue(self.invokes(f"      - run: {windows_style}\n"))
+        # 单行条件里 then 后面的命令照样算调用
+        self.assertTrue(self.invokes(f"      - run: if [ -d skills ]; then {self.RUNNER}; fi\n"))
+        # 同一 workflow 里另有停用的 job，不影响启用 job 的调用
+        text = ("jobs:\n  off:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo off\n"
+                f"  on:\n    runs-on: ubuntu-latest\n    steps:\n      - run: {self.RUNNER}\n")
+        self.assertTrue(registry._workflow_invokes(text, self.WORKFLOW, self.r_test))
+
+    def test_disabled_job_and_nested_text_are_not_invocations(self):
+        # RULING-PR80-001 第 1 项：整个 job 写死 if: false，其中步骤都不执行
+        for condition in ("false", "${{ false }}", "'false'"):
+            text = (f"jobs:\n  synthetic:\n    if: {condition}\n    runs-on: ubuntu-latest\n"
+                    f"    steps:\n      - run: {self.RUNNER}\n")
+            self.assertFalse(registry._workflow_invokes(text, self.WORKFLOW, self.r_test), condition)
+        # 其他键（如 with: script: |）正文里的 run: 行只是文本
+        nested = ("      - uses: actions/github-script@v7\n        with:\n          script: |\n"
+                  f"            run: {self.RUNNER}\n")
+        self.assertFalse(self.invokes(nested))
 
     def test_text_that_does_not_execute_is_not_an_invocation(self):
         for steps in (f"      - run: echo {self.RUNNER}\n",
@@ -410,6 +456,13 @@ class PublicBoundaryScanTests(unittest.TestCase):
             lines = list(boundary.added_lines("HEAD~1", "HEAD", [], cwd=tmp))
             self.assertEqual(sorted(path for path, _, _ in lines), ["ascii.md", "公开边界.md"])
             self.assertEqual(sum(len(boundary.scan_line(p, t)) for p, _, t in lines), 2)
+            # 同一 PR 加 .gitattributes 的 -diff，文件仍要进入扫描
+            (Path(tmp) / ".gitattributes").write_text("*.md -diff\n", encoding="utf-8")
+            (Path(tmp) / "ascii.md").write_text("local " + LOCAL_PATH + "\nmore " + LOCAL_PATH + "\n", encoding="utf-8")
+            git("add", "-A")
+            git("commit", "-q", "-m", "attributes")
+            lines = list(boundary.added_lines("HEAD~1", "HEAD", [], cwd=tmp))
+            self.assertIn(("ascii.md", 2), [(p, n) for p, n, _ in lines])
 
 
 if __name__ == "__main__":

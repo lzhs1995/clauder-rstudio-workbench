@@ -96,7 +96,8 @@ def parse_added_lines(diff: str):
 
 def added_lines(base: str, head: str, prefixes: list[str], cwd=None):
     # 固定输出格式，不受本机 quotePath、noprefix、颜色、外部 diff 等配置影响
-    command = ["git", "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--no-textconv",
+    # --text：仓库里的 .gitattributes（如 -diff）不能把文件挤出扫描
+    command = ["git", "-c", "core.quotePath=false", "diff", "--text", "--no-color", "--no-ext-diff", "--no-textconv",
                "--src-prefix=a/", "--dst-prefix=b/", "-U0", f"{base}...{head}", "--", *prefixes]
     diff = subprocess.run(command, capture_output=True, check=True, cwd=cwd).stdout
     yield from parse_added_lines(diff.decode("utf-8", errors="replace"))

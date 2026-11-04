@@ -12,6 +12,13 @@ states a limit on that evidence.
 For changing data sources or variables, follow
 [the source and variable swap contract](family-source-swap-contract.md).
 
+## Limits of the registry checks
+
+- CI wiring: `family_registry.py check` reads the commands of executed `run:` steps and skips steps or jobs
+  with a literal `if: false`. 静态接线检查不解析 shell heredoc/字符串里的命令，只防误接线，不防有意绕过；以 CI 实际运行日志为准。
+- Receipts: field types and identities are checked, but one-line text fields can still contain digits;
+  the public boundary scan is heuristic and human review remains the final check.
+
 | Family | Code | Routes | Synthetic compile | Native synthetic | Real-data swap | Historical replay |
 |---|---|---|---|---|---|---|
 | APIM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |

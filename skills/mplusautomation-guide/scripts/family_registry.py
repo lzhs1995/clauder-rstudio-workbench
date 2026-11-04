@@ -47,6 +47,8 @@ REGISTRY_ID = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}")
 COLUMN_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.]{0,63}")
 OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 TAIPEI_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00")
+# 回执只写逻辑名，任何绝对路径形状（/opt/…、~/…、\\主机\…）都不收；注册表文本仍只用 PRIVATE_PATH
+RECEIPT_ABS_PATH = re.compile(r"(?:^|[\s\"'(=:])~?/[^\s/]+/|\\\\[^\s\\]+\\")
 LABEL_MAX = 120
 PLATFORM_KEYS = {"os", "r", "mplus"}
 COMPARISON_KEYS = {"verdict", "items", "max_abs_diff"}
@@ -108,6 +110,51 @@ def _entry(spec, where, errors, root):
 
 RUN_KEY = re.compile(r"^(\s*)(-\s+)?run:(.*)$")
 NEVER_IF = re.compile(r"^\s*(?:-\s+)?if:\s*(?:false|'false'|\"false\"|\$\{\{\s*false\s*\}\})\s*(?:#.*)?$")
+BLOCK_HEADER = re.compile(r"^(\s*)(?:-\s+)?[^\s#][^:]*:\s*[|>][0-9+-]*\s*(?:#.*)?$")
+# 单行条件或循环里排在命令前的 shell 保留字
+SHELL_PREFIX_WORDS = {"then", "do", "else", "elif"}
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _block_scalar_lines(lines: list[str]) -> set[int]:
+    """属于某个 `key: |` / `key: >` 正文的行号；这些行是文本，不是 YAML 键。"""
+    inside: set[int] = set()
+    for index, line in enumerate(lines):
+        header = BLOCK_HEADER.match(line)
+        if not header or index in inside:
+            continue
+        key_indent = _indent(line) + (len(line.lstrip(" ")) - len(line.lstrip(" ").lstrip("-").lstrip()))
+        for following in range(index + 1, len(lines)):
+            if lines[following].strip() and _indent(lines[following]) <= key_indent:
+                break
+            inside.add(following)
+    return inside
+
+
+def _disabled_job_spans(lines: list[str]) -> list[range]:
+    """`jobs:` 下直接写了 `if: false` 的 job 所占的行范围。"""
+    spans: list[range] = []
+    starts = [i for i, line in enumerate(lines) if re.match(r"^jobs:\s*(?:#.*)?$", line)]
+    if not starts:
+        return spans
+    # jobs 段到下一个顶层键为止
+    stop = next((i for i in range(starts[0] + 1, len(lines))
+                 if lines[i].strip() and _indent(lines[i]) == 0 and not lines[i].startswith("#")), len(lines))
+    body = range(starts[0] + 1, stop)
+    job_indent = next((_indent(lines[i]) for i in body if lines[i].strip() and not lines[i].lstrip().startswith("#")), None)
+    if not job_indent:
+        return spans
+    heads = [i for i in body if lines[i].strip() and _indent(lines[i]) == job_indent and not lines[i].lstrip().startswith("#")]
+    for number, head in enumerate(heads):
+        end = heads[number + 1] if number + 1 < len(heads) else len(lines)
+        keys = [lines[i] for i in range(head + 1, end) if lines[i].strip() and _indent(lines[i]) > job_indent]
+        key_indent = min((_indent(k) for k in keys), default=None)
+        if any(_indent(k) == key_indent and NEVER_IF.match(k) for k in keys):
+            spans.append(range(head, end))
+    return spans
 
 
 def _strip_yaml_comment(value: str) -> str:
@@ -134,13 +181,17 @@ def _run_blocks(text: str) -> list[str]:
     """取出 workflow 各步骤 `run:` 的脚本正文；注释、name、echo 文字都不是调用。
 
     只处理 GitHub workflow 常见写法：单行 run 与 |、> 块标量（可带 -/+）。
-    `if: false` 这类写死不执行的步骤不计；其他 if 条件不求值。
+    step 或 job 写死 `if: false` 的不计；其他 if 条件不求值。
+    这是防误接线的静态检查：不解析 shell 的 heredoc、字符串、条件与函数，以 CI 实际运行日志为准。
     """
     lines = text.splitlines()
     blocks: list[str] = []
+    in_text = _block_scalar_lines(lines)
+    disabled_jobs = _disabled_job_spans(lines)
     for index, line in enumerate(lines):
         match = RUN_KEY.match(line)
-        if not match:
+        # 其他键的块标量正文里出现的 run: 只是文本；整个 job 写死 if: false 时其中步骤都不执行
+        if not match or index in in_text or any(index in span for span in disabled_jobs):
             continue
         key_indent = len(match.group(1)) + len(match.group(2) or "")
         step_start = len(match.group(1)) if match.group(2) else None
@@ -204,7 +255,8 @@ def _commands(script: str):
         command: list[str] = []
         for token in tokens + [";"]:
             if token and set(token) <= set(";&|()"):
-                while command and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", command[0]):
+                while command and (re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", command[0])
+                                   or command[0] in SHELL_PREFIX_WORDS):
                     command.pop(0)
                 if command:
                     yield command
@@ -224,7 +276,7 @@ def _invokes(command: list[str], workflow: str, test: dict) -> bool:
     if test["lang"] == "R":
         # R 测试由注册表驱动脚本统一调用：Rscript <...>/run_family_ci_tests.R <本 workflow 文件名> <输出根>
         return (program == "rscript" and len(positional) >= 2
-                and Path(positional[0]).name == "run_family_ci_tests.R" and positional[1] == workflow)
+                and Path(positional[0].replace("\\", "/")).name == "run_family_ci_tests.R" and positional[1] == workflow)
     if not re.fullmatch(r"python(?:3(?:\.\d+)?)?|py", program):
         return False
     target = Path(test["path"])
@@ -443,7 +495,7 @@ def validate_receipt(receipt, name: str = "receipt", reg: dict | None = None) ->
     if errors:
         return errors
     for where, text in _strings(receipt, name):
-        if PRIVATE_PATH.search(text):
+        if PRIVATE_PATH.search(text) or RECEIPT_ABS_PATH.search(text):
             errors.append(f"{where}: local absolute path is not allowed")
     if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1:
         errors.append(f"{name}: schema_version must be the integer 1")
@@ -493,7 +545,10 @@ def _column_errors(receipt: dict, name: str) -> list[str]:
             COLUMN_NAME.fullmatch(k) and _count(v) for k, v in counts.items()):
         errors.append(f"{name}: missing_by_column must map variable names to nonnegative integer counts")
         return errors
-    if names_ok and "column_names" in receipt and set(counts) - set(names):
+    if counts and "column_names" not in receipt:
+        # 缺失计数的键必须能对上已公开的列名，否则键本身就成了不受约束的文本
+        errors.append(f"{name}: missing_by_column requires column_names")
+    elif names_ok and set(counts) - set(names):
         errors.append(f"{name}: missing_by_column names columns not in column_names {sorted(set(counts) - set(names))}")
     if _count(receipt["rows"]) and any(v > receipt["rows"] for v in counts.values()):
         errors.append(f"{name}: a missing count exceeds rows")
@@ -591,6 +646,9 @@ def check_receipts(reg: dict, root: Path = SKILL_ROOT) -> tuple[list[str], list[
 
 def receipt_template(reg: dict, family: str, dataset: str, route: str, root: Path = SKILL_ROOT) -> dict:
     fam = reg["families"][family]
+    if not fam["freshness_files"]:
+        # 没有登记产出代码的家族写不出可核新鲜度的回执，先在 families.json 登记 freshness_files
+        raise ValueError(f"family {family} has no freshness_files; register the code that produced the run first")
     return {
         "schema_version": 1, "family": family, "dataset": dataset, "route": route,
         "generated_taipei": datetime.now(TAIPEI).isoformat(timespec="seconds"),
@@ -629,6 +687,13 @@ def render_doc(reg: dict) -> str:
         "",
         "For changing data sources or variables, follow",
         "[the source and variable swap contract](family-source-swap-contract.md).",
+        "",
+        "## Limits of the registry checks",
+        "",
+        "- CI wiring: `family_registry.py check` reads the commands of executed `run:` steps and skips steps or jobs",
+        "  with a literal `if: false`. 静态接线检查不解析 shell heredoc/字符串里的命令，只防误接线，不防有意绕过；以 CI 实际运行日志为准。",
+        "- Receipts: field types and identities are checked, but one-line text fields can still contain digits;",
+        "  the public boundary scan is heuristic and human review remains the final check.",
         "",
         "| Family | Code | Routes | Synthetic compile | Native synthetic | Real-data swap | Historical replay |",
         "|---|---|---|---|---|---|---|",
@@ -755,7 +820,12 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     reg = load()
     if args.command == "receipt-template":
-        print(json.dumps(receipt_template(reg, args.family, args.dataset, args.route), ensure_ascii=False, indent=1))
+        try:
+            template = receipt_template(reg, args.family, args.dataset, args.route)
+        except (KeyError, ValueError) as error:
+            print(f"ERROR: {error}")
+            return 1
+        print(json.dumps(template, ensure_ascii=False, indent=1))
         return 0
     if args.command == "render":
         if args.check:
