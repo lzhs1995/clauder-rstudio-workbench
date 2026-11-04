@@ -19,7 +19,7 @@ TITLE: synthetic second-stage moderated mediation [[nameiv#iv]]-[[namemv#mv]]-[[
 ! Categorical W needs an effect-coded variant with fixed probe codes, not mean +/- SD.
 DATA: FILE = "ch5_synthetic.dat";
 VARIABLE:
-NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2;
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
 MISSING = .;
 USEVARIABLES = [[variv#iv]] [[varmv#mv]] [[varwv#wv]] yc c1 c2 int;
 GROUPING = grp (0 = G0 1 = G1);

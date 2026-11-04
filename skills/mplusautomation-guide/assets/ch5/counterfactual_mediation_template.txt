@@ -19,7 +19,7 @@ TITLE: synthetic counterfactual mediation [[nameiv#iv]]-[[namemv#mv]]-[[namedv#d
 ! Synthetic teaching template: binary M and Y, X effect contrasted at X=0 vs X=1.
 DATA: FILE = "ch5_synthetic.dat";
 VARIABLE:
-NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2;
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
 MISSING = .;
 USEOBSERVATIONS = grp EQ [[valuegrp#grp]];
 USEVARIABLES = [[variv#iv]] [[varmv#mv]] [[vardv#dv]] c1 c2 intem;

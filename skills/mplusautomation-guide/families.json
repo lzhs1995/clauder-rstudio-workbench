@@ -83,6 +83,19 @@
         "references/chapter7-source-variable-contract-20261104.md",
         "references/lpa-lca-workflow.md"
       ]
+    },
+    "r_glm_moderation": {
+      "label": "R 静态调节：显式配置 → glm + 聚类 HC0 → 简单斜率与绘图",
+      "entry_functions": [
+        "scripts/ch5_moderation_route.R:ch5_moderation_spec",
+        "scripts/ch5_moderation_route.R:ch5_fit_moderation_spec",
+        "scripts/ch5_moderation_route.R:ch5_simple_slopes",
+        "scripts/ch5_moderation_route.R:ch5_plot_simple_slopes"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/mediation-moderation-workflow.md"
+      ]
     }
   },
   "adapters": {
@@ -334,6 +347,39 @@
       "lang": "R",
       "function": "test_other_growth_native",
       "args": [],
+      "needs_mplus": true,
+      "ci": null
+    },
+    "ch5_templates_extended": {
+      "path": "scripts/test_ch5_templates_extended_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_templates_extended",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
+    },
+    "ch5_moderation_route": {
+      "path": "scripts/test_ch5_moderation_route_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_moderation_route",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
+    },
+    "ch5_native_synthetic": {
+      "path": "scripts/test_ch5_native_synthetic_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_native_synthetic",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
       "needs_mplus": true,
       "ci": null
     }
@@ -606,16 +652,19 @@
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
-        "ch5_mediation_moderation_synthetic"
+        "ch5_mediation_moderation_synthetic",
+        "ch5_templates_extended",
+        "ch5_native_synthetic"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch5_mediation_moderation_synthetic",
-          "note": "合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛"
+          "source": "ch5_templates_extended",
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
         },
         "real_data_swap": {
           "status": "pending",
@@ -632,8 +681,8 @@
         "第五章"
       ],
       "gaps": [
-        "合成模板只覆盖二值 M、Y 的反事实分解；连续线性乘积中介没有单独的合成模板",
-        "模板尚未在 Mplus 引擎上跑过合成数据"
+        "原生合成验收等 Windows 计算窗口",
+        "freshness_files 暂空：tests/test_mplus_family_registry.py 以 MED 作无 freshness_files 的夹具"
       ]
     },
     "MOD": {
@@ -643,9 +692,9 @@
       "label_zh": "调节模型（单人）",
       "summary": "单人观测变量调节与简单斜率。",
       "routes": [
-        "template_bundle"
+        "r_glm_moderation"
       ],
-      "code_status": "doc_only",
+      "code_status": "configurable",
       "data_formats": [
         "csv",
         "dta"
@@ -656,13 +705,14 @@
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
-        "ch5_mediation_moderation_synthetic"
+        "ch5_mediation_moderation_synthetic",
+        "ch5_moderation_route"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch5_mediation_moderation_synthetic",
-          "note": "合成数据：R 拟合、效应编码、聚类 HC0 协方差与控制集合规则，不调用 Mplus"
+          "source": "ch5_moderation_route",
+          "note": "合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus"
         },
         "native_synthetic": {
           "status": "not_applicable",
@@ -679,14 +729,14 @@
         }
       },
       "freshness_files": [
-        "scripts/ch5_mediation_moderation.R"
+        "scripts/ch5_mediation_moderation.R",
+        "scripts/ch5_moderation_route.R"
       ],
       "thesis_refs": [
         "第五章"
       ],
       "gaps": [
-        "第五章静态调节在 R 中用 glm 加聚类稳健协方差拟合；注册表登记的 template_bundle 路线不对应该实现，R 拟合尚无注册路线",
-        "简单斜率只在文档中说明，没有可复用的绘图入口"
+        "第五章历史复现用的是锁定脚本原样复跑，尚未改由 r_glm_moderation 路线重跑"
       ]
     },
     "MODMED": {
@@ -709,16 +759,19 @@
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
-        "ch5_mediation_moderation_synthetic"
+        "ch5_mediation_moderation_synthetic",
+        "ch5_templates_extended",
+        "ch5_native_synthetic"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch5_mediation_moderation_synthetic",
-          "note": "合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛"
+          "source": "ch5_templates_extended",
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
         },
         "real_data_swap": {
           "status": "pending",
@@ -732,14 +785,16 @@
       },
       "freshness_files": [
         "scripts/ch5_mediation_moderation.R",
-        "assets/ch5/moderated_mediation_mg_template.txt"
+        "scripts/ch5_synthetic_data.R",
+        "assets/ch5/moderated_mediation_mg_template.txt",
+        "assets/ch5/moderated_mediation_cat_template.txt"
       ],
       "thesis_refs": [
         "第五章"
       ],
       "gaps": [
-        "合成模板只覆盖连续 W；三分类 W 的效应编码取值与子样本量常量没有合成模板",
-        "模板尚未在 Mplus 引擎上跑过合成数据"
+        "原生合成验收等 Windows 计算窗口",
+        "三分类 W 模板按样本分别拟合（USEOBSERVATIONS）；三分类 W 与 GROUPING 多组同时出现的模板尚无"
       ]
     },
     "LPA_LCA": {

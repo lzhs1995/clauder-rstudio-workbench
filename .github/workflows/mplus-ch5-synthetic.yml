@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - skills/mplusautomation-guide/assets/ch5/**
-      - skills/mplusautomation-guide/scripts/ch5_mediation_moderation.R
-      - skills/mplusautomation-guide/scripts/test_ch5_mediation_moderation_20261105.R
+      - skills/mplusautomation-guide/scripts/ch5_*.R
+      - skills/mplusautomation-guide/scripts/test_ch5_*.R
       - skills/mplusautomation-guide/references/mediation-moderation-workflow.md
       - skills/mplusautomation-guide/references/chapter5-replay-map.md
       - skills/mplusautomation-guide/scripts/run_family_ci_tests.R
