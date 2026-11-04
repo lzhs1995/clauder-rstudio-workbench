@@ -304,6 +304,17 @@
       "ci_os": [
         "Linux"
       ]
+    },
+    "ch5_mediation_moderation_synthetic": {
+      "path": "scripts/test_ch5_mediation_moderation_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_mediation_moderation",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
     }
   },
   "families": {
@@ -563,27 +574,36 @@
       "routes": [
         "template_bundle"
       ],
-      "code_status": "none",
+      "code_status": "template",
       "data_formats": [
         "csv",
         "dta"
       ],
-      "docs": [],
-      "acceptance_doc": null,
-      "tests": [],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic"
+      ],
       "evidence": {
         "synthetic_compile": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "ch5_mediation_moderation_synthetic",
+          "note": "合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛"
         },
         "native_synthetic": {
           "status": "not_started"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
         },
         "historical_replay": {
-          "status": "pending",
-          "note": "第五章复现进行中"
+          "status": "archived_readback_only",
+          "source": "references/chapter5-replay-map.md",
+          "note": "读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0"
         }
       },
       "freshness_files": [],
@@ -591,7 +611,8 @@
         "第五章"
       ],
       "gaps": [
-        "skill 内尚无文档、模板与测试"
+        "合成模板只覆盖二值 M、Y 的反事实分解；连续线性乘积中介没有单独的合成模板",
+        "模板尚未在 Mplus 引擎上跑过合成数据"
       ]
     },
     "MOD": {
@@ -603,35 +624,48 @@
       "routes": [
         "template_bundle"
       ],
-      "code_status": "none",
+      "code_status": "doc_only",
       "data_formats": [
         "csv",
         "dta"
       ],
-      "docs": [],
-      "acceptance_doc": null,
-      "tests": [],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic"
+      ],
       "evidence": {
         "synthetic_compile": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "ch5_mediation_moderation_synthetic",
+          "note": "合成数据：R 拟合、效应编码、聚类 HC0 协方差与控制集合规则，不调用 Mplus"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "not_applicable",
+          "note": "静态调节只在 R 中拟合，没有 Mplus 引擎步骤"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "尚无白名单换源回执"
         },
         "historical_replay": {
-          "status": "pending",
-          "note": "第五章复现进行中"
+          "status": "pass",
+          "source": "references/chapter5-replay-map.md",
+          "note": "在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致"
         }
       },
-      "freshness_files": [],
+      "freshness_files": [
+        "scripts/ch5_mediation_moderation.R"
+      ],
       "thesis_refs": [
         "第五章"
       ],
       "gaps": [
-        "skill 内尚无文档、模板与测试"
+        "第五章静态调节在 R 中用 glm 加聚类稳健协方差拟合；注册表登记的 template_bundle 路线不对应该实现，R 拟合尚无注册路线",
+        "简单斜率只在文档中说明，没有可复用的绘图入口"
       ]
     },
     "MODMED": {
@@ -643,35 +677,48 @@
       "routes": [
         "template_bundle"
       ],
-      "code_status": "none",
+      "code_status": "template",
       "data_formats": [
         "csv",
         "dta"
       ],
-      "docs": [],
-      "acceptance_doc": null,
-      "tests": [],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic"
+      ],
       "evidence": {
         "synthetic_compile": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "ch5_mediation_moderation_synthetic",
+          "note": "合成数据：生成 INP/DAT 并核计算函数，不调用 Mplus，不说明引擎接受或收敛"
         },
         "native_synthetic": {
           "status": "not_started"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
         },
         "historical_replay": {
-          "status": "pending",
-          "note": "第五章复现进行中"
+          "status": "archived_readback_only",
+          "source": "references/chapter5-replay-map.md",
+          "note": "读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0"
         }
       },
-      "freshness_files": [],
+      "freshness_files": [
+        "scripts/ch5_mediation_moderation.R",
+        "assets/ch5/moderated_mediation_mg_template.txt"
+      ],
       "thesis_refs": [
         "第五章"
       ],
       "gaps": [
-        "skill 内尚无文档、模板与测试"
+        "合成模板只覆盖连续 W；三分类 W 的效应编码取值与子样本量常量没有合成模板",
+        "模板尚未在 Mplus 引擎上跑过合成数据"
       ]
     },
     "LPA_LCA": {
