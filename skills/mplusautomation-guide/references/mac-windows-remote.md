@@ -58,6 +58,23 @@ RStudio/ClaudeR/MplusAutomation 1.3链路，新增引擎6703.5815702秒、阶段
 7263.353105秒，引擎占92.29%。这不是CPU利用率，也未计此前工具开发、失败和校准
 时间；没有Windows本机agent对照，不能声称远程比本机快。其余细节见
 [队列效率与最终核收](queue-efficiency.md#completed-income-queue-2026-11-03)。
+
+2026-11-04 的 CFPS H4.2 六个独立首尝试，经 xdev 提交回执 `3063` 进入同一
+Windows RStudio/ClaudeR 异步 R 链。原 `R_OWNER.json` 记录 RStudio PID 42264、
+rsession PID 33684、R worker PID 28872；`R_MPLUSAUTOMATION_CALL.json` 固定
+`MplusAutomation::runModels` 1.3。PID 仅标识这次证据，不是后续会话的连接参数。
+`QUEUE_CLAIM.json` 的 2026-11-03 23:47:44 UTC 至 `QUEUE_RESULT.json` 的
+2026-11-04 00:05:15 UTC 为 1051 秒，六次引擎记录合计 979.7800463 秒，占这段
+队列墙钟的 93.2236%。该比例包含失败尝试的引擎耗时，不是 CPU 利用率，不含
+此前开发与后续取回审计时间，也没有 Windows 本机 agent 对照，不能外推为整个
+项目效率或远程加速比。
+
+六格终态为 3 次 TIMEOUT、3 次负 SY 方差，科学可采用数为 0；完整 MI 家族没有
+完成。同一队列依原冻结计划、逐格确认退出并完整记账后完成六个独立首尝试，
+没有追加同规格重跑或后续 MI。终态证据独立核验通过只证明调用、成本、来源与
+失败分类可追溯，见 `CFPS_H42_FINAL_FIRST_ATTEMPT_DISPOSITION_20261104.json`
+及其引用的 `MAC_ACCEPTANCE.json`；不能把这次运行效率读成科研成功率。
+
 下面三组小模型保留原先完整往返的测量口径，不与该长批次直接作加速比。
 
 2026-11-01 在同一 Windows Mplus 9 / R 4.5.2 / MplusAutomation 1.2 上，
