@@ -1,0 +1,9 @@
+canonical,source,member,role,verification
+record,REPLACE_charls_couple_wave_id,shared,row_id,Join roster before export; require unique couple-wave identity
+pair,REPLACE_charls_couple_id,shared,cluster,Confirm spouse links; household ID alone does not prove one couple
+x1,REPLACE_charls_member1_exposure,1,x,Declare CHARLS items wave coding and units independently of CFPS
+x2,REPLACE_charls_member2_exposure,2,x,Same CHARLS construct as x1; verify member order
+m1,REPLACE_charls_member1_mediator,1,m,Declare CHARLS scale and timing; no automatic CFPS equivalence
+m2,REPLACE_charls_member2_mediator,2,m,Same CHARLS construct as m1; verify member order
+y1,REPLACE_charls_member1_outcome,1,y,Declare CHARLS outcome scoring direction and timing
+y2,REPLACE_charls_member2_outcome,2,y,Same CHARLS construct as y1; verify member order

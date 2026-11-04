@@ -240,9 +240,16 @@ run_apim_workflow_v2 <- function(config,stages=c('check','prepare','compile','fi
   snap<-apim_v2_io(config,'snapshot',list(root=plan$root,sources=unname(as.list(sources)),protected=unname(as.list(config$protected_roots))))
   apim_v2_write_json(snap,file.path(plan$root,'audit','source_snapshot.json'))
   raw<-apim_v2_read(config,snap$sources[[1]]$snapshot)
+  adapter_receipt<-attr(raw,'apim_source_adapter')
+  if(!is.null(adapter_receipt)) {
+    adapter_receipt$source_sha256<-plan$source_sha256
+    adapter_receipt$adapter_sha256<-apim_v2_code_hash('apim_v2_data_adapter.R')
+    apim_v2_write_json(adapter_receipt,file.path(plan$root,'audit','data_adapter.json'))
+  }
   if(length(config$template_bundles))for(i in seq_along(config$template_bundles))
     config$template_bundles[[i]]$template<-snap$sources[[i+1]]$snapshot
-  prepared<-list();prep_code<-apim_v2_function_hash(c('apim_v2_read','apim_v2_prepare','apim_v2_filter'))
+  prepared<-list();prep_code<-apim_v2_function_hash(c('apim_v2_read','apim_v2_read_source',
+    'apim_v2_missing_match','apim_v2_adapter_spec','apim_v2_prepare','apim_v2_filter'))
   for(m in plan$models) {
     folder<-file.path(plan$root,'models',m$id,'attempts','001');dir.create(folder,recursive=TRUE,showWarnings=FALSE)
     path<-file.path(folder,'prepared.rds');binding<-file.path(folder,'prepared_binding.rds')

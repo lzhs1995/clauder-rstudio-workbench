@@ -1,12 +1,6 @@
 # 数据准备、可解释的参数字典及多维模板编译。
 apim_v2_read <- function(config,path) {
-  if(apim_v2_default(config$data_mode,'csv')=='csv')
-    read.csv(path,colClasses='character',check.names=FALSE,na.strings=config$missing)
-  else {
-    x<-read.table(path,colClasses='character',na.strings=config$missing,header=FALSE,check.names=FALSE)
-    apim_v2_assert(ncol(x)==length(config$data_columns),'Archived DAT column mismatch')
-    names(x)<-config$data_columns;x
-  }
+  apim_v2_read_source(config,path)
 }
 apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
   archived <- identical(apim_v2_default(config$data_mode,'csv'),'archived_dat')
@@ -30,7 +24,7 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
     subset[[n]]<-val
   }
   if(!is.null(m$w)&&m$w$type!='continuous')for(n in m$w$columns)
-    apim_v2_assert(all(is.na(subset[[n]])|subset[[n]]%in%as.character(m$w$levels)),paste('Unrecognized moderator level',n))
+    apim_v2_assert(all(is.na(subset[[n]])|subset[[n]]%in%m$w$levels),paste('Unrecognized moderator level',n))
   complete<-complete.cases(subset[,used,drop=FALSE]);excluded<-subset[!complete,ids,drop=FALSE]
   if(archived) {
     apim_v2_assert(all(complete),'Archived DAT rows cannot be silently dropped')
@@ -65,7 +59,7 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
     w<-m$w
     if(w$type=='continuous') {pair('w',w$columns);w_alias<-paste0('w',seq_along(w$columns))}
     else {
-      levels<-as.character(w$levels[w$levels!=w$reference])
+      levels<-w$levels[w$levels!=w$reference]
       for(k in seq_along(w$columns))for(h in seq_along(levels)) {
         alias<-paste0('w',k,'d',h);w_alias<-c(w_alias,alias)
         add(w$columns[k],alias,if(w$scope=='shared')'shared' else as.character(k),'w',
@@ -78,7 +72,7 @@ apim_v2_prepare <- function(config,m,raw,folder,snapshot_path=NULL) {
       if(w$type=='continuous') {
         val<-as.numeric(pr$values);apim_v2_assert(all(is.finite(val)),'Nonfinite probe')
         if(pr$scale=='raw')val<-(val-moments$w$center)/moments$w$scale
-      } else val<-unlist(lapply(pr$values,function(z)as.numeric(as.character(z)==levels)),use.names=FALSE)
+      } else val<-unlist(lapply(pr$values,function(z)as.numeric(z==levels)),use.names=FALSE)
       names(val)<-w_alias;probe_values[[p]]<-val
     }
   }

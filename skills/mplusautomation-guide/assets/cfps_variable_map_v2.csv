@@ -1,0 +1,9 @@
+canonical,source,member,role,verification
+record,REPLACE_cfps_couple_wave_id,shared,row_id,Unique couple-wave identity; construct explicitly before reading
+pair,REPLACE_cfps_couple_id,shared,cluster,Stable couple identity; verify repeated-wave clustering
+x1,REPLACE_cfps_member1_exposure,1,x,Verify question items wave coding and units
+x2,REPLACE_cfps_member2_exposure,2,x,Same construct as x1; verify member order
+m1,REPLACE_cfps_member1_mediator,1,m,Verify mediator scale and timing
+m2,REPLACE_cfps_member2_mediator,2,m,Same construct as m1; verify member order
+y1,REPLACE_cfps_member1_outcome,1,y,Verify outcome scale direction and timing
+y2,REPLACE_cfps_member2_outcome,2,y,Same construct as y1; verify member order
