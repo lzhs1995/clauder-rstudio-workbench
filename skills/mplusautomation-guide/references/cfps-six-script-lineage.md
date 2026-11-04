@@ -19,7 +19,7 @@
 
 `reports/cfps_source_line_audit_20261004/cfps_source_line_audit_v2.{md,json}`。
 
-审计使用 Windows 原始路径 `C:\Users\LZHS\Desktop\interge_rela`，不执行 Rscript，不调用 Mplus，不修改原始脚本、原始数据、原始 `.inp/.out` 或 DOCX。导出路径和 `newdir` 必须再与实际结果文件的 canonical root、`.inp/.out` SHA、`MplusAutomation::readModels()` 身份一起核对。
+审计使用 Windows 原始路径 `C:\Users\<user>\Desktop\interge_rela`（由本机项目清单绑定实际用户目录），不执行 Rscript，不调用 Mplus，不修改原始脚本、原始数据、原始 `.inp/.out` 或 DOCX。导出路径和 `newdir` 必须再与实际结果文件的 canonical root、`.inp/.out` SHA、`MplusAutomation::readModels()` 身份一起核对。
 
 ## 关键语义边界
 
