@@ -1,0 +1,55 @@
+[[init]]
+iterators = samp iv;
+samp = 1:3;
+iv = 1:2;
+namesamp#samp = tt g0 g1;
+nameiv#iv = xc xa;
+variv#iv = xc xa;
+nw1#samp = [[n_w1_tt]] [[n_w1_g0]] [[n_w1_g1]];
+nw2#samp = [[n_w2_tt]] [[n_w2_g0]] [[n_w2_g1]];
+nw3#samp = [[n_w3_tt]] [[n_w3_g0]] [[n_w3_g1]];
+filename = "modmed_cat_[[nameiv#iv]]-mc-wcat-ycc_[[namesamp#samp]].inp";
+outputDirectory = "[[outdir]]";
+[[/init]]
+TITLE: synthetic moderated mediation, 3-category W [[nameiv#iv]] [[namesamp#samp]];
+! Synthetic teaching template: W effect-coded in level order 1,3,2.
+! Rows: level 1 -> (wc1, wc3) = (1, 0); level 3 -> (0, 1); level 2 -> (-1, -1).
+DATA: FILE = "ch5_synthetic.dat";
+VARIABLE:
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
+MISSING = .;
+[[samp = 2]]
+USEOBSERVATIONS = grp EQ 0;
+[[/samp = 2]]
+[[samp = 3]]
+USEOBSERVATIONS = grp EQ 1;
+[[/samp = 3]]
+USEVARIABLES = [[variv#iv]] mc ycc wc1 wc3 c1 c2 int1 int3;
+DEFINE:
+int1 = mc * wc1;
+int3 = mc * wc3;
+ANALYSIS:
+estimator = ML;
+bootstrap = 1000;
+MODEL:
+ycc ON mc (b1);
+ycc ON int1 (b12);
+ycc ON int3 (b13);
+ycc ON [[variv#iv]] (cdash);
+ycc ON wc1 wc3 c1 c2;
+mc ON [[variv#iv]] (a1);
+mc ON wc1 wc3 c1 c2;
+MODEL CONSTRAINT:
+! Sub-sample sizes are hand-filled per sample; recompute them for every sample file.
+NEW(n1 n2 n3 ind_W1 ind_W2 ind_W3 imm_W1 imm_W3 ind_avg);
+n1 = [[nw1#samp]];
+n2 = [[nw2#samp]];
+n3 = [[nw3#samp]];
+ind_W1 = a1*b1 + a1*b12*(1) + a1*b13*(0);
+ind_W3 = a1*b1 + a1*b12*(0) + a1*b13*(1);
+ind_W2 = a1*b1 + a1*b12*(-1) + a1*b13*(-1);
+imm_W1 = a1*b12;
+imm_W3 = a1*b13;
+ind_avg = (n1*ind_W1 + n2*ind_W2 + n3*ind_W3) / (n1 + n2 + n3);
+PLOT: TYPE = PLOT3;
+OUTPUT: SAMPSTAT CINTERVAL(BCBOOTSTRAP);

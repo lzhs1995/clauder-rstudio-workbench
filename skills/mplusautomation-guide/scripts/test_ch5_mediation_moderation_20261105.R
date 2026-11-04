@@ -23,21 +23,10 @@ test_ch5_mediation_moderation <- function(output_dir, skill_root) {
   on.exit(for (fun in c('runModels', 'detectMplus')) untrace(fun, where = ns), add = TRUE)
   reject('engine_guard_blocks_runModels', MplusAutomation::runModels())
 
-  # 合成数据：固定种子，不取自论文结果或个人记录；保存并恢复调用者的随机数状态
-  old_seed <- if (exists('.Random.seed', envir = globalenv())) get('.Random.seed', envir = globalenv()) else NULL
-  on.exit(if (is.null(old_seed)) rm('.Random.seed', envir = globalenv()) else assign('.Random.seed', old_seed, envir = globalenv()), add = TRUE)
-  set.seed(5105L)
+  # 合成数据：固定种子，不取自论文结果或个人记录（scripts/ch5_synthetic_data.R）
+  source(file.path(skill_root, 'scripts/ch5_synthetic_data.R'), local = TRUE)
   G <- 400L; n <- 3L * G
-  cl <- rep(seq_len(G), each = 3L); u <- rnorm(G)[cl]
-  d <- data.frame(id = seq_len(n), cl = cl, grp = rbinom(n, 1, .5),
-                  xa = rbinom(n, 1, .5), xb = rbinom(n, 1, .4))
-  d$ma <- rbinom(n, 1, plogis(-.3 + .8 * d$xa)); d$mb <- rbinom(n, 1, plogis(.2 + .5 * d$xb))
-  d$ya <- rbinom(n, 1, plogis(-.5 + .4 * d$xa + .7 * d$ma)); d$yb <- rbinom(n, 1, plogis(.1 + .6 * d$mb))
-  wcat <- sample(c(1, 2, 3), n, replace = TRUE)
-  d$w <- rnorm(n); d$w2 <- runif(n, 0, 4); ec <- ch5_effect_code(wcat, c(1, 3, 2), 'wc')
-  d$wc1 <- ec$wc_effect1; d$wc3 <- ec$wc_effect2
-  d$c1 <- rnorm(n) + .6 * d$w; d$c2 <- rnorm(n)
-  d$yc <- .3 * d$xa + .5 * d$ma + .25 * d$ma * d$w + .2 * d$c1 + u + rnorm(n)
+  d <- ch5_synthetic_data(5105L, G)
   check('synthetic_shape', nrow(d) == 1200L && length(unique(d$cl)) == 400L)
 
   # 1. 区间函数：对称抽样 BC=百分位；偏移抽样与手算 z0 公式一致；全部同侧返回 NA
@@ -92,7 +81,7 @@ test_ch5_mediation_moderation <- function(output_dir, skill_root) {
 
   # 5. 模板生成：先填常量与输出目录，再 createModels；核文件数、必备语句、行宽、NAMES 与 DAT 列序
   gen <- file.path(output_dir, 'generated'); dir.create(gen)
-  dat_cols <- c('id', 'cl', 'grp', 'xa', 'xb', 'ma', 'mb', 'ya', 'yb', 'w', 'wc1', 'wc3', 'c1', 'c2', 'yc', 'w2')
+  dat_cols <- CH5_SYNTHETIC_COLUMNS
   MplusAutomation::prepareMplusData(d[, dat_cols], file.path(gen, 'ch5_synthetic.dat'), inpfile = FALSE)
   wv <- c(w_mean = mean(d$w), w_sd = sd(d$w), w2_mean = mean(d$w2), w2_sd = sd(d$w2))
   reject('fill_requires_every_constant', ch5_fill_template(tpl_mm, file.path(output_dir, 'x.txt'),

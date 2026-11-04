@@ -50,9 +50,9 @@ whitelisted real-data receipts. After editing `families.json`, run
 | APIMeM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | APIMoM | configurable | pass | pass* | — | pass* | [APIM.md](APIM.md) |
 | APIMeMoM | configurable | pass | pass* | — | pass* | [APIM.md](APIM.md) |
-| MED | template | pass* | — | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MOD | doc_only | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MODMED | template | pass* | — | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | LPA_LCA | doc_only | pass* | — | — | readback | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
 | LTA | doc_only | pass* | — | — | readback | [lta-workflow.md](references/lta-workflow.md) |
 | MS_LTA | doc_only | pass* | — | — | readback | [ms-lta-workflow.md](references/ms-lta-workflow.md) |

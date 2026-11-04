@@ -1,0 +1,43 @@
+[[init]]
+iterators = samp iv mv;
+samp = 1:3;
+iv = 1:2;
+mv = 1:2;
+namesamp#samp = tt g0 g1;
+nameiv#iv = xc xa;
+namemv#mv = mc ma;
+variv#iv = xc xa;
+varmv#mv = mc ma;
+filename = "lin_[[nameiv#iv]]-[[namemv#mv]]-ycc_[[namesamp#samp]].inp";
+outputDirectory = "[[outdir]]";
+[[/init]]
+TITLE: synthetic linear-product mediation [[nameiv#iv]]-[[namemv#mv]]-ycc [[namesamp#samp]];
+! Synthetic teaching template: continuous M and Y; indirect effect = a*b.
+DATA: FILE = "ch5_synthetic.dat";
+VARIABLE:
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
+MISSING = .;
+[[samp = 2]]
+USEOBSERVATIONS = grp EQ 0;
+[[/samp = 2]]
+[[samp = 3]]
+USEOBSERVATIONS = grp EQ 1;
+[[/samp = 3]]
+USEVARIABLES = [[variv#iv]] [[varmv#mv]] ycc c1 c2;
+ANALYSIS:
+estimator = ML;
+bootstrap = 1000;
+MODEL:
+ycc ON [[varmv#mv]] (b1);
+ycc ON [[variv#iv]] (cdash);
+ycc ON c1 c2;
+[[varmv#mv]] ON [[variv#iv]] (a1);
+[[varmv#mv]] ON c1 c2;
+MODEL INDIRECT:
+ycc IND [[varmv#mv]] [[variv#iv]];
+MODEL CONSTRAINT:
+NEW(ind tot);
+ind = a1*b1;
+tot = ind + cdash;
+PLOT: TYPE = PLOT3;
+OUTPUT: SAMPSTAT CINTERVAL(BCBOOTSTRAP);

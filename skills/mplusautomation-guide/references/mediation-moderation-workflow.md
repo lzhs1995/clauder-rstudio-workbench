@@ -27,9 +27,20 @@
 既有 Mplus 模型未声明 `CLUSTER`：其 bootstrap 是逐行重抽样，不能称为夫妻聚类稳健区间。
 R 侧静态调节用聚类稳健协方差。两侧推断口径不同，表注必须分开写。
 
-模板骨架见 `assets/ch5/counterfactual_mediation_template.txt`（二值反事实、`USEOBSERVATIONS`
-分组单独拟合）与 `assets/ch5/moderated_mediation_mg_template.txt`（连续 W、`GROUPING` 多组）。
-两份都用合成变量名；计算函数在 `scripts/ch5_mediation_moderation.R`。
+模板骨架（合成变量名，`NAMES` 与 `scripts/ch5_synthetic_data.R` 的列序一致）：
+
+| 模板 | 结构 | 分组 |
+|---|---|---|
+| `assets/ch5/linear_mediation_template.txt` | 连续 X→M→Y，`IND` + `ind = a1*b1` | 全样本与两组各自 `USEOBSERVATIONS` |
+| `assets/ch5/counterfactual_mediation_template.txt` | 二值 M、Y 的反事实分解 | 两组各自 `USEOBSERVATIONS` |
+| `assets/ch5/moderated_mediation_mg_template.txt` | 连续 W 调节 b 路径，mean±SD 取值点 | `GROUPING` 多组，`dimm`/`dint` |
+| `assets/ch5/moderated_mediation_cat_template.txt` | 三分类 W 效应编码（1,0）/（0,1）/（−1,−1），按子样本量加权平均 | 每个样本文件各自的子样本量常量 |
+
+静态调节的 R 路线在 `scripts/ch5_moderation_route.R`：`ch5_moderation_spec()` 校验配置（未知键、缺列、
+角色重叠、连续 W 必须给显式取值点、三分类 W 必须给完整类别顺序），`ch5_fit_moderation_spec()` 拟合，
+`ch5_simple_slopes()` 用含协方差项的 delta 法算简单斜率（logit 另给 OR），`ch5_plot_simple_slopes()` 出图并返回绘制数据。
+合成合同核对：连续 W 的简单斜率等于把 W 平移到取值点后重拟合的主效应，三分类 W 的等于以该类为参照的处理编码重拟合，
+SE 逐位一致；去掉协方差项的 SE 会被判错。
 
 ## 2. 显式配置字段
 
@@ -84,7 +95,7 @@ R 侧静态调节用聚类稳健协方差。两侧推断口径不同，表注必
 1. 固定新源快照、角色映射、样本规则、中心化与效应编码，写配置文件并保存 SHA。
 2. 按配置重算全部手填常量；生成一个最小代表 `.inp`，核 `NAMES`、`USEVARIABLES`、
    `CATEGORICAL`、`DEFINE`、分组语句与 `MODEL CONSTRAINT`。
-3. 跑 `scripts/test_ch5_mediation_moderation_20261105.R` 的合成合同；新规格先过合成，再进真实数据。
+3. 跑合成合同（`scripts/test_ch5_mediation_moderation_20261105.R`、`test_ch5_templates_extended_20261105.R`、`test_ch5_moderation_route_20261105.R`）；新规格先过合成，再在获准窗口用 `test_ch5_native_synthetic_20261105.R --run` 过原生合成，再进真实数据。
 4. 在获准的计算窗口提交一次，隔离输出根；保留进程、版本、起止时间与输入输出 SHA。
 5. `readModels()` 读回，区分正常终止、估计诊断与解析成功；由 `.gh5` 重算区间与判据。
 6. 重出表图并绑定来源（模型、参数名、`.gh5` 语句下标、SHA）。
