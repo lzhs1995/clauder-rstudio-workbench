@@ -159,7 +159,7 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 - [latent-product-full-mi.md](references/latent-product-full-mi.md): correlated
   latent-product propagation, semantic full-covariance calibration, complete-MI
-  Rubin/D1 inference and the verified M1 versus calibrated-only M2 boundary.
+  Rubin/D1 inference, verified full-MI M1/M2 results and the unfinished-family boundary.
 
 - [durable-windows-worker.md](references/durable-windows-worker.md)：
   Windows 原目录恢复、独立引擎监督、永久预算和实际进程退出判断；
