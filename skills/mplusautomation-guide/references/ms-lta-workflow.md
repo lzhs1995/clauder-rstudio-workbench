@@ -26,9 +26,29 @@ MS-LTA 常见问题是 mover 转移单元稀疏和多项 logit 的完全分离�
 
 Mplus 自动修复参数必须作为诊断写入 receipt，不能悄悄当作普通成功。
 
+读取输出时为每张概率表声明条件集合。第七章四波模型打印的普通
+`C1 → C2`、`C2 → C3`、`C3 → C4` 表为总体相邻转移，不能改标为
+mover 专属矩阵；`G → C1` 是给定 G 的初始类别分布，不是时间转移。
+若需报告给定 G 的转移矩阵，须从对应 group-specific 语法及结果独立
+取得并核验，不能从普通 `transitionProbs` 列表名称推断。每行和按原打印
+精度验收，并记录来源潜变量、目标潜变量和是否条件于 G。
+
 ## 3. 第七章对应实现
 
 q1629 的实际语法含 `G(2)`、`G#1` movers 和 `G#2` stayers，且为两期（16a20）`c1(4) c3(4)`；这不是本次 replay 的全四波 MS-LTA，故按语法应归入 MS-LTA。不要把这三个潜变量的声明折算成一个平坦的“类别数”：readback summary 的聚合潜变量字段不能替代逐项语法分类。其 Step-3 归档输入在 N=7008 上完成新鲜复现，但四个 mover multinomial logits 被 Mplus 自动修复；这属于 `FRESH_EXACT_REPLAY_WITH_DIAGNOSTIC`，不是没有条件的 clean pass。
+
+2026-11-04 的归档核查另定位到四波
+`MS_lta_inv_3step_16_22_ref.cat.4_no_change.inp`：
+`G(2) c1(4) c2(4) c3(4) c4(4)`、N=3586、STARTS=0，Step-3 DAT
+为 3586×286。归档 LL/BIC 见本机证据（逻辑名：四波 MS-LTA 归档读回）；stayer 用有限
+`-10/+20` logit 逼近不转移。本轮对该文件的读取与重绘是
+`ARCHIVED_READBACK_ONLY`，不新增四波 Mplus 估计成功的声明。
+
+两期归档候选 DAT 为 7008×284；须按 INP/DAT/OUT 的 SHA 与原 q1629
+运行回执绑定。同名旧归档和新鲜 q1629 输出的警告可能不同，诊断不能在
+它们之间无条件复制。四波与两期各自保留样本、波次、分类误差校正参数和
+Step-1→Step-3 血缘；31 模型复盘顺序见
+[第七章复现映射](chapter7-replay-map.md)。
 
 动静模式图表使用归档 `readModels()` 对象和独立 R 脚本生成；最终 DOCX 中的 F30/F31 必须同时核对节点标签、比例、颜色和流量方向。
 
@@ -44,7 +64,9 @@ q1629 的实际语法含 `G(2)`、`G#1` movers 和 `G#2` stayers，且为两期�
 - [ ] movers/stayers 的约束被明确审计，并区分精确 0/1 与有限 logit 近似；
 - [ ] 区分四波 MS-LTA 与 q1629 的两期（16a20）MS-LTA；两期模型若单独使用，需把它作为额外约束或简化扩展论证，不能直接当作标准多期证据；
 - [ ] 自动修复参数和 warning 已进入 receipt；
+- [ ] 概率表区分总体相邻转移、给定 G 的转移和给定 G 的初始分布；
 - [ ] 图表和正文的模式名称、样本比例、流向一致；
+- [ ] 归档重绘、新鲜估计、完整生产链分别标状态，诊断绑定具体输出 SHA；
 - [ ] q1629 的 panel lineage 与 archived replay 边界已明确；
 - [ ] 不把普通 multiple-group LTA、RI-LTA 或错误语法计入 MS-LTA。
 
