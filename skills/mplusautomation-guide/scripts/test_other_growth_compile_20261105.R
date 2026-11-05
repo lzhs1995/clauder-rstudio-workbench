@@ -74,6 +74,13 @@ test_other_growth_compile <- function(output_dir, skill_root) {
   long <- growth_model_syntax(seq(0, 11), sprintf("score%02d", 1:12), width = 60L)
   check("syntax_wraps_long_statements", all(nchar(strsplit(long$model, "\n")[[1]]) <= 60L) &&
     length(strsplit(long$model, "\n")[[1]]) > 1L)
+  # 临界最后一列必须留给分号，否则 Mplus 在第90列之后截断终止符。
+  boundary <- growth_model_syntax(1:13, paste0("xx", 1:13), width = 90L)
+  check("syntax_reserves_final_semicolon", all(nchar(strsplit(boundary$model, "\n")[[1]]) <= 90L) &&
+    isTRUE(check_growth_statements(boundary, paste0("xx", 1:13))) && grepl(";$", boundary$model))
+  reject("syntax_rejects_unbreakable_loading", growth_model_syntax(c(0, 1e100, 2e100), c("a", "b", "c")))
+  reject("syntax_rejects_collapsed_times", growth_model_syntax(c(0, 1e-11, 2e-11), c("a", "b", "c")))
+  reject("syntax_rejects_transformed_overflow", growth_model_syntax(c(0, 1e200, 2e200), c("a", "b", "c"), "quadratic"))
   check("syntax_check_passes_on_output", isTRUE(check_growth_statements(long, sprintf("score%02d", 1:12))))
   tampered <- growth_model_syntax(waves, aliases)
   tampered$statements[[1]] <- sub("y15@4", "y15@4 y15@4", tampered$statements[[1]], fixed = TRUE)
