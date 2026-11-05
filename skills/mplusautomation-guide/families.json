@@ -399,6 +399,19 @@
       ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml"
+    },
+    "charls_apim_moderated_swap": {
+      "path": "scripts/test_charls_apim_moderated_swap_20261105.R",
+      "lang": "R",
+      "function": "test_charls_apim_moderated_swap",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
     }
   },
   "families": {
@@ -566,7 +579,8 @@
           "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "CHARLS 2011 换源准备到只差 Windows 运行：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；配偶关系与城乡编码未核实，默认阻断"
         },
         "historical_replay": {
           "status": "pass",
@@ -627,7 +641,8 @@
           "note": "a 与 ab 路径为后加"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pending",
+          "note": "CHARLS 2011 换源准备到只差 Windows 运行：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；配偶关系与城乡编码未核实，默认阻断"
         },
         "historical_replay": {
           "status": "pass",

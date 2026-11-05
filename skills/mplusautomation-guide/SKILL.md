@@ -48,8 +48,8 @@ whitelisted real-data receipts. After editing `families.json`, run
 |---|---|---|---|---|---|---|
 | APIM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | APIMeM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMoM | configurable | pass | pass* | — | pass* | [APIM.md](APIM.md) |
-| APIMeMoM | configurable | pass | pass* | — | pass* | [APIM.md](APIM.md) |
+| APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
