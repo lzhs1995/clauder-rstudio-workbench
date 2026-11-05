@@ -147,6 +147,14 @@ charls_apim_moderated_contract_from_json <- function(x) {
   x
 }
 
+# 绝对路径（按本平台判断，在任何规范化之前）：Windows 要盘符或 UNC，其他平台要以 / 开头。
+# 相对路径会随当前工作目录解释，同一份 grant 换个 cwd 就会指向另一个运行根。
+charls_mod_is_abs <- function(p) {
+  if(!(is.character(p)&&length(p)==1&&!is.na(p)&&nzchar(p)))return(FALSE)
+  q<-gsub('\\','/',p,fixed=TRUE)
+  if(.Platform$OS.type=='windows')grepl('^[A-Za-z]:/',q)||grepl('^//[^/]+/[^/]+',q) else startsWith(q,'/')
+}
+
 # 路径比较：统一斜杠、去尾斜杠；Windows 不分大小写
 charls_mod_norm <- function(p) {
   q<-sub('/+$','',gsub('\\','/',normalizePath(p,winslash='/',mustWork=FALSE),fixed=TRUE))
@@ -165,23 +173,26 @@ charls_apim_moderated_admit_grant <- function(grant,window_request,root,request_
     'grant must be grants/<request_name>.json')
   ok(identical(basename(window_request$path),paste0(request_name,'.json'))&&identical(basename(dirname(window_request$path)),'requests'),
     'window request must be requests/<request_name>.json')
+  ok(charls_mod_is_abs(root),'run root must be an absolute path')
   run_root<-charls_mod_norm(root)
   ok(!startsWith(paste0(charls_mod_norm(grant$path),'/'),paste0(run_root,'/')),'grant file must not be inside the run root')
   read<-function(p)tryCatch(jsonlite::read_json(p,simplifyVector=TRUE),error=function(e)NULL)
   g<-read(grant$path);q<-read(window_request$path)
   ok(is.list(g)&&length(g)>0,'grant is not a JSON object');ok(is.list(q)&&length(q)>0,'window request is not a JSON object')
   str1<-function(x)is.character(x)&&length(x)==1&&!is.na(x)&&nzchar(x)
+  int1<-function(x)is.numeric(x)&&length(x)==1&&is.finite(x)&&x>=1&&x==round(x)
   ok(isTRUE(g$approved),'grant approved is not true')
   ok(identical(g$request_name,request_name),'grant request_name differs')
   ok(identical(g$request_sha256,window_request$sha256),'grant request_sha256 differs from the window request file')
   for(f in c('worker','request_id','purpose'))ok(str1(g[[f]])&&str1(q[[f]])&&identical(g[[f]],q[[f]]),paste('grant',f,'differs from the window request'))
-  ok(is.numeric(g$models)&&length(g$models)==1&&is.numeric(q$models)&&identical(as.integer(g$models),as.integer(q$models))&&
-    identical(as.integer(g$models),as.integer(n_models)),'grant models differs from the request or the planned model count')
-  ok(str1(g$root)&&identical(charls_mod_norm(g$root),run_root),'grant root differs from this run root')
+  # 先核三者都是正整数，再按原值比较；不先截断，4.5 与 4 不相等
+  ok(int1(g$models)&&int1(q$models)&&int1(n_models),'grant, request and planned model counts must be positive integers')
+  ok(g$models==q$models&&g$models==n_models,'grant models differs from the request or the planned model count')
+  ok(charls_mod_is_abs(g$root),'grant root must be an absolute path')
+  ok(identical(charls_mod_norm(g$root),run_root),'grant root differs from this run root')
   for(f in c('granted_by','granted_taipei'))ok(str1(g[[f]]),paste('grant',f,'missing'))
   # hard_cap 照抄或收紧请求；引擎启动数要容得下全部模型
   caps<-c('max_engine_starts','max_wall_seconds','processors_per_model')
-  int1<-function(x)is.numeric(x)&&length(x)==1&&is.finite(x)&&x>=1&&x==round(x)
   ok(is.list(g$hard_cap)&&all(vapply(caps,function(f)int1(g$hard_cap[[f]]),logical(1))),'grant hard_cap incomplete')
   ok(is.list(q$hard_cap)&&all(vapply(caps,function(f)int1(q$hard_cap[[f]])&&g$hard_cap[[f]]<=q$hard_cap[[f]],logical(1))),
     'grant hard_cap is looser than the request')

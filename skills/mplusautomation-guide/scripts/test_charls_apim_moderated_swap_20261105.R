@@ -171,14 +171,19 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
   for(d in c(file.path(win,'requests'),file.path(win,'grants'),file.path(run_root,'grants')))dir.create(d,recursive=TRUE)
   rname<-'SYNTHETIC-moderated-v1';caps<-list(max_engine_starts=4L,max_wall_seconds=600L,processors_per_model=1L)
   qpath<-file.path(win,'requests',paste0(rname,'.json'))
-  jsonlite::write_json(list(worker='W3',request_id=rname,purpose='synthetic moderated swap',models=4L,hard_cap=caps),qpath,auto_unbox=TRUE)
-  qsha<-charls_mod_sha(qpath)
+  qbody<-list(worker='W3',request_id=rname,purpose='synthetic moderated swap',models=4L,hard_cap=caps)
+  jsonlite::write_json(qbody,qpath,auto_unbox=TRUE);qsha<-charls_mod_sha(qpath)
   grant_body<-function(...)modifyList(list(approved=TRUE,request_name=rname,request_sha256=qsha,worker='W3',request_id=rname,
     purpose='synthetic moderated swap',models=4L,root=normalizePath(run_root,winslash='/'),hard_cap=caps,
     granted_by='synthetic dispatcher',granted_taipei='2026-11-05 13:00'),list(...))
-  admit<-function(body,dir=file.path(win,'grants'),raw=NULL){
+  # request=换一份窗口请求（SHA 随之重算并写进 grant）；wd=调用时的工作目录；at=本次运行根
+  admit<-function(body,dir=file.path(win,'grants'),raw=NULL,request=NULL,wd=NULL,at=run_root){
+    qp<-qpath;qs<-qsha
+    if(!is.null(request)){qp<-file.path(test_root,'window_alt','requests',paste0(rname,'.json'));dir.create(dirname(qp),recursive=TRUE,showWarnings=FALSE)
+      jsonlite::write_json(request,qp,auto_unbox=TRUE);qs<-charls_mod_sha(qp);body$request_sha256<-qs}
     p<-file.path(dir,paste0(rname,'.json'));if(is.null(raw))jsonlite::write_json(body,p,auto_unbox=TRUE,null='null') else writeLines(raw,p)
-    tryCatch(charls_apim_moderated_admit_grant(list(path=p,sha256=charls_mod_sha(p)),list(path=qpath,sha256=qsha),run_root,rname,4L),
+    old<-getwd();if(!is.null(wd))setwd(wd);on.exit(setwd(old))
+    tryCatch(charls_apim_moderated_admit_grant(list(path=p,sha256=charls_mod_sha(p)),list(path=qp,sha256=qs),at,rname,4L),
       error=function(e)conditionMessage(e))}
   denied<-function(x,why)is.character(x)&&startsWith(x,'FIT_GRANT_NOT_ADMITTED')&&grepl(why,x,fixed=TRUE)
   good<-admit(grant_body())
@@ -194,6 +199,16 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
   check('grant_hard_cap_looser_refused',denied(admit(grant_body(hard_cap=modifyList(caps,list(max_wall_seconds=900L)))),'looser'))
   check('grant_hard_cap_missing_refused',denied(admit(grant_body(hard_cap=NULL)),'hard_cap incomplete'))
   check('grant_without_granted_by_refused',denied(admit(grant_body(granted_by=NULL)),'granted_by'))
+  # 相对 root：同一份 root="." 的 grant 在两个不同 cwd、两个运行根下都必须拒绝
+  other_root<-file.path(test_root,'grant_run_root_b');dir.create(other_root)
+  check('grant_relative_root_refused_in_first_cwd',denied(admit(grant_body(root='.'),wd=run_root),'absolute path'))
+  check('grant_relative_root_refused_in_second_cwd',denied(admit(grant_body(root='.'),wd=other_root,at=other_root),'absolute path'))
+  check('grant_relative_subdir_root_refused',denied(admit(grant_body(root='grant_run_root'),wd=test_root),'absolute path'))
+  check('relative_run_root_refused',denied(admit(grant_body(),wd=test_root,at='grant_run_root'),'run root must be an absolute path'))
+  # models：先核正整数，不截断；4/4/4 仍放行
+  check('grant_fractional_models_refused',denied(admit(grant_body(models=4.5)),'positive integers'))
+  check('request_fractional_models_refused',denied(admit(grant_body(),request=modifyList(qbody,list(models=4.9))),'positive integers'))
+  check('equal_integer_models_still_admitted',is.list(admit(grant_body(models=4),request=modifyList(qbody,list(models=4)))))
   tight<-admit(grant_body(hard_cap=list(max_engine_starts=4L,max_wall_seconds=300L,processors_per_model=1L)))
   capped<-charls_apim_moderated_swap_config(prep$data_path,file.path(test_root,'run_capped'),engine,python,hard_cap=tight$hard_cap)
   check('admitted_hard_cap_reaches_config',identical(capped$execution$wait_limit_seconds,300L)&&identical(capped$execution$processor_budget,1L)&&
