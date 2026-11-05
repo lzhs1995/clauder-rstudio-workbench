@@ -580,7 +580,7 @@
         },
         "real_data_swap": {
           "status": "pending",
-          "note": "CHARLS 2011 换源准备到只差 Windows 运行：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；配偶关系与城乡编码未核实，默认阻断"
+          "note": "准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
         },
         "historical_replay": {
           "status": "pass",
@@ -642,7 +642,7 @@
         },
         "real_data_swap": {
           "status": "pending",
-          "note": "CHARLS 2011 换源准备到只差 Windows 运行：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；配偶关系与城乡编码未核实，默认阻断"
+          "note": "准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
         },
         "historical_replay": {
           "status": "pass",

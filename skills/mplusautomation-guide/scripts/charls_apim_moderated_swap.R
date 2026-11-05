@@ -59,8 +59,28 @@ charls_apim_moderated_read_moderator <- function(path,contract) {
   out
 }
 
+# #79 在回执旁存 source_contract.rds，回执的 contract_sha256 是它的 digest。
+# 这里核绑定与三项核验结果；哈希只核格式与一致性，挡不住有意伪造，但能挡住拿未核实或合成合同产出的回执去跑。
+charls_apim_moderated_check_couples_contract <- function(receipt,contract_path) {
+  charls_mod_assert(charls_mod_hex(receipt$contract_sha256),'BLOCKED_UNBOUND_COUPLE_CONTRACT: receipt contract_sha256 must be a 64-hex digest')
+  charls_mod_assert(is.character(contract_path)&&length(contract_path)==1&&file.exists(contract_path),
+    'BLOCKED_UNBOUND_COUPLE_CONTRACT: source_contract.rds saved by charls_prepare_apim_swap() is missing')
+  k<-readRDS(contract_path)
+  charls_mod_assert(identical(digest::digest(k,algo='sha256'),receipt$contract_sha256),
+    'BLOCKED_UNBOUND_COUPLE_CONTRACT: source_contract.rds digest differs from receipt contract_sha256')
+  s<-k$spouse_link
+  charls_mod_assert(is.list(s)&&isTRUE(s$verified)&&isTRUE(s$reciprocity_required)&&charls_mod_hex(s$documentation_sha256),
+    'BLOCKED_UNVERIFIED_COUPLE_CONTRACT: reciprocal spouse link is not verified')
+  charls_mod_assert(isTRUE(k$missing_codes_verified)&&charls_mod_hex(k$missing_codes_documentation_sha256),
+    'BLOCKED_UNVERIFIED_COUPLE_CONTRACT: missing codes are not verified')
+  charls_mod_assert(isTRUE(k$identity_codes_verified)&&charls_mod_hex(k$identity_documentation_sha256),
+    'BLOCKED_UNVERIFIED_COUPLE_CONTRACT: identity codes are not verified')
+  invisible(digest::digest(k,algo='sha256'))
+}
+
 # couples_data/couples_receipt 是 charls_prepare_apim_swap() 的输出；配偶互指、成员角色与社区一致在那一步已核过。
-charls_apim_moderated_attach <- function(couples_data,couples_receipt,moderator,contract,output_dir) {
+charls_apim_moderated_attach <- function(couples_data,couples_receipt,moderator,contract,output_dir,
+                                         couples_contract=file.path(dirname(couples_receipt),'source_contract.rds')) {
   charls_apim_moderated_validate_contract(contract)
   for(p in c('haven','digest','jsonlite'))charls_mod_assert(requireNamespace(p,quietly=TRUE),paste('Missing package',p))
   charls_mod_assert(file.exists(couples_data)&&file.exists(couples_receipt),'Missing couple table or its receipt')
@@ -69,11 +89,14 @@ charls_apim_moderated_attach <- function(couples_data,couples_receipt,moderator,
   charls_mod_assert(identical(r$status,contract$couples$receipt_status)&&identical(as.integer(r$wave),as.integer(contract$wave))&&
     identical(r$cluster,'community')&&identical(r$data_sha256,data_sha),
     'Couple table must match a PASS_PREPARE_ONLY receipt for the same wave, community clustering and data hash')
+  contract79_sha<-charls_apim_moderated_check_couples_contract(r,couples_contract)
   wide<-as.data.frame(haven::read_dta(couples_data,.name_repair='minimal'),check.names=FALSE)
   need<-contract$couples$required_columns;w<-contract$moderator
   charls_mod_assert(all(need%in%names(wide))&&!w$output_column%in%names(wide),'Couple table columns differ from the declared contract')
   charls_mod_assert(nrow(wide)>0&&identical(as.integer(r$couples),nrow(wide))&&!anyDuplicated(wide$couple_wave_id),
     'Couple count differs from receipt or couple records repeat')
+  charls_mod_assert(!anyNA(wide$member1_id)&&!anyNA(wide$member2_id)&&all(as.character(wide$member1_id)!=as.character(wide$member2_id)),
+    'BLOCKED_SELF_PAIRED_COUPLE: member1_id equals member2_id')
   charls_mod_assert(is.data.frame(moderator)&&identical(names(moderator)[1:2],c('pid','w'))&&!anyDuplicated(moderator$pid),
     'Moderator table must come from charls_apim_moderated_read_moderator()')
   i1<-match(as.character(wide$member1_id),moderator$pid);i2<-match(as.character(wide$member2_id),moderator$pid)
@@ -104,7 +127,8 @@ charls_apim_moderated_attach <- function(couples_data,couples_receipt,moderator,
     one_sided_missing=0L,discordant=0L,moderator=list(column=w$column,output_column=w$output_column,
       scope=w$scope,level=w$level,valid_codes=w$valid_codes,reference=w$reference,coding_basis=w$coding_basis),
     predictor_rank_checks=ranks,moderator_evidence=attr(moderator,'charls_moderator_evidence'),
-    couples_data_sha256=data_sha,couples_receipt_sha256=receipt_sha,couples_contract_sha256=r$contract_sha256,
+    couples_data_sha256=data_sha,couples_receipt_sha256=receipt_sha,couples_contract_sha256=contract79_sha,
+    couples_contract_file_sha256=charls_mod_sha(couples_contract),
     moderated_contract_sha256=digest::digest(contract,algo='sha256'),data_sha256=charls_mod_sha(data_path),
     scientific_boundary=contract$scientific_boundary,new_mplus_calls=0L)
   jsonlite::write_json(receipt,file.path(output_dir,'moderated_preparation_receipt.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
@@ -121,4 +145,47 @@ charls_apim_moderated_contract_from_json <- function(x) {
   w$labels<-lapply(w$labels,function(z)as.numeric(unlist(z)))
   x$moderator<-w;x$couples$required_columns<-as.character(unlist(x$couples$required_columns))
   x
+}
+
+# 路径比较：统一斜杠、去尾斜杠；Windows 不分大小写
+charls_mod_norm <- function(p) {
+  q<-sub('/+$','',gsub('\\','/',normalizePath(p,winslash='/',mustWork=FALSE),fixed=TRUE))
+  if(.Platform$OS.type=='windows')tolower(q) else q
+}
+
+# 拟合准入（PROGRAM 第 4 条的 grant 格式，字段沿用 #79 validate_grant()）：解析 grant 内容逐项核对，
+# 不只比文件名和 SHA。任何一项不符都报 FIT_GRANT_NOT_ADMITTED；通过时返回 grant 里的 hard_cap 供配置使用。
+charls_apim_moderated_admit_grant <- function(grant,window_request,root,request_name,n_models) {
+  why<-function(reason)stop(paste0('FIT_GRANT_NOT_ADMITTED: ',reason),call.=FALSE)
+  ok<-function(cond,reason)if(!isTRUE(cond))why(reason)
+  for(x in list(grant,window_request))
+    ok(is.list(x)&&is.character(x$path)&&length(x$path)==1&&file.exists(x$path)&&charls_mod_hex(x$sha256)&&
+      identical(charls_mod_sha(x$path),x$sha256),'grant or window request file missing or hash mismatch')
+  ok(identical(basename(grant$path),paste0(request_name,'.json'))&&identical(basename(dirname(grant$path)),'grants'),
+    'grant must be grants/<request_name>.json')
+  ok(identical(basename(window_request$path),paste0(request_name,'.json'))&&identical(basename(dirname(window_request$path)),'requests'),
+    'window request must be requests/<request_name>.json')
+  run_root<-charls_mod_norm(root)
+  ok(!startsWith(paste0(charls_mod_norm(grant$path),'/'),paste0(run_root,'/')),'grant file must not be inside the run root')
+  read<-function(p)tryCatch(jsonlite::read_json(p,simplifyVector=TRUE),error=function(e)NULL)
+  g<-read(grant$path);q<-read(window_request$path)
+  ok(is.list(g)&&length(g)>0,'grant is not a JSON object');ok(is.list(q)&&length(q)>0,'window request is not a JSON object')
+  str1<-function(x)is.character(x)&&length(x)==1&&!is.na(x)&&nzchar(x)
+  ok(isTRUE(g$approved),'grant approved is not true')
+  ok(identical(g$request_name,request_name),'grant request_name differs')
+  ok(identical(g$request_sha256,window_request$sha256),'grant request_sha256 differs from the window request file')
+  for(f in c('worker','request_id','purpose'))ok(str1(g[[f]])&&str1(q[[f]])&&identical(g[[f]],q[[f]]),paste('grant',f,'differs from the window request'))
+  ok(is.numeric(g$models)&&length(g$models)==1&&is.numeric(q$models)&&identical(as.integer(g$models),as.integer(q$models))&&
+    identical(as.integer(g$models),as.integer(n_models)),'grant models differs from the request or the planned model count')
+  ok(str1(g$root)&&identical(charls_mod_norm(g$root),run_root),'grant root differs from this run root')
+  for(f in c('granted_by','granted_taipei'))ok(str1(g[[f]]),paste('grant',f,'missing'))
+  # hard_cap 照抄或收紧请求；引擎启动数要容得下全部模型
+  caps<-c('max_engine_starts','max_wall_seconds','processors_per_model')
+  int1<-function(x)is.numeric(x)&&length(x)==1&&is.finite(x)&&x>=1&&x==round(x)
+  ok(is.list(g$hard_cap)&&all(vapply(caps,function(f)int1(g$hard_cap[[f]]),logical(1))),'grant hard_cap incomplete')
+  ok(is.list(q$hard_cap)&&all(vapply(caps,function(f)int1(q$hard_cap[[f]])&&g$hard_cap[[f]]<=q$hard_cap[[f]],logical(1))),
+    'grant hard_cap is looser than the request')
+  ok(g$hard_cap$max_engine_starts>=n_models,'grant max_engine_starts below the planned model count')
+  list(hard_cap=lapply(g$hard_cap[caps],as.integer),granted_by=g$granted_by,granted_taipei=g$granted_taipei,
+    grant_sha256=grant$sha256,window_request_sha256=window_request$sha256)
 }

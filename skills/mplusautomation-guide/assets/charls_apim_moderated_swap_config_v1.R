@@ -18,7 +18,7 @@ charls_apim_moderated_swap_contract <- function() {
 }
 
 charls_apim_moderated_swap_config <- function(data,output_dir,engine,python,protected_roots=character(),
-                                              member_labels=c('Husband','Wife')) {
+                                              member_labels=c('Husband','Wife'),hard_cap=NULL) {
   # 四个模型：APIMoM 一个，APIMeMoM 按 moderated_paths 取 a、b、ab 各一个；都只有一个无约束步骤。
   w<-list(rural=list(columns='wr',scope='shared',type='binary',levels=c(0,1),reference=0))
   probes<-list(urban=list(values=0,scale='raw'),rural=list(values=1,scale='raw'))
@@ -29,6 +29,12 @@ charls_apim_moderated_swap_config <- function(data,output_dir,engine,python,prot
       testing_family=paste0('charls_moderated_technical_',family))
     if(family=='APIMeMoM'){x$m<-list(adl=c('m1','m2'));x$moderated_paths<-paths}
     x
+  }
+  # grant 的 hard_cap：processors_per_model 进处理器预算；max_wall_seconds 收紧调度等待上限（到时停调度、保留进程，不强杀）
+  execution<-list(max_parallel=1L,processor_budget=1L,wait_limit_seconds=14400)
+  if(!is.null(hard_cap)) {
+    execution$processor_budget<-as.integer(hard_cap$processors_per_model)
+    execution$wait_limit_seconds<-as.integer(min(14400L,as.integer(hard_cap$max_wall_seconds)))
   }
   list(schema_version=2L,data=data,data_mode='dta',output_dir=output_dir,engine=engine,python=python,
     row_id='record',cluster='community',members=member_labels,
@@ -44,7 +50,7 @@ charls_apim_moderated_swap_config <- function(data,output_dir,engine,python,prot
     # 与 charls_apim_swap 相同：历史入口名不决定聚类层级，CLUSTER=cid 来自 community 映射。
     inference='spouse_cluster_MLR_delta',
     resource=list(ram_reserve_gib=.75,incremental_peak_gib=.55,commit_required_gib=.7,disk_required_gib=10),
-    execution=list(max_parallel=1L,processor_budget=1L,wait_limit_seconds=14400),
+    execution=execution,
     presentation=list(profile='generic',title='CHARLS cross-sectional moderated APIM technical demonstration'),
     testing=list(adjustment='none'),protected_roots=protected_roots)
 }

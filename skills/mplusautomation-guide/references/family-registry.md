@@ -84,7 +84,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; CHARLS 2011 换源准备到只差 Windows 运行：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；配偶关系与城乡编码未核实，默认阻断
+- real_data_swap: pending; 准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放
 - Thesis: 第四章
 - Gap: 没有排期的真实数据换源测试
@@ -103,7 +103,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `references/apim-v2-implementation-acceptance.md`; a 与 ab 路径为后加
-- real_data_swap: pending; CHARLS 2011 换源准备到只差 Windows 运行：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；配偶关系与城乡编码未核实，默认阻断
+- real_data_swap: pending; 准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 历史模型只有 b 路径
 - Thesis: 第四章
 - Gap: 没有排期的真实数据换源测试

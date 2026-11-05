@@ -16,12 +16,20 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
     member1_adl=sample(0:6,n,TRUE),member2_adl=sample(0:6,n,TRUE),
     member1_cesd10=sample(0:30,n,TRUE),member2_cesd10=sample(0:30,n,TRUE),stringsAsFactors=FALSE)
   wide$member1_cesd10[3]<-NA_real_;wide$member2_adl[5]<-NA_real_
-  write_couples<-function(d,label,status='PASS_PREPARE_ONLY',couples=nrow(d),sha=NULL) {
+  # #79 风格的配偶合同：三项核验都为 TRUE，文档哈希为合成值；回执的 contract_sha256 是它的 digest
+  doc<-function(x)digest::digest(paste('synthetic',x),algo='sha256')
+  couple_contract<-list(schema_version=1L,wave=2011L,
+    spouse_link=list(verified=TRUE,reciprocity_required=TRUE,spouse_id_column='spouse_id',documentation_sha256=doc('spouse')),
+    missing_codes_verified=TRUE,missing_codes_documentation_sha256=doc('missing'),
+    identity_codes_verified=TRUE,identity_documentation_sha256=doc('identity'))
+  write_couples<-function(d,label,status='PASS_PREPARE_ONLY',couples=nrow(d),sha=NULL,k=couple_contract,write_rds=TRUE,contract_sha=NULL) {
     dir<-file.path(fixture,label);dir.create(dir);data<-file.path(dir,'charls_couples_2011_v2.dta');haven::write_dta(d,data)
+    if(write_rds)saveRDS(k,file.path(dir,'source_contract.rds'))
     receipt<-list(status=status,wave=2011L,couples=couples,cluster='community',
-      data_sha256=if(is.null(sha))charls_mod_sha(data) else sha,contract_sha256=digest::digest(label,algo='sha256'))
+      data_sha256=if(is.null(sha))charls_mod_sha(data) else sha,
+      contract_sha256=if(is.null(contract_sha))digest::digest(k,algo='sha256') else contract_sha)
     rp<-file.path(dir,'preparation_receipt.json');jsonlite::write_json(receipt,rp,auto_unbox=TRUE,pretty=TRUE,null='null')
-    list(data=data,receipt=rp)
+    list(data=data,receipt=rp,contract=file.path(dir,'source_contract.rds'))
   }
   couples<-write_couples(wide,'couples')
   # 调节来源：住户层城乡，同户两人取值相同；含原生缺失、标记缺失与一个已声明的数值缺失码。
@@ -32,7 +40,8 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
   harmonized$h1rural[c(11,n+11)]<-9
   harmonized$h1rural<-haven::labelled(harmonized$h1rural,c(urban=0,rural=1))
   hpath<-file.path(fixture,'harmonized_moderator_synthetic_v1.dta');haven::write_dta(harmonized,hpath)
-  hashes<-c(couples=charls_mod_sha(couples$data),receipt=charls_mod_sha(couples$receipt),harmonized=charls_mod_sha(hpath))
+  hashes<-c(couples=charls_mod_sha(couples$data),receipt=charls_mod_sha(couples$receipt),harmonized=charls_mod_sha(hpath),
+    contract=charls_mod_sha(couples$contract))
   # 合同：默认阻断；合成文档哈希只为放行合成数据。
   default<-charls_apim_moderated_swap_contract()
   check('unverified_default_moderator_contract_blocks',blocks(charls_apim_moderated_validate_contract(default),'BLOCKED_UNVERIFIED_MODERATOR_CODES'))
@@ -79,7 +88,9 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
     sum(cc)==n-4L&&sum(ccm)==n-5L&&prep$receipt$moderator_missing_couples==3L)
   check('receipt_binds_couple_table_and_contracts',identical(prep$receipt$status,'PASS_MODERATED_PREPARE_ONLY')&&
     identical(prep$receipt$couples_data_sha256,unname(hashes['couples']))&&identical(prep$receipt$couples_receipt_sha256,unname(hashes['receipt']))&&
-    identical(prep$receipt$data_sha256,charls_mod_sha(prep$data_path))&&identical(prep$receipt$new_mplus_calls,0L))
+    identical(prep$receipt$data_sha256,charls_mod_sha(prep$data_path))&&identical(prep$receipt$new_mplus_calls,0L)&&
+    identical(prep$receipt$couples_contract_sha256,digest::digest(couple_contract,algo='sha256'))&&
+    identical(prep$receipt$couples_contract_file_sha256,unname(hashes['contract'])))
   check('preparation_never_overwrites_existing_attempt',
     blocks(charls_apim_moderated_attach(couples$data,couples$receipt,moderator,contract,file.path(test_root,'prepared')),'already exists'))
   att<-function(c,m=moderator,label)charls_apim_moderated_attach(c$data,c$receipt,m,contract,file.path(test_root,paste0('bad_',label)))
@@ -96,6 +107,22 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
   check('degenerate_moderator_blocks',blocks(att(couples,m,'degenerate'),'Degenerate moderator'))
   coll<-wide;coll$member1_age<-50+10*ifelse(is.na(expected_w),0,expected_w)
   check('collinear_moderated_predictors_block',blocks(att(write_couples(coll,'collinear'),label='collinear'),'Rank-deficient'))
+  # #79 的核验结果：回执必须绑定一份三项都已核验的配偶合同
+  check('missing_couple_contract_rds_blocks',blocks(att(write_couples(wide,'no_rds',write_rds=FALSE),label='no_rds'),'source_contract.rds saved'))
+  check('receipt_contract_sha_absent_blocks',blocks(att(write_couples(wide,'sha_absent',contract_sha=NA_character_),label='sha_absent'),'64-hex digest'))
+  check('receipt_contract_sha_garbage_blocks',blocks(att(write_couples(wide,'sha_garbage',contract_sha='not-a-hash'),label='sha_garbage'),'64-hex digest'))
+  check('couple_contract_digest_mismatch_blocks',blocks(att(write_couples(wide,'sha_other',contract_sha=strrep('a',64)),label='sha_other'),'digest differs'))
+  for(f in c('spouse','missing','identity')) {
+    k<-couple_contract
+    if(f=='spouse')k$spouse_link$verified<-FALSE else if(f=='missing')k$missing_codes_verified<-FALSE else k$identity_codes_verified<-FALSE
+    check(paste0('unverified_',f,'_in_couple_contract_blocks'),blocks(att(write_couples(wide,paste0('unv_',f),k=k),label=paste0('unv_',f)),'BLOCKED_UNVERIFIED_COUPLE_CONTRACT'))
+  }
+  k<-couple_contract;k$spouse_link$documentation_sha256<-'documented'
+  check('couple_contract_doc_hash_format_blocks',blocks(att(write_couples(wide,'doc_fmt',k=k),label='doc_fmt'),'spouse link is not verified'))
+  # 复审里那份手写回执：没跑 #79，没有合同文件，contract_sha256 是一句话
+  check('hand_written_receipt_blocks',blocks(att(write_couples(wide,'forged',write_rds=FALSE,contract_sha='hand-written, no #79 contract'),label='forged'),'BLOCKED_UNBOUND_COUPLE_CONTRACT'))
+  self<-wide;self$member2_id<-self$member1_id
+  check('self_paired_couple_blocks',blocks(att(write_couples(self,'self_pair'),label='self_pair'),'BLOCKED_SELF_PAIRED_COUPLE'))
   # 计划与编译：恰好四个模型，W 原始 0/1，乘积项所在方程随 moderated_paths 变化。
   cfg<-charls_apim_moderated_swap_config(prep$data_path,file.path(test_root,'run'),engine,python)
   plan<-plan_apim_workflow(cfg)
@@ -139,16 +166,49 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
   check('contract_json_roundtrip',isTRUE(charls_apim_moderated_validate_contract(back))&&
     identical(back$moderator$valid_codes,contract$moderator$valid_codes)&&identical(back$moderator$missing_codes,contract$moderator$missing_codes)&&
     identical(back$moderator$labels,contract$moderator$labels)&&identical(back$couples$required_columns,contract$couples$required_columns))
+  # 拟合准入：解析 grant 内容逐项核对；与平台无关，各平台都跑
+  win<-file.path(test_root,'window');run_root<-file.path(test_root,'grant_run_root')
+  for(d in c(file.path(win,'requests'),file.path(win,'grants'),file.path(run_root,'grants')))dir.create(d,recursive=TRUE)
+  rname<-'SYNTHETIC-moderated-v1';caps<-list(max_engine_starts=4L,max_wall_seconds=600L,processors_per_model=1L)
+  qpath<-file.path(win,'requests',paste0(rname,'.json'))
+  jsonlite::write_json(list(worker='W3',request_id=rname,purpose='synthetic moderated swap',models=4L,hard_cap=caps),qpath,auto_unbox=TRUE)
+  qsha<-charls_mod_sha(qpath)
+  grant_body<-function(...)modifyList(list(approved=TRUE,request_name=rname,request_sha256=qsha,worker='W3',request_id=rname,
+    purpose='synthetic moderated swap',models=4L,root=normalizePath(run_root,winslash='/'),hard_cap=caps,
+    granted_by='synthetic dispatcher',granted_taipei='2026-11-05 13:00'),list(...))
+  admit<-function(body,dir=file.path(win,'grants'),raw=NULL){
+    p<-file.path(dir,paste0(rname,'.json'));if(is.null(raw))jsonlite::write_json(body,p,auto_unbox=TRUE,null='null') else writeLines(raw,p)
+    tryCatch(charls_apim_moderated_admit_grant(list(path=p,sha256=charls_mod_sha(p)),list(path=qpath,sha256=qsha),run_root,rname,4L),
+      error=function(e)conditionMessage(e))}
+  denied<-function(x,why)is.character(x)&&startsWith(x,'FIT_GRANT_NOT_ADMITTED')&&grepl(why,x,fixed=TRUE)
+  good<-admit(grant_body())
+  check('grant_with_matching_content_admitted',is.list(good)&&identical(good$hard_cap,caps)&&identical(good$window_request_sha256,qsha))
+  check('grant_approved_false_refused',denied(admit(grant_body(approved=FALSE)),'approved'))
+  check('grant_other_worker_refused',denied(admit(grant_body(worker='W1')),'worker'))
+  check('grant_empty_file_refused',denied(admit(NULL,raw=''),'JSON object'))
+  check('grant_root_mismatch_refused',denied(admit(grant_body(root=normalizePath(test_root,winslash='/'))),'root'))
+  check('grant_inside_run_root_refused',denied(admit(grant_body(),dir=file.path(run_root,'grants')),'inside the run root'))
+  check('grant_request_sha_mismatch_refused',denied(admit(grant_body(request_sha256=strrep('0',64))),'request_sha256'))
+  check('grant_other_request_id_refused',denied(admit(grant_body(request_id='W3-other')),'request_id'))
+  check('grant_models_mismatch_refused',denied(admit(grant_body(models=2L)),'models'))
+  check('grant_hard_cap_looser_refused',denied(admit(grant_body(hard_cap=modifyList(caps,list(max_wall_seconds=900L)))),'looser'))
+  check('grant_hard_cap_missing_refused',denied(admit(grant_body(hard_cap=NULL)),'hard_cap incomplete'))
+  check('grant_without_granted_by_refused',denied(admit(grant_body(granted_by=NULL)),'granted_by'))
+  tight<-admit(grant_body(hard_cap=list(max_engine_starts=4L,max_wall_seconds=300L,processors_per_model=1L)))
+  capped<-charls_apim_moderated_swap_config(prep$data_path,file.path(test_root,'run_capped'),engine,python,hard_cap=tight$hard_cap)
+  check('admitted_hard_cap_reaches_config',identical(capped$execution$wait_limit_seconds,300L)&&identical(capped$execution$processor_budget,1L)&&
+    identical(cfg$execution$wait_limit_seconds,14400))
   # 真正运行 CLI 驱动到拒绝点：未核验合同在读数据前停；已核验合同编译四个输入后，在拟合授权处停。
   make_request<-function(label,candidate) {
     root<-file.path(test_root,label);dir.create(root);own<-file.path(root,'inputs');dir.create(own)
-    copies<-file.path(own,c('charls_couples_2011_v2.dta','preparation_receipt.json',basename(hpath)))
-    stopifnot(all(file.copy(c(couples$data,couples$receipt,hpath),copies)))
+    copies<-file.path(own,c('charls_couples_2011_v2.dta','preparation_receipt.json',basename(hpath),'source_contract.rds'))
+    stopifnot(all(file.copy(c(couples$data,couples$receipt,hpath,couples$contract),copies)))
     entry<-function(p)list(path=normalizePath(p,winslash='/'),sha256=charls_mod_sha(p))
     grants<-file.path(root,'grants');dir.create(grants);grant<-file.path(grants,paste0('SYNTHETIC_',label,'.json'))
     writeLines('{"synthetic": "not an approval"}',grant)
     request<-list(request_name=paste0('SYNTHETIC_',label),root=normalizePath(root,winslash='/'),attempt_id=paste0('SYNTHETIC_',label,'_1'),
-      couples_data=entry(copies[1]),couples_receipt=entry(copies[2]),moderator_source=entry(copies[3]),
+      couples_data=entry(copies[1]),couples_receipt=entry(copies[2]),moderator_source=entry(copies[3]),couples_contract=entry(copies[4]),
+      window_request=list(path=normalizePath(qpath,winslash='/'),sha256=qsha),
       moderated_contract=candidate,engine=engine,python=python,protected_roots=character(),
       expected_models=charls_apim_moderated_expected_models(),
       # SHA 故意不匹配：任何平台都不给拟合许可。
@@ -174,7 +234,7 @@ test_charls_apim_moderated_swap <- function(skill_root,test_root,engine,python) 
       file.exists(file.path(req$root,'prepared_moderated','moderated_preparation_receipt.json')))
   }
   check('source_files_unchanged',identical(c(couples=charls_mod_sha(couples$data),receipt=charls_mod_sha(couples$receipt),
-    harmonized=charls_mod_sha(hpath)),hashes))
+    harmonized=charls_mod_sha(hpath),contract=charls_mod_sha(couples$contract)),hashes))
   result<-list(status='PASS_SYNTHETIC_PREPARE_COMPILE_ONLY',checks=checks,new_mplus_calls=0L,
     real_moderator_codes_verified=FALSE,real_charls_pair_identity_verified=FALSE,scientific_released=FALSE,
     code_sha256=vapply(file.path(skill_root,c('scripts/charls_apim_moderated_swap.R','assets/charls_apim_moderated_swap_config_v1.R',

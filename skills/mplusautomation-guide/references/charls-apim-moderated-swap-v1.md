@@ -13,7 +13,7 @@
 | `scripts/charls_apim_moderated_swap_driver.R` | `--request PATH`；准备/编译后，在原生 Windows 上核到同名 grant 才拟合 |
 | `scripts/test_charls_apim_moderated_swap_20261105.R` | 无引擎合成检查（CI：mplus-guide-family-tests.yml） |
 
-输入边界是 #79 `charls_prepare_apim_swap()` 的两件产物：`charls_couples_2011_v2.dta` 与 `preparation_receipt.json`。本流程只接受 `status=PASS_PREPARE_ONLY`、`wave=2011`、`cluster=community` 且 `data_sha256` 等于宽表当前 SHA256 的回执，并把回执里的 `contract_sha256` 原样记入自己的回执，因此每次运行都能追到它所用的配偶合同。本流程不重做、也不放宽配偶互指、成员角色和社区一致的检查。
+输入边界是 #79 `charls_prepare_apim_swap()` 的三件产物：`charls_couples_2011_v2.dta`、`preparation_receipt.json` 和同目录的 `source_contract.rds`。本流程只接受 `status=PASS_PREPARE_ONLY`、`wave=2011`、`cluster=community` 且 `data_sha256` 等于宽表当前 SHA256 的回执；回执的 `contract_sha256` 必须是 64 位十六进制，并等于 `source_contract.rds` 的 digest；这份合同里配偶互指（`spouse_link.verified`、`reciprocity_required`）、缺失码、身份码三项都必须已核验，三份文档 SHA256 都是 64 位十六进制。核过的合同 digest 与文件 SHA256 记入本流程的回执。哈希只核格式与一致性，挡不住有意伪造，但能挡住拿未核实或合成合同产出的回执去跑。本流程不重做配偶互指、成员角色和社区一致的检查，只另拒 `member1_id == member2_id`。
 
 ## 调节变量的选择
 
@@ -41,19 +41,20 @@ X 为双方年龄，Y 为双方 CESD10 总分，M 为双方 ADL 困难数，W �
 
 - 合同：`codes_verified=TRUE`、编码本 SHA256 与定位都要填；空的缺失码列表不算核验证据。缺失码不得与有效码重叠。
 - 读取：人员 ID 必须是 12 位字符串且唯一；有效码与已声明缺失码以外的值直接阻断，不静默改成缺失。原生缺失与 Stata 标记缺失计数分别保留。
+- 夫妻宽表：回执没有绑定已核验的配偶合同（`BLOCKED_UNBOUND_COUPLE_CONTRACT` / `BLOCKED_UNVERIFIED_COUPLE_CONTRACT`），或同一人自配成对（`BLOCKED_SELF_PAIRED_COUPLE`），阻断。
 - 追加：夫妻任一方不在调节来源里，说明来源版本不一致，阻断。住户层变量只有一方有值或两人取值不同，也阻断，不挑一个人的值顶替。
 - 完整病例中 W 必须两档都有、社区多于一个；含 W 主效应与乘积项的 Y 方程、M 方程预测矩阵必须满秩。
 - 输出目录已存在就停，保留原 attempt。准备回执只记计数与哈希，取值分布留在本机证据。
 
 ## 授权与单次执行
 
-驱动读取私有请求 JSON：`request_name`、`root`、`attempt_id`、`couples_data`/`couples_receipt`/`moderator_source`（各含绝对 `path` 与当前 `sha256`）、`moderated_contract`、`engine`、`python`、`protected_roots`、`expected_models`、`grant`（`path` 与 `sha256`）。请求文件含本机路径，只留本地，不进仓库。
+驱动读取私有请求 JSON：`request_name`、`root`、`attempt_id`、`couples_data`/`couples_receipt`/`couples_contract`/`moderator_source`（各含绝对 `path` 与当前 `sha256`）、`moderated_contract`、`engine`、`python`、`protected_roots`、`expected_models`、`grant` 与 `window_request`（各含 `path` 与 `sha256`）。请求文件含本机路径，只留本地，不进仓库。
 
-1. 先按 #79 的流程在 Windows 上核实配偶关联与缺失码，并运行到 `charls_prepare_apim_swap()` 产出 `PASS_PREPARE_ONLY` 回执；不需要先拟合 #79 的两个模型。
+1. 需先合并 #79：main 上目前没有 `charls_prepare_apim_swap()`。先按 #79 的流程在 Windows 上核实配偶关联与缺失码，并运行到 `charls_prepare_apim_swap()` 产出 `PASS_PREPARE_ONLY` 回执；不需要先拟合 #79 的两个模型。
 2. 只读核对 harmonized 文件中 `h1rural` 的标签与编码本，把编码本 SHA256 与定位写进合同；未核实就保持 `codes_verified=FALSE`。
 3. 在 `mplus_window/requests/` 提交请求，等调度者写出同名 grant。把 grant 文件的 SHA256 写进私有请求 JSON。
-4. 运行一次驱动：先准备、编译四个输入，再核 grant（必须在原生 Windows、文件名为 `<request_name>.json`、位于 `grants` 目录、SHA256 一致），用独占创建写 `FIT_STARTED.json` 后串行拟合、解析、计算效应并做内部校验，最后独占创建 `DRIVER_COMPLETE.json`。失败保留现场，不重提、不杀进程。
-5. 展示副本用 #79 的 `charls_render_apim_swap()` 改写聚类文字（v2 历史入口名会写成夫妻聚类，实际是社区聚类）；只改标签，数值缓存不变。
+4. 运行一次驱动：先准备、编译四个输入，再在原生 Windows 上由 `charls_apim_moderated_admit_grant()` 核 grant。grant 格式见 PROGRAM 计算窗口规则：文件为 `grants/<request_name>.json`，SHA256 一致且不在运行根之内；内容 `approved=true`，`request_name`、`request_sha256`（窗口请求文件的 SHA256）、`worker`、`request_id`、`purpose`、`models` 与窗口请求一致，`root` 等于本次运行根，有 `granted_by`、`granted_taipei`；`hard_cap` 照抄或收紧请求，`max_engine_starts` 不少于模型数。任何一项不符都报 `FIT_GRANT_NOT_ADMITTED`。准入后按 `hard_cap` 重建配置：`processors_per_model` 进处理器预算，`max_wall_seconds` 收紧调度等待上限（到时停调度、保留进程，不强杀）。用独占创建写 `FIT_STARTED.json` 后串行拟合、解析、计算效应并做内部校验，最后独占创建 `DRIVER_COMPLETE.json`。失败保留现场，不重提、不杀进程。
+5. 展示副本用 #79 的 `charls_render_apim_swap()`（同样需先合并 #79）改写聚类文字（v2 历史入口名会写成夫妻聚类，实际是社区聚类）；只改标签，数值缓存不变。
 
 本驱动的拟合闸门比 #79 的 `charls_swap_windows_runner.py` 简单：它不做源文件只读快照、进程身份和宿主资源检查。那个 runner 把 worker 和两模型集合写死，要用它跑这四个模型，需要先让它从配置读取 worker、请求名与模型表，这一步不在本 PR 范围内。
 
