@@ -20,11 +20,16 @@ ch5_moderation_spec <- function(spec, data) {
   cols <- c(roles, spec$controls)
   if (!all(cols %in% names(data))) stop('Columns not in data: ', paste(setdiff(cols, names(data)), collapse = ', '))
   if (spec$moderator_type == 'continuous') {
-    if (!is.numeric(spec$probes) || length(spec$probes) < 2) stop('Continuous moderator needs explicit numeric probes')
+    if (!is.numeric(spec$probes) || length(spec$probes) < 2 || any(!is.finite(spec$probes)))
+      stop('Continuous moderator needs explicit finite numeric probes')
   } else {
     lv <- spec$level_order
     if (is.null(lv) || length(lv) < 2) stop('Categorical moderator needs level_order')
     if (!all(stats::na.omit(unique(data[[spec$moderator]])) %in% lv)) stop('Data has moderator levels outside level_order')
+    # cbind 不会消除同名旧列；公式会取到旧值，因此在拟合前明确拒绝碰撞。
+    internal <- paste0('modw_effect', seq_len(length(lv) - 1L))
+    collision <- intersect(internal, names(data))
+    if (length(collision)) stop('Internal effect-code names already in data: ', paste(collision, collapse = ', '))
   }
   spec
 }

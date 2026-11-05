@@ -37,7 +37,7 @@ R 侧静态调节用聚类稳健协方差。两侧推断口径不同，表注必
 | `assets/ch5/moderated_mediation_cat_template.txt` | 三分类 W 效应编码（1,0）/（0,1）/（−1,−1），按子样本量加权平均 | 每个样本文件各自的子样本量常量 |
 
 静态调节的 R 路线在 `scripts/ch5_moderation_route.R`：`ch5_moderation_spec()` 校验配置（未知键、缺列、
-角色重叠、连续 W 必须给显式取值点、三分类 W 必须给完整类别顺序），`ch5_fit_moderation_spec()` 拟合，
+角色重叠、连续 W 必须给显式且有限的取值点、三分类 W 必须给完整类别顺序；输入列名不得与内部 modw_effect1 等效应编码列冲突），`ch5_fit_moderation_spec()` 拟合，
 `ch5_simple_slopes(m, level = 0.95)` 用含协方差项的 delta 法算简单斜率（logit 另给 OR）；`level` 必须显式给出，没有默认值，输出表带 `level` 列。`ch5_plot_simple_slopes()` 出图，y 轴标签写明置信水平（如 `95% CI`），并返回绘制数据。
 合成合同核对：连续 W 的简单斜率等于把 W 平移到取值点后重拟合的主效应，三分类 W 的等于以该类为参照的处理编码重拟合，
 SE 逐位一致；去掉协方差项的 SE 会被判错。
