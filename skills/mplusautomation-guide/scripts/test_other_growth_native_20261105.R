@@ -29,18 +29,36 @@ test_other_growth_native <- function(run_root, skill_root, command = Sys.getenv(
   results <- list()
   for (id in names(runs)) {
     cat("[other-growth-native]", id, "start", format(Sys.time(), "%H:%M:%S"), "\n"); flush.console()
-    out <- run_mplus_model(runs[[id]], run_root, id, command = command)
-    results[[id]] <- list(status = out$validation$status, reasons = out$validation$reasons, directory = out$directory)
-    cat("[other-growth-native]", id, out$validation$status, "\n"); flush.console()
+    # 单个模型报错（找不到引擎、目录已存在等）也记进回执，不中断其余模型
+    results[[id]] <- tryCatch({
+      out <- run_mplus_model(runs[[id]], run_root, id, command = command)
+      list(status = out$validation$status, reasons = out$validation$reasons, directory = out$directory)
+    }, error = function(e) list(status = "ERROR", reasons = conditionMessage(e), directory = NA_character_))
+    cat("[other-growth-native]", id, results[[id]]$status, "\n"); flush.console()
+  }
+  code_sha256 <- lapply(stats::setNames(nm = c("model_mapping.R", "growth_time_basis.R", "mplus_workflow.R")),
+    function(f) digest::digest(file = file.path(skill_root, "scripts", f), algo = "sha256"))
+  receipt_path <- file.path(run_root, "other_growth_native_receipt.json")
+  dir.create(run_root, recursive = TRUE, showWarnings = FALSE)
+  # 先看状态再读参数：有模型没通过时只写状态与原因的回执，不去读可能不存在的 parameters.csv
+  passed <- vapply(results, function(r) identical(r$status, "PASS"), logical(1))
+  if (!all(passed)) {
+    receipt <- list(test = "other_growth_native", models = length(runs),
+      statuses = lapply(results, `[[`, "status"), reasons = lapply(results[!passed], `[[`, "reasons"),
+      checks = list(all_models_pass = FALSE), code_sha256 = code_sha256)
+    jsonlite::write_json(receipt, receipt_path, auto_unbox = TRUE, pretty = TRUE)
+    stop("OTHER_GROWTH native acceptance failed: models not PASS: ", paste(names(results)[!passed], collapse = ", "))
   }
   read_params <- function(id) utils::read.csv(file.path(results[[id]]$directory, "parameters.csv"))
   key <- function(p) paste(p$paramHeader, p$param)
   a <- read_params("linear_A"); b <- read_params("linear_B"); cc <- read_params("linear_C")
-  same_ab <- identical(key(a), key(b)) && identical(a$est, b$est) && identical(a$se, b$se)
-  differs_ac <- identical(key(a), key(cc)) && any(a$est != cc$est)
+  # 空参数表会让逐项比较空转，所以先要求有行
+  same_keys_ab <- nrow(a) > 0L && identical(key(a), key(b))
+  same_ab <- same_keys_ab && identical(a$est, b$est) && identical(a$se, b$se)
+  differs_ac <- nrow(a) > 0L && identical(key(a), key(cc)) && any(a$est != cc$est)
   factors <- function(id) unique(toupper(read_params(id)$paramHeader))
   checks <- c(
-    all_models_pass = all(vapply(results, function(r) identical(r$status, "PASS"), logical(1))),
+    all_models_pass = TRUE,
     renamed_reordered_identical_estimates = same_ab,
     changed_values_change_estimates = differs_ac,
     # MplusAutomation 把增长语句的载荷头写成「因子名.|」
@@ -49,10 +67,10 @@ test_other_growth_native <- function(run_root, skill_root, command = Sys.getenv(
   # 回执只记状态与计数；估计值留在各模型目录（本机证据），不进公开仓库
   receipt <- list(test = "other_growth_native", models = length(runs),
     statuses = lapply(results, `[[`, "status"), checks = as.list(checks),
-    compared_items_ab = nrow(a), max_abs_diff_ab = max(abs(c(a$est - b$est, a$se - b$se))),
-    code_sha256 = lapply(stats::setNames(nm = c("model_mapping.R", "growth_time_basis.R", "mplus_workflow.R")),
-      function(f) digest::digest(file = file.path(skill_root, "scripts", f), algo = "sha256")))
-  jsonlite::write_json(receipt, file.path(run_root, "other_growth_native_receipt.json"), auto_unbox = TRUE, pretty = TRUE)
+    compared_items_ab = nrow(a),
+    max_abs_diff_ab = if (same_keys_ab) max(abs(c(a$est - b$est, a$se - b$se))) else NA,
+    code_sha256 = code_sha256)
+  jsonlite::write_json(receipt, receipt_path, auto_unbox = TRUE, pretty = TRUE, na = "null")
   if (!all(checks)) stop("OTHER_GROWTH native acceptance failed: ", paste(names(checks)[!checks], collapse = ", "))
   cat("OTHER_GROWTH_NATIVE_PASS", length(runs), "models\n")
   invisible(receipt)
