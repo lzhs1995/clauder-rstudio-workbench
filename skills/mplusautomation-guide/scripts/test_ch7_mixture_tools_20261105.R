@@ -124,6 +124,10 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
     grepl("STARTS = 0;", s3$object$ANALYSIS, fixed = TRUE))
   reject("rejects_lpa_with_two_waves", ch7_mixture_object(syn, "lpa", waves = list(wave(1), wave(2)), classes = 2L))
   reject("rejects_lta_with_one_wave", ch7_mixture_object(syn, "lta", waves = list(wave(1)), classes = 2L))
+  # 无效规格须在生成前拒绝，不能交出空测量或缺少类别下标的 INP。
+  reject("rejects_empty_wave", ch7_mixture_object(syn, "lpa", waves = list(character()), classes = 2L))
+  reject("rejects_one_class_step3", ch7_mixture_object(data.frame(n1 = 1, n2 = 1), "lta", classes = 1L,
+    step3 = list(nominal = c("n1", "n2"), error = matrix(1, 1, 1))))
   reject("rejects_categorical_outside_waves", ch7_mixture_object(syn, "lpa", waves = list(c("x1a", "x1b")), categorical = "u1a", classes = 2L))
   reject("rejects_unequal_invariant_pattern", ch7_mixture_object(syn, "lta", waves = list(wave(1), c("x2a", "u2a", "x2b", "u2b")),
     categorical = binary, classes = 2L))
@@ -180,6 +184,43 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   }
   check("classify_apim_says_structure_only", grepl("not verified", family_of(hand$apim[2])$subtype))
 
+  # 分类器回归：声明排序不能改变 ON 拓扑；固定参数只有给出对角近似才算 stayer。
+  classifier_lta <- paste("VARIABLE: NAMES = y1 y2; USEVARIABLES = y1 y2; CLASSES = c1(2) c2(2);",
+    "ANALYSIS: TYPE = MIXTURE;", "MODEL:", "%OVERALL%", "c2 ON c1;", sep = "\n")
+  classifier_reordered <- sub("c1(2) c2(2)", "c2(2) c1(2)", classifier_lta, fixed = TRUE)
+  check("classify_lta_independent_of_classes_order", ch7_classify_inp(text = classifier_reordered)$family == "LTA")
+  classifier_three <- sub("c1(2) c2(2)", "c3(2) c1(2) c2(2)", classifier_lta, fixed = TRUE)
+  classifier_three <- paste(classifier_three, "c3 ON c2;", sep = "\n")
+  check("classify_three_wave_chain_from_edges", ch7_classify_inp(text = classifier_three)$family == "LTA")
+  check("classify_cyclic_paths_not_lta",
+    ch7_classify_inp(text = paste(classifier_lta, "c1 ON c2;", sep = "\n"))$family == "OTHER_MIXTURE")
+  classifier_ms <- paste("VARIABLE: NAMES = y1 y2; USEVARIABLES = y1 y2; CLASSES = g(2) c1(2) c2(2);",
+    "ANALYSIS: TYPE = MIXTURE;", "MODEL:", "%OVERALL%", "c2 ON c1;", "c1 ON g;", "MODEL g:",
+    "%g#1%", "[c2#1];", "c2 ON c1;", "%g#2%", "[c2#1@-10];", "c2#1 ON c1#1@20;", sep = "\n")
+  check("classify_explicit_stayer_diagonal", ch7_classify_inp(text = classifier_ms)$family == "MS_LTA")
+  classifier_random <- sub("[c2#1@-10]", "[c2#1@0]", classifier_ms, fixed = TRUE)
+  classifier_random <- sub("c1#1@20", "c1#1@0", classifier_random, fixed = TRUE)
+  check("classify_fixed_random_transition_not_stayer", ch7_classify_inp(text = classifier_random)$family == "OTHER_MIXTURE")
+  classifier_switch <- sub("[c2#1@-10]", "[c2#1@10]", classifier_ms, fixed = TRUE)
+  classifier_switch <- sub("c1#1@20", "c1#1@-20", classifier_switch, fixed = TRUE)
+  check("classify_fixed_switch_transition_not_stayer", ch7_classify_inp(text = classifier_switch)$family == "OTHER_MIXTURE")
+  classifier_partial <- sub("[c2#1@-10];", "[c2#1];", classifier_ms, fixed = TRUE)
+  check("classify_free_intercept_not_stayer", ch7_classify_inp(text = classifier_partial)$family == "OTHER_MIXTURE")
+  check("classify_stayer_tolerance_is_enforced",
+    ch7_classify_inp(text = classifier_ms, stayer_tolerance = 1e-6)$family == "OTHER_MIXTURE")
+  check("classify_stayer_tolerance_is_reported",
+    any(grepl("tolerance 0.001", ch7_classify_inp(text = classifier_ms)$approximations, fixed = TRUE)))
+  reject("rejects_invalid_stayer_tolerance", ch7_classify_inp(text = classifier_ms, stayer_tolerance = 0.5))
+  classifier_ms4 <- paste("VARIABLE:", ms4$object$VARIABLE, "ANALYSIS:", ms4$object$ANALYSIS,
+    "MODEL:", ms4$object$MODEL, sep = "\n")
+  classifier_ms4_partial <- sub("c2#1 ON c1#1@20 c1#2@0 c1#3@0;",
+    "c2#1 ON c1#1@20 c1#2@0;", classifier_ms4, fixed = TRUE)
+  check("classify_incomplete_multiclass_fixed_block_not_stayer",
+    ch7_classify_inp(text = classifier_ms4_partial)$family == "OTHER_MIXTURE")
+  classifier_covariate <- sub("c1 ON g;", "c1 ON g; c2 ON y1;", classifier_ms, fixed = TRUE)
+  check("classify_inherited_transition_predictor_not_ignored",
+    ch7_classify_inp(text = classifier_covariate)$family == "OTHER_MIXTURE")
+
   # 3. 类别枚举：BIC 与 AIC/aBIC 选的 K 不同、K=4 最优 LL 未复现、K=4 有小类
   spec <- data.frame(K = 1:4, npar = c(9L, 14L, 19L, 24L), ll = c(-2000, -1900, -1850, -1840),
                      entropy = c(NA, .70, .85, .82), vlmr = c(NA, .001, .004, .30), lmr = c(NA, .002, .006, .33),
@@ -210,6 +251,37 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   reject("enum_rejects_other_n", ch7_enumeration_table(c(paths[2], one("n.out", 3L, ll = -1850, n = 300L))))
   reject("enum_rejects_two_class_variables", ch7_enumeration_table(one("two.out", 2L, ll = -1900, classes = "c1(2) c2(2)")))
   reject("enum_rejects_count_table_mismatch", ch7_enumeration_table(one("rows.out", 3L, ll = -1850, props = c(.5, .5))))
+  # 未收敛且无最终类别表的 K 仍要出诊断行，不能让整个枚举表中止。
+  failed_enum <- one("not_converged.out", 3L, ll = -1850)
+  failed_text <- readLines(failed_enum, warn = FALSE)
+  result_at <- grep("THE BEST LOGLIKELIHOOD", failed_text, fixed = TRUE)[1]
+  writeLines(c(failed_text[seq_len(result_at - 1L)],
+    "THE MODEL ESTIMATION DID NOT TERMINATE NORMALLY DUE TO AN",
+    "INSUFFICIENT NUMBER OF E STEPS. INCREASE THE NUMBER OF MITERATIONS.", "", "MUTHEN & MUTHEN"), failed_enum)
+  with_failed <- ch7_enumeration_table(c(paths[2], failed_enum), min_class_prop = .05, min_entropy = .8)
+  check("enum_keeps_nonconverged_row", nrow(with_failed) == 2L &&
+    identical(with_failed$terminated_normally, c(TRUE, FALSE)) &&
+    with_failed$observations[2] == 320 && is.na(with_failed$LL[2]) &&
+    is.na(with_failed$min_prop_estimated[2]) && is.na(with_failed$min_prop_most_likely[2]))
+  check("enum_failed_row_has_no_pass_flags", !with_failed$lowest_BIC[2] &&
+    !with_failed$lowest_aBIC[2] && !with_failed$lowest_AIC[2] && !with_failed$entropy_ok[2] &&
+    is.na(with_failed$class_size_ok[2]) && !with_failed$LMR_significant[2])
+  no_fit_warnings <- character()
+  all_failed <- withCallingHandlers(ch7_enumeration_table(failed_enum), warning = function(w) {
+    no_fit_warnings <<- c(no_fit_warnings, conditionMessage(w)); invokeRestart("muffleWarning")
+  })
+  check("enum_all_failed_no_min_warning", !length(no_fit_warnings) && nrow(all_failed) == 1L &&
+    !all_failed$lowest_BIC && !all_failed$lowest_aBIC && !all_failed$lowest_AIC)
+  success_without_counts <- one("success_without_counts.out", 3L, ll = -1850)
+  no_counts_text <- readLines(success_without_counts, warn = FALSE)
+  counts_at <- grep("FINAL CLASS COUNTS", no_counts_text, fixed = TRUE)[1]
+  writeLines(c(no_counts_text[seq_len(counts_at - 1L)], "MUTHEN & MUTHEN"), success_without_counts)
+  reject("enum_still_rejects_success_without_counts", ch7_enumeration_table(success_without_counts))
+  failed_wrong_counts <- one("failed_wrong_counts.out", 3L, ll = -1850, props = c(.5, .5))
+  writeLines(sub("THE MODEL ESTIMATION TERMINATED NORMALLY", "THE MODEL ESTIMATION DID NOT TERMINATE NORMALLY",
+    readLines(failed_wrong_counts, warn = FALSE), fixed = TRUE), failed_wrong_counts)
+  reject("enum_still_rejects_failed_nonempty_wrong_counts", ch7_enumeration_table(failed_wrong_counts))
+
   # 4. Step-1 存盘 → Step-3 输入绑定：合成的 Step-1 .out 片段与存盘，经生成器写出的 Step-3 INP/DAT
   base <- file.path(output_dir, "binding", "base"); dir.create(base, recursive = TRUE)
   m <- 60L
@@ -268,6 +340,52 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
     text[target] <- sub("@(-?[0-9.]+)", "@0.123", text[target]); writeLines(text, file.path(folder, "model.inp")) }),
     "N2_fixed_logits_match_error")
   check("binding_step3_inp_classified_as_lta_step3", isTRUE(family_of(file.path(base, "model.inp"))$step3))
+
+  # 路径绑定必须跟随 DATA FILE 的子目录/绝对路径，拒绝同名旧副本。
+  move_dat <- function(folder, absolute = FALSE, change_value = FALSE) {
+    dir.create(file.path(folder, "actual"))
+    target <- file.path(folder, "actual", "data.dat")
+    file.copy(file.path(folder, "data.dat"), target)
+    if (change_value) {
+      d <- utils::read.table(target, header = FALSE)
+      d[5, 4] <- d[5, 4] + 0.5
+      utils::write.table(d, target, row.names = FALSE, col.names = FALSE)
+    }
+    text <- readLines(file.path(folder, "model.inp"))
+    declared <- if (absolute) normalizePath(target, winslash = "/") else "actual/data.dat"
+    text <- sub('FILE = "data.dat";', paste0('FILE = "', declared, '";'), text, fixed = TRUE)
+    writeLines(text, file.path(folder, "model.inp"))
+  }
+  relative_good <- variant("relative_dat", function(folder) move_dat(folder))
+  check("binding_resolves_relative_dat", identical(relative_good$status, "PASS"))
+  absolute_good <- variant("absolute_dat", function(folder) move_dat(folder, absolute = TRUE))
+  check("binding_resolves_absolute_dat", identical(absolute_good$status, "PASS"))
+  fails("binding_reads_declared_subdirectory", variant("changed_relative_dat", function(folder)
+    move_dat(folder, change_value = TRUE)), "projected_values_match")
+  fails("binding_rejects_same_name_other_directory", variant("stale_sibling_dat", function(folder)
+    move_dat(folder, change_value = TRUE), step3_dat = "data.dat"), "step3_inp_reads_step3_dat")
+  if (.Platform$OS.type != "windows") reject("binding_rejects_foreign_absolute_path",
+    ch7_data_path("C:\\study\\data.dat", base))
+
+  # Step-1 的星号与 Step-3 声明的数值缺失码表示相同的缺失值。
+  numeric_missing <- function(folder, declaration) {
+    d <- utils::read.table(file.path(folder, "step1_cprob.dat"), header = FALSE)
+    d[5, 1] <- NA_real_
+    utils::write.table(d, file.path(folder, "step1_cprob.dat"), row.names = FALSE, col.names = FALSE, na = "*")
+    edit_dat(folder, function(d) { d[5, 4] <- -999; d })
+    text <- readLines(file.path(folder, "model.inp"))
+    text <- sub("MISSING\\s*=\\s*\\.;", paste0("MISSING = ", declaration, ";"), text)
+    writeLines(text, file.path(folder, "model.inp"))
+  }
+  for (i in seq_along(c("ALL(-999)", "-999", "y(-999)", "n1-n2(-888) y(-999)"))) {
+    declaration <- c("ALL(-999)", "-999", "y(-999)", "n1-n2(-888) y(-999)")[[i]]
+    r <- variant(paste0("numeric_missing_", i), function(folder) numeric_missing(folder, declaration))
+    check(paste0("binding_numeric_missing_", i), identical(r$status, "PASS"))
+  }
+  fails("binding_does_not_mask_undeclared_code", variant("undeclared_missing_code", function(folder)
+    numeric_missing(folder, "n1 n2(-999)")), "projected_values_match")
+  reject("binding_rejects_unsupported_missing", variant("unsupported_missing", function(folder)
+    numeric_missing(folder, "ALL(LOWEST THRU -999)")))
 
   check("no_engine_outputs", !length(list.files(output_dir, pattern = "\\.(gh5)$", recursive = TRUE)) &&
     !length(list.files(file.path(output_dir, "classify"), pattern = "\\.out$", recursive = TRUE)))

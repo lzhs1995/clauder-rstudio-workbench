@@ -88,8 +88,73 @@ ch7_on <- function(statement) {
        values = suppressWarnings(as.numeric(sub("^[^@]*@", "", rhs))))
 }
 
+# 从 ON 图恢复唯一有向次序；声明顺序没有波次含义，分叉歧义或环不认作链。
+ch7_transition_chain <- function(nodes, pairs) {
+  ordered <- character(); remaining <- nodes
+  while (length(remaining)) {
+    incoming <- pairs$to[pairs$from %in% remaining & pairs$to %in% remaining]
+    ready <- setdiff(remaining, incoming)
+    if (length(ready) != 1L) return(character())
+    ordered <- c(ordered, ready); remaining <- setdiff(remaining, ready)
+  }
+  if (length(ordered) < 2L || !all(vapply(2:length(ordered), function(t)
+      any(pairs$from == ordered[t - 1L] & pairs$to == ordered[t]), logical(1)))) return(character())
+  ordered
+}
+
+# 保守核 stayer：只接受块内逐项写出的完整固定截距/斜率，不推断继承或简写约束。
+# 最后一类为 logit 参照；每个相邻转移都必须在 tolerance 内接近单位矩阵。
+ch7_stayer_block <- function(statements, chain, classes, tolerance, overall = character()) {
+  worst <- 0
+  for (t in 2:length(chain)) {
+    from <- chain[t - 1L]; to <- chain[t]; K <- unname(classes[to])
+    if (K < 2L || classes[from] != K) return(NULL)
+    # OVERALL 中的额外预测变量仍会影响该块，不能忽略后宣称无条件的 stayer。
+    for (statement in overall) {
+      r <- ch7_on(statement)
+      if (!is.null(r) && any(sub("#.*$", "", r$lhs) == to) &&
+          any(sub("#.*$", "", r$rhs) != from)) return(NULL)
+    }
+    targets <- paste0(to, "#", seq_len(K - 1L)); sources <- paste0(from, "#", seq_len(K - 1L))
+    intercept <- rep(NA_real_, K - 1L); slope <- matrix(NA_real_, K - 1L, K - 1L)
+    for (statement in statements) {
+      m <- regmatches(statement, regexec("^\\s*\\[([^]]+)\\]\\s*(?:\\([^)]*\\))?\\s*$",
+                                        statement, perl = TRUE))[[1]]
+      if (length(m)) {
+        tokens <- strsplit(toupper(trimws(m[2])), "\\s+")[[1]]
+        tokens <- tokens[sub("#.*$", "", tokens) == to]
+        if (length(tokens)) {
+          idx <- match(sub("@.*$", "", tokens), targets)
+          values <- suppressWarnings(as.numeric(sub("^[^@]*@", "", tokens)))
+          if (anyNA(idx) || any(!grepl("@", tokens)) || any(!is.finite(values)) ||
+              anyDuplicated(idx) || any(!is.na(intercept[idx]))) return(NULL)
+          intercept[idx] <- values
+        }
+      }
+      r <- ch7_on(statement)
+      if (!is.null(r) && any(sub("#.*$", "", r$lhs) == to)) {
+        rows <- match(r$lhs, targets); cols <- match(r$rhs, sources)
+        if (anyNA(rows) || anyNA(cols) || any(!r$fixed) || any(!is.finite(r$values)) ||
+            anyDuplicated(rows) || anyDuplicated(cols) || any(!is.na(slope[rows, cols]))) return(NULL)
+        slope[rows, cols] <- rep(r$values, each = length(rows))
+      }
+    }
+    if (anyNA(intercept) || anyNA(slope)) return(NULL)
+    # 行为来源类别，列为去向类别；稳定 softmax 避免极端有限 logit 溢出。
+    logits <- rbind(t(sweep(slope, 1L, intercept, "+")), intercept)
+    logits <- cbind(logits, 0)
+    weights <- exp(logits - apply(logits, 1L, max))
+    probabilities <- weights / rowSums(weights)
+    worst <- max(worst, abs(probabilities - diag(K)))
+  }
+  if (worst > tolerance) NULL else list(max_identity_difference = worst)
+}
+
 # 从 INP 判定家族：只看语法（CLASSES、KNOWNCLASS、类别变量之间的 ON、类别块约束），不看 TITLE 或注释
-ch7_classify_inp <- function(path = NULL, text = NULL) {
+ch7_classify_inp <- function(path = NULL, text = NULL, stayer_tolerance = 1e-3) {
+  if (!is.numeric(stayer_tolerance) || length(stayer_tolerance) != 1L ||
+      !is.finite(stayer_tolerance) || stayer_tolerance < 0 || stayer_tolerance >= 0.5)
+    stop("stayer_tolerance must be one finite number in [0, 0.5)")
   if (is.null(text)) text <- readLines(path, warn = FALSE)
   sec <- ch7_inp_sections(text)
   var <- ch7_statements(sec[["VARIABLE"]]); ana <- ch7_statements(sec[["ANALYSIS"]])
@@ -173,10 +238,9 @@ ch7_classify_inp <- function(path = NULL, text = NULL) {
     return(finish(kind, if (length(known)) paste("multiple-group by KNOWNCLASS", known) else NA_character_))
   }
   pairs <- unique(edges[edges$from %in% chain & edges$to %in% chain, c("from", "to")])
-  first_order <- length(chain) >= 2L && all(vapply(2:length(chain), function(t)
-    any(pairs$from == chain[t - 1L] & pairs$to == chain[t]), logical(1)))
-  if (!first_order) {
-    evidence <- c(evidence, "class variables are not linked by a first-order chain in CLASSES order")
+  chain <- ch7_transition_chain(chain, pairs)
+  if (!length(chain)) {
+    evidence <- c(evidence, "class variables do not define an unambiguous directed transition chain")
     return(finish("OTHER_MIXTURE", "several class variables without a transition chain"))
   }
   evidence <- c(evidence, paste("transition chain", paste(chain, collapse = " -> ")))
@@ -191,13 +255,20 @@ ch7_classify_inp <- function(path = NULL, text = NULL) {
     }, character(1))
     evidence <- c(evidence, paste0("MODEL ", h, ": ", paste0(groups, "=", state, collapse = " ")))
     if (any(state == "fixed") && any(state != "fixed")) {
-      fixed_vals <- edges$value[edges$namespace == h & edges$block %in% groups[state == "fixed"] & edges$fixed]
-      if (any(is.finite(fixed_vals)))
-        approximations <- c(approximations, sprintf("stayer transitions fixed by finite logits (max |logit| %s), not exact 0/1",
-                                                    format(max(abs(fixed_vals), na.rm = TRUE))))
-      return(finish("MS_LTA", paste("mover/stayer by", h)))
+      verified <- lapply(groups[state == "fixed"], function(b)
+        ch7_stayer_block(blocks$statement[blocks$namespace == h & blocks$block == b],
+                         chain, classes, stayer_tolerance,
+                         blocks$statement[blocks$namespace == "OVERALL" & blocks$block == "OVERALL"]))
+      verified <- Filter(Negate(is.null), verified)
+      if (length(verified)) {
+        difference <- max(vapply(verified, `[[`, 0, "max_identity_difference"))
+        approximations <- c(approximations, sprintf(
+          "stayer transitions verified from finite logits: max identity difference %s <= tolerance %s; not exact 0/1",
+          format(difference), format(stayer_tolerance)))
+        return(finish("MS_LTA", paste("mover/stayer by", h)))
+      }
     }
-    return(finish("OTHER_MIXTURE", paste("higher-order", h, "without a fixed (stayer) transition block")))
+    return(finish("OTHER_MIXTURE", paste("higher-order", h, "without a verified stayer transition block")))
   }
   if (length(higher) || length(known)) {
     g <- c(known, higher)[1]
@@ -220,16 +291,20 @@ ch7_enumeration_row <- function(path) {
   K <- unname(inp$classes)
   props <- function(x) if (is.data.frame(x) && "proportion" %in% names(x)) x$proportion else numeric()
   estimated <- props(m$class_counts$modelEstimated); likely <- props(m$class_counts$mostLikely)
-  if (length(estimated) != K) stop(basename(path), ": estimated class table has ", length(estimated), " rows for K = ", K)
+  terminated <- any(grepl("THE MODEL ESTIMATION TERMINATED NORMALLY", text, fixed = TRUE))
+  # 未收敛时可以没有最终类别表，保留诊断行；已有但损坏的表及成功输出仍严格核 K。
+  if (length(estimated) != K && (terminated || length(estimated) > 0L))
+    stop(basename(path), ": estimated class table has ", length(estimated), " rows for K = ", K)
   joined <- paste(text, collapse = " ")
   replicated <- if (grepl("BEST LOGLIKELIHOOD VALUE HAS BEEN REPLICATED", joined, fixed = TRUE)) TRUE
                 else if (grepl("BEST LOGLIKELIHOOD VALUE WAS NOT REPLICATED", joined, fixed = TRUE)) FALSE else NA
   data.frame(file = basename(path), sha256 = digest::digest(file = path, algo = "sha256"), K = K,
-    latent = names(inp$classes), terminated_normally = any(grepl("THE MODEL ESTIMATION TERMINATED NORMALLY", text, fixed = TRUE)),
+    latent = names(inp$classes), terminated_normally = terminated,
     best_ll_replicated = replicated, parameters = value_of("Parameters"), observations = value_of("Observations"),
     LL = value_of("LL"), AIC = value_of("AIC"), BIC = value_of("BIC"), aBIC = value_of("aBIC"),
     entropy = if (K == 1L) NA_real_ else value_of("Entropy"),
-    min_prop_estimated = min(estimated), min_prop_most_likely = if (length(likely)) min(likely) else NA_real_,
+    min_prop_estimated = if (length(estimated)) min(estimated) else NA_real_,
+    min_prop_most_likely = if (length(likely)) min(likely) else NA_real_,
     VLMR_p = value_of("T11_VLMR_PValue"), LMR_p = value_of("T11_LMR_PValue"), BLRT_p = value_of("BLRT_PValue"),
     warnings = length(m$warnings), errors = length(m$errors),
     usevariables = paste(sort(inp$used), collapse = " "),
@@ -245,7 +320,8 @@ ch7_enumeration_table <- function(paths, min_class_prop = NULL, min_entropy = NU
   if (length(unique(rows$latent)) != 1L || length(unique(rows$usevariables)) != 1L ||
       length(unique(rows$observations[!is.na(rows$observations)])) > 1L)
     stop("Enumeration outputs must share the latent variable, USEVARIABLES and number of observations")
-  lowest <- function(x) !is.na(x) & x == min(x, na.rm = TRUE)
+  # 全部输出失败时没有拟合值，不产生 min(numeric(0)) 警告或最优标记。
+  lowest <- function(x) if (all(is.na(x))) rep(FALSE, length(x)) else !is.na(x) & x == min(x, na.rm = TRUE)
   rows$lowest_BIC <- lowest(rows$BIC); rows$lowest_aBIC <- lowest(rows$aBIC); rows$lowest_AIC <- lowest(rows$AIC)
   for (k in c("VLMR", "LMR", "BLRT")) rows[[paste0(k, "_significant")]] <- !is.na(rows[[paste0(k, "_p")]]) & rows[[paste0(k, "_p")]] < alpha
   rows$entropy_ok <- if (is.null(min_entropy)) NA else !is.na(rows$entropy) & rows$entropy >= min_entropy
@@ -268,6 +344,50 @@ ch7_savedata_info <- function(text) {
   list(names = toupper(sub("\\s+[A-Z][0-9.]+$", "", rows)), file = trimws(tail[save_at[1] + 1L]))
 }
 
+# DATA FILE 按 INP 所在目录解析，不能用同名文件代替真正的数据源。
+ch7_data_path <- function(value, input_dir) {
+  if (length(value) != 1L || is.na(value) || !nzchar(value)) stop("Step-3 INP has no DATA FILE")
+  windows <- .Platform$OS.type == "windows"
+  if (!windows && (grepl("^[A-Za-z]:", value) || grepl("\\\\", value)))
+    stop("Windows DATA FILE paths cannot be resolved on this platform")
+  if (windows && grepl("^[A-Za-z]:[^/\\\\]", value)) stop("Drive-relative DATA FILE paths are unsupported")
+  absolute <- grepl("^/", value) || (windows && grepl("^[A-Za-z]:[/\\\\]|^\\\\\\\\", value))
+  path <- if (absolute) value else file.path(input_dir, value)
+  normalizePath(path, winslash = "/", mustWork = TRUE)
+}
+
+# 先把 INP 声明的数值缺失码按列还原成 NA，再与 Step-1 的存盘投影比较。
+# 支持全局代码、ALL(code) 和变量清单(code)；复杂或不识别的形式明确拒绝。
+ch7_missing_codes <- function(value, names) {
+  result <- stats::setNames(rep(list(numeric()), length(names)), names)
+  if (is.null(value)) return(result)
+  value <- trimws(value)
+  if (value %in% c("*", ".")) return(result)
+  number <- "[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][-+]?[0-9]+)?"
+  codes <- function(x) {
+    tokens <- strsplit(trimws(x), "[ ,]+")[[1]]
+    if (!length(tokens) || any(!grepl(paste0("^", number, "$"), tokens, perl = TRUE)))
+      stop("Unsupported MISSING declaration: expected finite numeric codes")
+    values <- as.numeric(tokens)
+    if (any(!is.finite(values))) stop("Unsupported MISSING declaration: non-finite code")
+    values
+  }
+  if (!grepl("[()]", value)) {
+    result[] <- rep(list(codes(value)), length(names))
+    return(result)
+  }
+  groups <- regmatches(value, gregexpr("[^()]+\\([^()]*\\)", value, perl = TRUE))[[1]]
+  remainder <- trimws(gsub("[^()]+\\([^()]*\\)", "", value, perl = TRUE))
+  if (!length(groups) || nzchar(remainder)) stop("Unsupported MISSING declaration")
+  for (group in groups) {
+    m <- regmatches(group, regexec("^\\s*([^()]+)\\(([^()]*)\\)$", group, perl = TRUE))[[1]]
+    targets <- if (toupper(trimws(m[2])) == "ALL") names else ch7_varlist(trimws(m[2]), names)
+    if (!length(targets) || any(!targets %in% names)) stop("Unsupported MISSING variable list")
+    for (n in targets) result[[n]] <- unique(c(result[[n]], codes(m[3])))
+  }
+  result
+}
+
 # 绑定核对：Step-1 正常结束且存盘名一致；Step-3 INP 读的就是这份 DAT；按 ID 对行，Step-3 每列都能
 # 从 Step-1 存盘投影出来；Step-3 固定的分类误差 logit 与给定的误差矩阵（行 = 真类别，列 = 赋类）一致。
 # 误差矩阵由调用方从 Step-1 输出取得并记录来源；本函数不解析 Step-1 的分类概率表。
@@ -285,10 +405,12 @@ ch7_step3_binding <- function(step1_out, step1_savedata, step3_inp, step3_dat = 
   check("step1_savedata_name_matches", !is.null(info) && toupper(basename(info$file)) == toupper(basename(step1_savedata)),
         "Step-1 output saved a different file")
   sec <- ch7_inp_sections(readLines(step3_inp, warn = FALSE))
-  data_file <- gsub("[\"']", "", ch7_option(ch7_statements(sec[["DATA"]]), "FILE") %||% "")
-  if (is.null(step3_dat)) step3_dat <- file.path(dirname(step3_inp), basename(data_file))
+  data_file <- trimws(ch7_option(ch7_statements(sec[["DATA"]]), "FILE") %||% "")
+  data_file <- sub("^([\"'])(.*)\\1$", "\\2", data_file)
+  declared_dat <- ch7_data_path(data_file, dirname(step3_inp))
+  if (is.null(step3_dat)) step3_dat <- declared_dat
   if (!file.exists(step3_dat)) stop("Missing file: ", step3_dat)
-  check("step3_inp_reads_step3_dat", nzchar(data_file) && toupper(basename(data_file)) == toupper(basename(step3_dat)),
+  check("step3_inp_reads_step3_dat", identical(declared_dat, normalizePath(step3_dat, winslash = "/", mustWork = TRUE)),
         "Step-3 INP DATA FILE is not the Step-3 DAT under review")
   finish <- function() c(list(status = if (length(reasons)) "FAIL" else "PASS", checks = checks, reasons = reasons,
     files = lapply(list(step1_out = step1_out, step1_savedata = step1_savedata, step3_inp = step3_inp, step3_dat = step3_dat),
@@ -303,6 +425,8 @@ ch7_step3_binding <- function(step1_out, step1_savedata, step3_inp, step3_dat = 
   check("step3_columns_match_names", length(names3) == ncol(d3), "Step-3 DAT column count differs from NAMES")
   if (length(names1) != ncol(d1) || length(names3) != ncol(d3)) return(finish())
   colnames(d1) <- names1; colnames(d3) <- names3; id <- toupper(id)
+  missing <- ch7_missing_codes(ch7_option(variable, "MISSING"), names3)
+  for (n in names3) d3[d3[, n] %in% missing[[n]], n] <- NA_real_
   check("id_in_both", id %in% names1 && id %in% names3, "ID column missing from Step-1 savedata or Step-3 DAT")
   if (!(id %in% names1 && id %in% names3)) return(finish())
   check("ids_unique", !anyNA(d1[, id]) && !anyNA(d3[, id]) && !anyDuplicated(d1[, id]) && !anyDuplicated(d3[, id]),
