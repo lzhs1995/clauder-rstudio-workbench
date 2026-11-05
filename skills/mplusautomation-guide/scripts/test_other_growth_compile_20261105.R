@@ -35,14 +35,20 @@ test_other_growth_compile <- function(output_dir, skill_root) {
     if (!isTRUE(ok)) stop("Contract failed: ", name)
     checks[[name]] <<- TRUE
   }
-  reject <- function(name, expr) check(name, inherits(tryCatch(force(expr), error = identity), "error"))
+  # pattern 非空时还要求报错信息命中，防止别的错误冒充预期的拒绝
+  reject <- function(name, expr, pattern = NULL) {
+    error <- tryCatch({ force(expr); NULL }, error = identity)
+    check(name, inherits(error, "error") && (is.null(pattern) || grepl(pattern, conditionMessage(error), fixed = TRUE)))
+  }
   # 引擎守卫：生成阶段若误调 runModels/detectMplus，立即失败
   ns <- asNamespace("MplusAutomation")
   for (fun in c("runModels", "detectMplus")) {
     trace(fun, tracer = quote(stop("ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI")), print = FALSE, where = ns)
   }
   on.exit(for (fun in c("runModels", "detectMplus")) untrace(fun, where = ns), add = TRUE)
-  reject("engine_guard_blocks_runModels", MplusAutomation::runModels())
+  # 没装 Mplus 时 runModels 本来就会报错，所以要核对拦截信息本身
+  reject("engine_guard_blocks_runModels", MplusAutomation::runModels(), "ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI")
+  reject("engine_guard_blocks_detectMplus", MplusAutomation::detectMplus(), "ENGINE_CALL_FORBIDDEN_SYNTHETIC_CI")
 
   # 1. growth_time_basis：不规则波次（CHARLS 式 2011/2013/2015/2018/2020）
   waves <- c(2011, 2013, 2015, 2018, 2020)
@@ -74,13 +80,45 @@ test_other_growth_compile <- function(output_dir, skill_root) {
   long <- growth_model_syntax(seq(0, 11), sprintf("score%02d", 1:12), width = 60L)
   check("syntax_wraps_long_statements", all(nchar(strsplit(long$model, "\n")[[1]]) <= 60L) &&
     length(strsplit(long$model, "\n")[[1]]) > 1L)
-  check("syntax_check_passes_on_output", isTRUE(check_growth_statements(long, sprintf("score%02d", 1:12))))
+  # 临界最后一列必须留给分号，否则 Mplus 在第90列之后截断终止符。
+  boundary <- growth_model_syntax(1:13, paste0("xx", 1:13), width = 90L)
+  check("syntax_reserves_final_semicolon", all(nchar(strsplit(boundary$model, "\n")[[1]]) <= 90L) &&
+    isTRUE(check_growth_statements(boundary, paste0("xx", 1:13))) && grepl(";$", boundary$model))
+  reject("syntax_rejects_unbreakable_loading", growth_model_syntax(c(0, 1e100, 2e100), c("a", "b", "c")))
+  reject("syntax_rejects_collapsed_times", growth_model_syntax(c(0, 1e-11, 2e-11), c("a", "b", "c")))
+  reject("syntax_rejects_transformed_overflow", growth_model_syntax(c(0, 1e200, 2e200), c("a", "b", "c"), "quadratic"))
+  # 逐个宽度、形状和波数扫一遍：8 字符别名（最长的记号）下每行都不超过所给宽度
+  sweep_ok <- TRUE
+  for (shape in c("linear", "quadratic", "piecewise")) for (n in c(5L, 12L, 25L)) for (w in 40:90) {
+    swept <- growth_model_syntax(seq(0, n - 1), sprintf("v%07d", seq_len(n)), shape,
+      knot = if (shape == "piecewise") 1.5 else NULL, width = w)
+    sweep_ok <- sweep_ok && all(nchar(strsplit(swept$model, "\n")[[1]]) <= w)
+  }
+  check("syntax_lines_within_width_sweep", sweep_ok)
+  # 手工换行（断行位置不同于生成器）的同一条语句也要被接受：核对器读语句，不是复读生成器
+  hand <- growth_model_syntax(waves, aliases)
+  hand$statements[[1]] <- "i s |\n  y11@0 y13@2\n  y15@4 y18@7 y20@9;"
+  check("syntax_check_accepts_hand_wrapped", isTRUE(check_growth_statements(hand, aliases)))
   tampered <- growth_model_syntax(waves, aliases)
   tampered$statements[[1]] <- sub("y15@4", "y15@4 y15@4", tampered$statements[[1]], fixed = TRUE)
-  reject("syntax_check_rejects_repeated_variable", check_growth_statements(tampered, aliases))
+  reject("syntax_check_rejects_repeated_variable", check_growth_statements(tampered, aliases), "exactly once")
   tampered <- growth_model_syntax(waves, aliases)
   tampered$statements[[1]] <- sub("y18@7", "y18@6", tampered$statements[[1]], fixed = TRUE)
-  reject("syntax_check_rejects_wrong_loading", check_growth_statements(tampered, aliases))
+  reject("syntax_check_rejects_wrong_loading", check_growth_statements(tampered, aliases), "do not match")
+  # 多行语句：丢掉续行、续行里少一个变量、跨行交换两个载荷，都要被拒绝
+  long_aliases <- sprintf("score%02d", 1:12)
+  long_lines <- strsplit(long$statements[[1]], "\n")[[1]]
+  check("long_statement_has_continuation_lines", length(long_lines) >= 3L)
+  tampered <- long
+  tampered$statements[[1]] <- paste(long_lines[-2], collapse = "\n")
+  reject("syntax_check_rejects_dropped_continuation_line", check_growth_statements(tampered, long_aliases), "exactly once")
+  tampered <- long
+  tampered$statements[[1]] <- sub("score06@5 ", "", long$statements[[1]], fixed = TRUE)
+  reject("syntax_check_rejects_dropped_wrapped_variable", check_growth_statements(tampered, long_aliases), "exactly once")
+  tampered <- long
+  swapped <- sub("score01@0", "score01@11", long$statements[[1]], fixed = TRUE)
+  tampered$statements[[1]] <- sub("score12@11", "score12@0", swapped, fixed = TRUE)
+  reject("syntax_check_rejects_swapped_wrapped_loadings", check_growth_statements(tampered, long_aliases), "do not match")
   reject("syntax_rejects_alias_count", growth_model_syntax(waves, aliases[-1]))
   reject("syntax_rejects_long_alias", growth_model_syntax(waves, c("y11", "y13", "y15", "y18", "y2020abcd")))
   reject("syntax_rejects_factor_alias_clash", growth_model_syntax(waves, c("i", "y13", "y15", "y18", "y20")))

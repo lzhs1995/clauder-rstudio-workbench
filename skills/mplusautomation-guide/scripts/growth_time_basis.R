@@ -26,6 +26,7 @@ growth_model_syntax <- function(waves, aliases, shape = c("linear", "quadratic",
                                 factors = NULL, width = 80L) {
   shape <- match.arg(shape)
   basis <- growth_time_basis(waves, shape, knot)
+  if (any(!is.finite(basis))) stop("Growth loadings must remain finite after centering and transformation")
   if (is.null(factors)) factors <- switch(shape, linear = c("i", "s"), quadratic = c("i", "s", "q"),
                                           piecewise = c("i", "s1", "s2"))
   if (!is.character(aliases) || length(aliases) != length(waves) || anyNA(aliases))
@@ -42,13 +43,20 @@ growth_model_syntax <- function(waves, aliases, shape = c("linear", "quadratic",
   score <- function(x) {
     text <- formatC(round(x, 10), format = "f", digits = 10)
     text <- sub("0+$", "", text)
-    sub("\\.$", "", text)
+    text <- sub("\\.$", "", text)
+    # 小间隔不能静默压成同一个时间分数；重复的分段载荷仍然允许。
+    if (anyDuplicated(text[!duplicated(x)]))
+      stop("Distinct growth loadings collapse at 10 decimal places; rescale the wave-time unit")
+    text
   }
   statement <- function(lhs, loadings) {
     tokens <- paste0(aliases, "@", score(loadings))
+    # 单个载荷不可拆行；缩进与终止分号也属于行宽。
+    if (any(nchar(tokens) + 3L > width))
+      stop("A growth loading token cannot fit within width; rescale the wave-time unit or increase width")
     lines <- character(); current <- paste(lhs, "|")
     for (token in tokens) {
-      if (nchar(current) + 1L + nchar(token) > width) {
+      if (nchar(current) + 1L + nchar(token) + 1L > width) {
         lines <- c(lines, current); current <- paste0("  ", token)
       } else current <- paste(current, token)
     }

@@ -24,6 +24,17 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
   cat_spec <- modifyList(base, list(outcome = 'ycc', focal = 'mc', moderator = 'wcat', moderator_type = 'categorical',
                                     controls = c('xc', 'c1', 'c2'), probes = NULL, level_order = c(1, 3, 2)))
   reject('level_order_complete', ch5_moderation_spec(modifyList(cat_spec, list(level_order = c(1, 3))), d))
+  # 未使用的旧编码列也可能遮蔽内部列，必须在配置阶段拒绝。
+  for (k in 1:2) {
+    collision <- d; collision[[paste0('modw_effect', k)]] <- sin(seq_len(nrow(d)))
+    reject(paste0('internal_effect_name_collision_', k), ch5_moderation_spec(cat_spec, collision))
+  }
+  unrelated <- d; unrelated$unused_column <- sin(seq_len(nrow(d)))
+  check('unrelated_column_still_allowed', identical(ch5_moderation_spec(cat_spec, unrelated), ch5_moderation_spec(cat_spec, d)))
+  for (entry in c('Inf', 'NA', 'NaN')) {
+    invalid <- list('Inf' = Inf, 'NA' = NA_real_, 'NaN' = NaN)[[entry]]
+    reject(paste0('nonfinite_probe_', entry), ch5_moderation_spec(modifyList(base, list(probes = c(0, invalid))), d))
+  }
   sp <- ch5_moderation_spec(modifyList(base, list(drop_rules = list(yc = 'c2'))), d)
   check('drop_rule_applied', identical(sp$controls, c('xa', 'c1')))
 
@@ -47,6 +58,16 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
     abs(coef(r$fit)[['ma']] - s$estimate[i]) < 1e-10 && abs(sqrt(r$vcov['ma', 'ma']) - s$se[i]) < 1e-10
   }, logical(1))
   check('continuous_slopes_equal_recentered_fits', all(shift_ok))
+  # 有限且不等距的取值点应保持合法，并与逐点平移重拟合一致。
+  uneven <- modifyList(base, list(probes = c(-.75, .2, 1.6)))
+  uneven_slopes <- ch5_simple_slopes(ch5_fit_moderation_spec(uneven, d), level = .95)
+  uneven_ok <- vapply(seq_along(uneven$probes), function(i) {
+    dd <- d; dd$w <- dd$w - uneven$probes[i]
+    r <- ch5_fit_moderation(yc ~ ma + w + ma:w + xa + c1 + c2, dd, cluster = 'cl')
+    abs(coef(r$fit)[['ma']] - uneven_slopes$estimate[i]) < 1e-10 &&
+      abs(sqrt(r$vcov['ma', 'ma']) - uneven_slopes$se[i]) < 1e-10
+  }, logical(1))
+  check('finite_uneven_probes_equal_recentered_fits', all(uneven_ok))
   V <- m$vcov; no_cov <- sqrt(V['ma', 'ma'] + base$probes[3]^2 * V['ma:w', 'ma:w'])
   check('covariance_term_matters', abs(no_cov - s$se[3]) > 1e-4)
 
