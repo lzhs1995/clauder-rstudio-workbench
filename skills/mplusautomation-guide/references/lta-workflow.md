@@ -57,6 +57,8 @@ Vermunt 三步法、BCH 和一步法必须区分用途。三步法用于固定�
 - [ ] 辅助变量方法、硬分类限制和未采用 VAM 的理由写入方法；
 - [ ] 图表、表格和正文使用同一套 transition state 定义。
 
+`ch7_step3_binding()` 按 INP 所在目录解析相对 DATA FILE，核对规范化后的真实路径；同名的另一份 DAT 不视为同一文件。数值缺失码按 MISSING 的全局代码、ALL(code) 或变量清单(code) 还原，其他形式明确拒绝。
+
 ## 参考来源状态
 
 初稿中可追溯的关键 key 包括 `Nylund2007`、`Nylund-Gibson2023`、`Lanza2010`、`Collins2009`、`Asparouhov2014`、`Asparouhov2021b`、`Muthen2022`、`Moore2025`、`Wang2019a`。`Asparouhov2014` DOI 为 `10.1080/10705511.2014.915181`，`Nylund-Gibson2023` DOI 为 `10.1037/met0000486`，`Muthen2022` DOI 为 `10.1037/met0000370`，`Moore2025` DOI 为 `10.1002/ijop.70021`。附件读取状态必须查 source audit manifest。

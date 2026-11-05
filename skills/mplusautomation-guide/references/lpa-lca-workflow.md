@@ -32,6 +32,7 @@
 `scripts/ch7_mixture_tools.R` 的 `ch7_enumeration_table(paths, min_class_prop, min_entropy)` 读同一组数据、同一个类别变量的各 K `.out`，
 汇总上述 1–4 项（含最优 LL 是否复现）和各准则的单列标记，并在 `attr(, "selection")` 写明不代选 K。
 输入不一致（类别变量、USEVARIABLES、样本量不同或 K 重复）时直接报错。第 5 项和最终取舍仍由研究者记录。
+未正常结束且没有最终类别表的输出仍保留诊断行，缺失拟合值和类别比例记为 NA；成功输出缺表或非空类别表与 K 不符仍报错。
 
 ## 3. MplusAutomation 结构
 

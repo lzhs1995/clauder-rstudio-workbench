@@ -10,12 +10,13 @@ ch7_mixture_object <- function(data, family = c("lpa", "lta", "mslta"), waves = 
                                stayer = c(intercept = -10, slope = 20)) {
   family <- match.arg(family)
   if (!is.data.frame(data) || !nrow(data)) stop("A nonempty data.frame is required")
-  if (!is.numeric(classes) || length(classes) != 1L || classes != round(classes) || classes < 1)
+  if (!is.numeric(classes) || length(classes) != 1L || !is.finite(classes) || classes != round(classes) || classes < 1)
     stop("classes must be one positive integer")
   K <- as.integer(classes)
-  mplus_name <- function(x) is.character(x) && all(grepl("^[A-Za-z][A-Za-z0-9_]{0,7}$", x))
+  mplus_name <- function(x) is.character(x) && length(x) > 0L && all(grepl("^[A-Za-z][A-Za-z0-9_]{0,7}$", x))
   if (!is.null(step3)) {
     if (family == "lpa") stop("Step-3 syntax is defined for lta and mslta only")
+    if (K < 2L) stop("Step-3 needs at least two classes")
     if (!is.list(step3) || !mplus_name(step3$nominal) || length(step3$nominal) < 2L)
       stop("step3$nominal must name one most-likely-class variable per wave")
     nw <- length(step3$nominal)
