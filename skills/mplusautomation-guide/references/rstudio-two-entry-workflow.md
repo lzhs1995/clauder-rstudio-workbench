@@ -22,6 +22,17 @@ RStudio may launch asynchronous child R processes. This preserves the requested
 route when the actual parent chain and ClaudeR job are recorded and the R code
 calls MplusAutomation. Record current RStudio/R/worker identities, package
 versions, exact R/input hashes, actual Mplus process receipts and output checks.
+
+Read process fields according to the driver that wrote them. When the R-owner,
+MplusAutomation-call and claim receipts record `R_pid` from `Sys.getpid()`,
+all three must identify the actual worker at the first entry of its recorded
+child-to-parent ancestry. Locate the bound rsession and then RStudio in that
+chain, checking their names and process creation times as well as PIDs. An
+asynchronous worker may have a different PID from the bound rsession; requiring
+those PIDs to be equal rejects a valid route. Preserve the original receipts
+when correcting that audit binding and recheck the saved attempt without
+launching another engine.
+
 Loading MplusAutomation and then bypassing it with a direct engine launch does
 not establish that route. Direct-engine engineering benchmarks keep their own
 label and cannot stand in for requested RStudio workflow acceptance.
