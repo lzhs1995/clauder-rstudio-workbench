@@ -153,3 +153,26 @@ and change preserved. It did not loosen statistical thresholds or input/data
 hash checks. A missing exit receipt means unknown cost, not a new zero budget.
 See [engine cost accounting](engine-cost-accounting.md) and the separate
 [batch-versus-pilot timing evidence](queue-efficiency.md#separate-batch-throughput-from-calibration-time).
+
+## Separate gender-case boundary: 2026-11-06
+
+In a separate gender working-MI continuation, both M1 and M2 completed
+independent Windows verification of all 20 saved members, pooling through the
+original Windows RStudio/ClaudeR session, and independent pooled-output
+readback. M1 retained its joint two-df D1 test and scalar intervals; M2 retained
+its sole registered scalar Rubin target. Each kept its own predeclared primary
+and sensitivity degrees of freedom. Mac collection was still pending, so these
+are Windows acceptances, not Mac returned-output acceptances.
+
+The earlier SD results do not transfer to this different sample. Each accepted
+family remains bound to its own model, saved imputations and source hashes.
+The fixed family was now 5/12 complete, without a partial Holm adjustment;
+working-MI limitations and unrelated research boundaries remained unchanged.
+
+M4's A7 audit recovered from a Windows path-representation failure by reading
+the same saved output with a separately named adapter. That recovery did not
+rerun A7 or establish the remaining calibration points, complete MI or pooling.
+Its successor entries bind the accepted A7 audit to its original source SHA
+and later stages to their own frozen auditor; a prepared or running successor
+is not an accepted result. See the
+[Windows saved-output route](remote-output-acceptance.md#windows原件独审与原rstudio合并).
