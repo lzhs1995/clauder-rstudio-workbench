@@ -119,6 +119,17 @@ ADL working MI with observed product auxiliaries was retained in this case;
 exact substantive-model congeniality and MAR were not established by numerical
 acceptance. A completed extension does not repair an unrelated CFPS branch.
 
+Define the multiplicity unit from the registered hypotheses. A twelve-test
+family can contain four joint two-df D1 tests and eight scalar Rubin tests:
+each joint hypothesis supplies one primary p-value, regardless of its two
+coefficients. Component tests and sensitivity analyses enter only if the
+registered family includes them. After verifying all full-MI and pooling
+acceptances and their source hashes, freeze the ordered raw p-value vector
+and apply Holm to the complete declared family. Keep raw and adjusted values
+separate; independently reproduce the sorted step-down calculation and map
+back to the registered order. Structural NA fields for a joint row's scalar
+estimate, SE or interval are distinct from a missing family p-value.
+
 ## Evidence and cost boundary: 2026-11-04
 
 M1 reused its accepted MI01 and completed MI02–20: 19 new calls,
