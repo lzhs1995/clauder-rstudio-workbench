@@ -12,7 +12,10 @@ MS-LTA（Mover–Stayer LTA）在普通 LTA 之上区分转移结构不同的高
 - mover 的转移概率是否自由估计；
 - 是否有 `KNOWNCLASS`、multiple-group 或随机截距等其他结构。
 
-队列 metadata 只是导航信息。实际语法优先于队列标签。
+队列 metadata 只是导航信息。实际语法优先于队列标签。`scripts/ch7_mixture_tools.R` 的 `ch7_classify_inp()` 按上述各项
+从 INP 判定 LPA/LCA、LTA、MS-LTA、APIM 或其他（不读 TITLE 和注释）；KNOWNCLASS 分组、含 BY/`|` 的混合模型
+不计入 MS-LTA，有限 logit 的 stayer 约束在 `approximations` 里注明。
+分类器按 ON 路径恢复波次顺序，不依赖 CLASSES 声明顺序。stayer 目前只核显式完整的固定截距和斜率：每个相邻转移须距单位矩阵不超过 `stayer_tolerance`（默认 1e-3），容差与最大差写入近似说明；无法核实的约束归入 OTHER_MIXTURE。
 
 ## 2. 估计与诊断
 

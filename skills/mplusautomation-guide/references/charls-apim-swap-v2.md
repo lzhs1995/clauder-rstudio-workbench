@@ -35,6 +35,8 @@ APIM 与 APIMeM 使用各自完整病例，N 可能不同。不能把两模型�
 | `schema` | `CHARLS_SWAP_RUN_V1` |
 | `ready`, `worker`, `request_id` | 布尔准备状态、`W1`、`W1_charls_swap_20261104` |
 | `purpose`, `root`, `models` | 与真实 grant 完全匹配的用途、独立绝对运行根、上表有序两模型集合 |
+| `request` | 原请求 JSON 的绝对 `path` 与当前 `sha256`；请求须位于运行根外，与配置、grant 分属不同文件 |
+| `grant_authority` | `granted_by` 为已核实的调度者 pane 与会话声明；必须与正式 grant 精确一致 |
 | `sources` | `harmonized`、`demographic`、`health`，必要时加 `spouse_roster`；每项为原始 `.dta` 的绝对 `path` 和当前 `sha256` |
 | `protected_roots` | 非空来源/其它研究只读目录；每个源都须处于受保护目录中 |
 | `files` | `rscript`、`python`、`driver`、`engine` 的绝对路径及当前 SHA256 |
@@ -46,11 +48,17 @@ APIM 与 APIMeM 使用各自完整病例，N 可能不同。不能把两模型�
 
 外层 `PREFLIGHT_PASS_NOT_STARTED` 仅表示运行授权、文件与宿主资源检查通过，不代表配偶/缺失码合同科学有效。R helper 会在读取副本后再次拒绝未验证或不互指的配偶关系。
 
+原请求须含 `worker/request_id/purpose/root/models`（与配置一致）、正数 `est_minutes/est_ram_gb`、非空 `xdev_command` 和 `hard_cap`。后者的精确六键为 `max_total_bytes/max_single_file_bytes/min_c_free_bytes/min_ram_available_bytes/reserve_bytes/run_growth_upper_bound_bytes`，数值须与配置预算一致；命令字段只作审查信息，验证器不执行它。
+
+正式 grant 除 `approved=true` 和相同身份/目的/root/模型外，还须有 `request_name`（原请求文件 stem）、`request_sha256`、`config_sha256`、完整 `hard_cap`、`granted_by` 和有效带 `+08:00` 偏移且不晚于校验时间的 `granted_taipei`。grant 与原请求文件同名、目录不同，且都在运行根外。签发者匹配证明声明一致；真实来源仍依调度者交付与外部固定 SHA，不等于数字签名认证。
+
+当前版本仅执行与冻结配置完全相等的授权预算。放宽拒绝；收紧也明确拒绝，直到新的请求、配置和正式 grant 一致，不会接受更紧 grant 却继续使用较宽配置。增长上界是容量估算，不能通过调低它少预留。没有新增授权有效期假设。
+
 ## 授权与单次执行
 
 1. 先完成真实文件 header、标签与文档核验，确定同波明确配偶关联及缺失码。不能用同户、性别、婚姻状态或猜测 `s1*` 字段代替关系证据。
 2. 在独立包目录部署已冻结代码并逐件核 SHA；包目录、原始数据、配置、grant 和实际输出根互相隔离。输出根必须不存在或完全为空；任何旧产物/意图存在时只观察原 attempt，不自动重新拟合。
-3. 取得正式调度 grant 原件，原件内容须有 `approved=true`，且 `worker/request_id/purpose/root/models` 与配置逐项相符。由调用方另传 grant 和配置的预期 SHA，不能用自行生成的占位文件代替授权。
+3. 先冻结请求，再冻结记录请求 SHA 的配置，最后由调度者签发绑定这两份 SHA 的 grant。调用方另传 grant 和配置的预期 SHA。请求不得反向包含最终配置/授权 SHA，配置不得包含 grant SHA。包含 grant SHA 的独立启动脚本最后冻结，其 SHA 写入独立审查回执，不能回写请求形成哈希循环。占位文件不代替真实授权。
 4. 使用 Windows 宿主 Python 进行只读预检；要求没有 Mplus 或 Stata 进程、可用 RAM ≥ 3 GiB、C 盘可用量 ≥ 10 GiB，并留足复制/运行上界及预留空间。Python 的 `psutil` 是项目既有依赖，缺失时拒绝，不自动安装。
 5. 由操作者通过其既有持久任务机制调用一次 `launch`，不要使用有超时后自动重提行为的包装。启动器不会运行 xdev，也不会修改共享队列或他人进程。
 
@@ -61,9 +69,11 @@ APIM 与 APIMeM 使用各自完整病例，N 可能不同。不能把两模型�
 & $python $runner launch --config $config --config-sha256 $configSha --grant $grant --grant-sha256 $grantSha
 ```
 
-启动器以 `O_CREAT|O_EXCL` 创建 `STARTED.json` 后才复制源和启动 R。源以只读句柄核 SHA，复制到本方 `source_snapshot`，核原件及副本一致后将副本设只读；R driver 仅接受这些副本路径。`PROCESS.json` 保存 R PID、出生时间、exe、driver/request/config/grant 哈希。失败保留 STARTED 和原 attempt；不删除意图、不杀进程、不自动重试。
+启动器以 `O_CREAT|O_EXCL` 创建 `STARTED.json` 后才复制源和启动 R。请求、配置与grant都对同一次读取的JSON字节核SHA并解析，拒绝重复键和非有限数值。源以只读句柄核 SHA，复制到本方 `source_snapshot`，核原件及副本一致后将副本设只读；R driver 仅接受这些副本路径。`PROCESS.json` 保存 R PID、出生时间、exe、driver/request/config/grant 哈希。失败保留 STARTED 和原 attempt；不删除意图、不杀进程、不自动重试。
 
 R driver 首先构造宽表并准备/编译两模型。拟合前调用 `gate-fit --run-root ... --attempt-id ...`：再次核正式 grant、完整代码/源 SHA、宿主资源、同一 R 与 Python 监督进程身份、请求文件哈希，并沿每条父子边校验 gate 是该 R 的后代（允许 Windows `system2` 的 shell 中介，拒绝仅同名 exe）。原子生成 `FIT_ADMITTED.json` 后才进入既有 v2 拟合队列；同一批次无法重复领取许可。
+
+`gate-fit`重新读取原调度请求；其 SHA 必须与 `RUN_BINDING/STARTED/PROCESS`一致，不能以driver请求代替调度请求。`FIT_ADMITTED`记录原请求SHA及实际使用上限。持久任务若另开PowerShell进程，启动脚本必须自含冻结路径/SHA，无交互输入，并用`exit $LASTEXITCODE`传递Python退出码；不要依赖父会话变量或超时自动重提。
 
 ## 验收与比对清单
 

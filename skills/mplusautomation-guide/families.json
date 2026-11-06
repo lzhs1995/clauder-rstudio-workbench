@@ -1,0 +1,1099 @@
+{
+  "schema_version": 1,
+  "description": "mplusautomation-guide 模型家族注册表。路径相对 skill 根目录。不写估计值、个体值、ID、本机路径或样本量以外的描述统计。人读视图由 scripts/family_registry.py render 生成。",
+  "routes": {
+    "apim_v1_config": {
+      "label": "APIM v1 配置编译器",
+      "entry_functions": [
+        "scripts/workflow.R:validate_apim_config",
+        "scripts/workflow.R:run_apim_workflow"
+      ],
+      "config_example": "assets/example_config.R",
+      "docs": [
+        "references/executable-workflow.md"
+      ]
+    },
+    "apim_v2_config": {
+      "label": "APIM v2 配置编译器（schema_version = 2）",
+      "entry_functions": [
+        "scripts/apim_v2_config.R:plan_apim_workflow",
+        "scripts/apim_v2_runtime.R:run_apim_workflow_v2"
+      ],
+      "config_example": "assets/example_config_v2.R",
+      "docs": [
+        "references/apim-v2-implementation-acceptance.md",
+        "references/apim-v2-data-adapter.md"
+      ]
+    },
+    "template_bundle": {
+      "label": "已审 [[init]] 模板的保持式编译",
+      "entry_functions": [
+        "scripts/compile_template_bundle.R:compile_mplus_template_bundle",
+        "scripts/template_contracts.py:manifest_contract"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/template-preserving-workflow.md"
+      ]
+    },
+    "archived_replay": {
+      "label": "归档 DAT/INP 回放",
+      "entry_functions": [
+        "scripts/durable_mplus_worker.py:main",
+        "scripts/verify_saved_batch.py:main"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/archived-replay-runtime.md",
+        "references/durable-windows-worker.md"
+      ]
+    },
+    "mplus_object_mapping": {
+      "label": "mplusObject 换名映射",
+      "entry_functions": [
+        "scripts/model_mapping.R:mplus_from_mapping",
+        "scripts/mplus_workflow.R:run_mplus_model",
+        "scripts/growth_time_basis.R:growth_time_basis",
+        "scripts/growth_time_basis.R:growth_model_syntax",
+        "scripts/growth_time_basis.R:check_growth_statements"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/reusable-models.md",
+        "references/cross-dataset-migration.md"
+      ]
+    },
+    "external_project": {
+      "label": "外部研究项目驱动 + 共用执行层",
+      "entry_functions": [
+        "scripts/run_rstudio_mplus_batch.R:run_rstudio_mplus_batch",
+        "scripts/run_rstudio_family_queue.R:run_rstudio_family_queue"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/rstudio-two-entry-workflow.md",
+        "references/pp-lgcm-worked-example.md"
+      ]
+    },
+    "mplus_object_syntax": {
+      "label": "mplusObject()/mplusModeler() 语法生成（第七章混合模型；显式规格，不是通用编译器）",
+      "entry_functions": [
+        "scripts/ch7_mixture_syntax.R:ch7_mixture_object",
+        "scripts/ch7_mixture_tools.R:ch7_classify_inp",
+        "scripts/ch7_mixture_tools.R:ch7_enumeration_table",
+        "scripts/ch7_mixture_tools.R:ch7_step3_binding"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/chapter7-source-variable-contract-20261104.md",
+        "references/lpa-lca-workflow.md"
+      ]
+    },
+    "r_glm_moderation": {
+      "label": "R 静态调节：显式配置 → glm + 聚类 HC0 → 简单斜率与绘图",
+      "entry_functions": [
+        "scripts/ch5_moderation_route.R:ch5_moderation_spec",
+        "scripts/ch5_moderation_route.R:ch5_fit_moderation_spec",
+        "scripts/ch5_moderation_route.R:ch5_simple_slopes",
+        "scripts/ch5_moderation_route.R:ch5_plot_simple_slopes"
+      ],
+      "config_example": null,
+      "docs": [
+        "references/mediation-moderation-workflow.md"
+      ]
+    }
+  },
+  "adapters": {
+    "apim_v2_data_adapter": {
+      "status": "implemented",
+      "formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "entry_functions": [
+        "scripts/apim_v2_data_adapter.R:apim_v2_read_source",
+        "scripts/apim_v2_data_adapter.R:apim_v2_adapter_spec"
+      ],
+      "docs": [
+        "references/apim-v2-data-adapter.md",
+        "references/family-source-swap-contract.md"
+      ]
+    },
+    "model_mapping": {
+      "status": "implemented",
+      "formats": [
+        "in_memory"
+      ],
+      "entry_functions": [
+        "scripts/model_mapping.R:mplus_from_mapping"
+      ],
+      "docs": [
+        "references/reusable-models.md"
+      ]
+    },
+    "source_spec": {
+      "status": "planned",
+      "formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "entry_functions": [],
+      "docs": [
+        "references/family-source-swap-contract.md"
+      ]
+    }
+  },
+  "datasets": {
+    "CFPS": {
+      "variable_map_template": "assets/cfps_variable_map_v2.csv",
+      "docs": [
+        "references/cfps-acceptance.md",
+        "references/cross-dataset-migration.md"
+      ]
+    },
+    "CHARLS": {
+      "variable_map_template": "assets/charls_variable_map_v2.csv",
+      "docs": [
+        "references/charls-baseline-control-contract.md",
+        "references/charls-roster-missingness.md"
+      ]
+    },
+    "OTHER": {
+      "variable_map_template": null,
+      "docs": [
+        "references/cross-dataset-migration.md"
+      ]
+    }
+  },
+  "execution": {
+    "queue": {
+      "scripts": [
+        "scripts/mplus_queue.py"
+      ],
+      "docs": [
+        "references/parallel-models.md",
+        "references/queue-efficiency.md"
+      ]
+    },
+    "durable_worker": {
+      "scripts": [
+        "scripts/durable_mplus_worker.py"
+      ],
+      "docs": [
+        "references/durable-windows-worker.md"
+      ]
+    },
+    "remote_client": {
+      "scripts": [
+        "scripts/remote_batch_client.py"
+      ],
+      "docs": [
+        "references/durable-remote-client.md",
+        "references/mac-windows-remote.md"
+      ]
+    },
+    "resource_admission": {
+      "scripts": [
+        "scripts/resource_admission.py",
+        "scripts/resource_gate.R",
+        "scripts/windows_host_profile.py"
+      ],
+      "docs": [
+        "references/mplus-priority-resource-workflow.md",
+        "references/windows-resource-coordination.md"
+      ]
+    },
+    "recovery": {
+      "scripts": [
+        "scripts/orphan_output_guard.py",
+        "scripts/verify_saved_batch.py"
+      ],
+      "docs": [
+        "references/recovery-runbook.md",
+        "references/remote-output-acceptance.md"
+      ]
+    }
+  },
+  "tests": {
+    "apim_v2_data_adapter": {
+      "path": "scripts/test_apim_v2_data_adapter.R",
+      "lang": "R",
+      "function": "test_apim_v2_data_adapter",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "apim_v2_contract": {
+      "path": "scripts/test_apim_v2.R",
+      "lang": "R",
+      "function": "test_apim_v2",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "apim_v1_contract": {
+      "path": "scripts/test_workflow_contract.R",
+      "lang": "R",
+      "function": "test_apim_contract",
+      "args": [
+        "scripts_dir",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "apim_native_bc_contract": {
+      "path": "scripts/test_native_bc_contract.R",
+      "lang": "R",
+      "function": "test_native_bc_contract",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "template_bundle_compiler": {
+      "path": "scripts/test_compile_template_bundle.R",
+      "lang": "R",
+      "function": "test_compile_template_bundle",
+      "args": [
+        "skill_root",
+        "out_dir"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "apim_native_acceptance": {
+      "path": "scripts/test_native_acceptance.R",
+      "lang": "R",
+      "function": "run_matrix",
+      "args": [],
+      "needs_mplus": true,
+      "ci": null
+    },
+    "template_contracts_py": {
+      "path": "scripts/test_template_contracts.py",
+      "lang": "python",
+      "function": null,
+      "args": [],
+      "needs_mplus": false,
+      "ci": "comparegroups-guide.yml"
+    },
+    "windows_coordinator_py": {
+      "path": "scripts/test_windows_coordinator.py",
+      "lang": "python",
+      "function": null,
+      "args": [],
+      "needs_mplus": false,
+      "ci": "comparegroups-guide.yml"
+    },
+    "rstudio_queue_admission_py": {
+      "path": "scripts/test_rstudio_queue_admission.py",
+      "lang": "python",
+      "function": null,
+      "args": [],
+      "needs_mplus": false,
+      "ci": "mplus-guide-registry.yml"
+    },
+    "ch7_mixture_compile": {
+      "path": "scripts/test_ch7_mixture_family_20261105.R",
+      "lang": "R",
+      "function": "test_ch7_mixture_family",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml",
+      "ci_os": [
+        "Linux"
+      ]
+    },
+    "ch5_mediation_moderation_synthetic": {
+      "path": "scripts/test_ch5_mediation_moderation_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_mediation_moderation",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
+    },
+    "other_growth_compile": {
+      "path": "scripts/test_other_growth_compile_20261105.R",
+      "lang": "R",
+      "function": "test_other_growth_compile",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "other_growth_native": {
+      "path": "scripts/test_other_growth_native_20261105.R",
+      "lang": "R",
+      "function": "test_other_growth_native",
+      "args": [],
+      "needs_mplus": true,
+      "ci": null
+    },
+    "ch5_templates_extended": {
+      "path": "scripts/test_ch5_templates_extended_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_templates_extended",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
+    },
+    "ch5_moderation_route": {
+      "path": "scripts/test_ch5_moderation_route_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_moderation_route",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-ch5-synthetic.yml"
+    },
+    "ch5_native_synthetic": {
+      "path": "scripts/test_ch5_native_synthetic_20261105.R",
+      "lang": "R",
+      "function": "test_ch5_native_synthetic",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": true,
+      "ci": null
+    },
+    "ch7_mixture_tools": {
+      "path": "scripts/test_ch7_mixture_tools_20261105.R",
+      "lang": "R",
+      "function": "test_ch7_mixture_tools",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "charls_apim_moderated_swap": {
+      "path": "scripts/test_charls_apim_moderated_swap_20261105.R",
+      "lang": "R",
+      "function": "test_charls_apim_moderated_swap",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    }
+  },
+  "families": {
+    "APIM": {
+      "aliases": [],
+      "label_zh": "行动者-伙伴互依模型",
+      "summary": "可区分二元组的行动者与伙伴路径。",
+      "routes": [
+        "apim_v2_config",
+        "apim_v1_config",
+        "template_bundle",
+        "archived_replay"
+      ],
+      "code_status": "configurable",
+      "data_formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "docs": [
+        "APIM.md",
+        "references/apim-v2-implementation-acceptance.md",
+        "references/apim-v2-data-adapter.md",
+        "references/apim-paths.md"
+      ],
+      "acceptance_doc": "references/synthetic-acceptance.md",
+      "tests": [
+        "apim_v2_data_adapter",
+        "apim_v2_contract",
+        "apim_v1_contract",
+        "apim_native_bc_contract",
+        "apim_native_acceptance"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "apim_v2_contract"
+        },
+        "native_synthetic": {
+          "status": "pass",
+          "source": "assets/native_acceptance_20261015.json",
+          "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "CFPS → CHARLS 换源已排期"
+        },
+        "historical_replay": {
+          "status": "pass",
+          "source": "references/archived-replay-runtime.md",
+          "note": "仅归档 DAT/INP 数值回放；上游行身份来源未闭合"
+        }
+      },
+      "freshness_files": [
+        "scripts/workflow.R",
+        "scripts/apim_v2_config.R",
+        "scripts/apim_v2_data_adapter.R",
+        "scripts/apim_v2_models.R",
+        "scripts/apim_v2_runtime.R",
+        "scripts/results.R"
+      ],
+      "thesis_refs": [
+        "第四章"
+      ],
+      "gaps": []
+    },
+    "APIMeM": {
+      "aliases": [],
+      "label_zh": "APIM 中介模型",
+      "summary": "在 APIM 中加入成员中介变量（a/b 路径与间接效应）。",
+      "routes": [
+        "apim_v2_config",
+        "apim_v1_config",
+        "template_bundle",
+        "archived_replay"
+      ],
+      "code_status": "configurable",
+      "data_formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "docs": [
+        "APIM.md",
+        "references/apim-v2-implementation-acceptance.md",
+        "references/effect-extraction-and-testing-families.md"
+      ],
+      "acceptance_doc": "references/synthetic-acceptance.md",
+      "tests": [
+        "apim_v2_data_adapter",
+        "apim_v2_contract",
+        "apim_v1_contract",
+        "apim_native_bc_contract",
+        "apim_native_acceptance"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "apim_v2_contract"
+        },
+        "native_synthetic": {
+          "status": "pass",
+          "source": "assets/native_acceptance_20261015.json",
+          "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "CFPS → CHARLS 换源已排期"
+        },
+        "historical_replay": {
+          "status": "pass",
+          "source": "references/archived-replay-runtime.md",
+          "note": "仅归档 DAT/INP 数值回放"
+        }
+      },
+      "freshness_files": [
+        "scripts/workflow.R",
+        "scripts/apim_v2_config.R",
+        "scripts/apim_v2_data_adapter.R",
+        "scripts/apim_v2_models.R",
+        "scripts/apim_v2_runtime.R",
+        "scripts/results.R"
+      ],
+      "thesis_refs": [
+        "第四章"
+      ],
+      "gaps": []
+    },
+    "APIMoM": {
+      "aliases": [],
+      "label_zh": "APIM 调节模型",
+      "summary": "成对或共享的连续/二分/多分类调节变量与乘积路径。",
+      "routes": [
+        "apim_v2_config",
+        "apim_v1_config",
+        "template_bundle",
+        "archived_replay"
+      ],
+      "code_status": "configurable",
+      "data_formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "docs": [
+        "APIM.md",
+        "references/apim-v2-implementation-acceptance.md",
+        "references/binary-observed-interaction-computation.md"
+      ],
+      "acceptance_doc": "references/synthetic-acceptance.md",
+      "tests": [
+        "apim_v2_contract",
+        "apim_v1_contract",
+        "apim_native_bc_contract",
+        "apim_native_acceptance"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "apim_v2_contract"
+        },
+        "native_synthetic": {
+          "status": "pass",
+          "source": "assets/native_acceptance_20261015.json",
+          "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+        },
+        "historical_replay": {
+          "status": "pass",
+          "source": "references/archived-replay-runtime.md",
+          "note": "仅归档 DAT/INP 数值回放"
+        }
+      },
+      "freshness_files": [
+        "scripts/workflow.R",
+        "scripts/apim_v2_config.R",
+        "scripts/apim_v2_data_adapter.R",
+        "scripts/apim_v2_models.R",
+        "scripts/apim_v2_runtime.R",
+        "scripts/results.R"
+      ],
+      "thesis_refs": [
+        "第四章"
+      ],
+      "gaps": [
+        "没有排期的真实数据换源测试"
+      ]
+    },
+    "APIMeMoM": {
+      "aliases": [
+        "moderated APIMeM"
+      ],
+      "label_zh": "有调节的 APIM 中介",
+      "summary": "条件间接效应；moderated_paths 取 b（默认）、a 或 ab，直接路径不调节。",
+      "routes": [
+        "apim_v2_config",
+        "template_bundle",
+        "archived_replay"
+      ],
+      "code_status": "configurable",
+      "data_formats": [
+        "csv",
+        "dta",
+        "archived_dat"
+      ],
+      "docs": [
+        "APIM.md",
+        "references/apim-v2-implementation-acceptance.md"
+      ],
+      "acceptance_doc": "references/apim-v2-implementation-acceptance.md",
+      "tests": [
+        "apim_v2_contract",
+        "apim_v1_contract",
+        "apim_native_bc_contract"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "apim_v2_contract"
+        },
+        "native_synthetic": {
+          "status": "pass",
+          "source": "references/apim-v2-implementation-acceptance.md",
+          "note": "a 与 ab 路径为后加"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+        },
+        "historical_replay": {
+          "status": "pass",
+          "source": "references/archived-replay-runtime.md",
+          "note": "历史模型只有 b 路径"
+        }
+      },
+      "freshness_files": [
+        "scripts/apim_v2_config.R",
+        "scripts/apim_v2_data_adapter.R",
+        "scripts/apim_v2_models.R",
+        "scripts/apim_v2_runtime.R",
+        "scripts/results.R"
+      ],
+      "thesis_refs": [
+        "第四章"
+      ],
+      "gaps": [
+        "没有排期的真实数据换源测试"
+      ]
+    },
+    "MED": {
+      "aliases": [
+        "mediation"
+      ],
+      "label_zh": "中介模型（单人）",
+      "summary": "单人观测变量中介、bootstrap 置信区间。",
+      "routes": [
+        "template_bundle"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "csv",
+        "dta"
+      ],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic",
+        "ch5_templates_extended",
+        "ch5_native_synthetic"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch5_templates_extended",
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖"
+        },
+        "native_synthetic": {
+          "status": "pending",
+          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
+        },
+        "historical_replay": {
+          "status": "archived_readback_only",
+          "source": "references/chapter5-replay-map.md",
+          "note": "读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0"
+        }
+      },
+      "freshness_files": [],
+      "thesis_refs": [
+        "第五章"
+      ],
+      "gaps": [
+        "原生合成验收等 Windows 计算窗口",
+        "freshness_files 暂空：tests/test_mplus_family_registry.py 以 MED 作无 freshness_files 的夹具"
+      ]
+    },
+    "MOD": {
+      "aliases": [
+        "moderation"
+      ],
+      "label_zh": "调节模型（单人）",
+      "summary": "单人观测变量调节与简单斜率。",
+      "routes": [
+        "r_glm_moderation"
+      ],
+      "code_status": "configurable",
+      "data_formats": [
+        "csv",
+        "dta"
+      ],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic",
+        "ch5_moderation_route"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch5_moderation_route",
+          "note": "合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus"
+        },
+        "native_synthetic": {
+          "status": "not_applicable",
+          "note": "静态调节只在 R 中拟合，没有 Mplus 引擎步骤"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "尚无白名单换源回执"
+        },
+        "historical_replay": {
+          "status": "pass",
+          "source": "references/chapter5-replay-map.md",
+          "note": "在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致"
+        }
+      },
+      "freshness_files": [
+        "scripts/ch5_mediation_moderation.R",
+        "scripts/ch5_moderation_route.R"
+      ],
+      "thesis_refs": [
+        "第五章"
+      ],
+      "gaps": [
+        "第五章历史复现用的是锁定脚本原样复跑，尚未改由 r_glm_moderation 路线重跑"
+      ]
+    },
+    "MODMED": {
+      "aliases": [
+        "moderated mediation"
+      ],
+      "label_zh": "有调节的中介（单人）",
+      "summary": "条件间接效应与多组比较。",
+      "routes": [
+        "template_bundle"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "csv",
+        "dta"
+      ],
+      "docs": [
+        "references/mediation-moderation-workflow.md",
+        "references/chapter5-replay-map.md"
+      ],
+      "acceptance_doc": "references/mediation-moderation-workflow.md",
+      "tests": [
+        "ch5_mediation_moderation_synthetic",
+        "ch5_templates_extended",
+        "ch5_native_synthetic"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch5_templates_extended",
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对"
+        },
+        "native_synthetic": {
+          "status": "pending",
+          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
+        },
+        "historical_replay": {
+          "status": "archived_readback_only",
+          "source": "references/chapter5-replay-map.md",
+          "note": "读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0"
+        }
+      },
+      "freshness_files": [
+        "scripts/ch5_mediation_moderation.R",
+        "scripts/ch5_synthetic_data.R",
+        "assets/ch5/moderated_mediation_mg_template.txt",
+        "assets/ch5/moderated_mediation_cat_template.txt"
+      ],
+      "thesis_refs": [
+        "第五章"
+      ],
+      "gaps": [
+        "原生合成验收等 Windows 计算窗口",
+        "三分类 W 模板按样本分别拟合（USEOBSERVATIONS）；三分类 W 与 GROUPING 多组同时出现的模板尚无"
+      ]
+    },
+    "LPA_LCA": {
+      "aliases": [
+        "LPA",
+        "LCA"
+      ],
+      "label_zh": "潜剖面/潜类别分析",
+      "summary": "单期类别枚举、类别命名与后验分类；第七章为四连续加两分类的混合指标。",
+      "routes": [
+        "mplus_object_syntax",
+        "template_bundle"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "csv",
+        "archived_dat"
+      ],
+      "docs": [
+        "references/lpa-lca-workflow.md",
+        "references/chapter7-replay-map.md",
+        "references/chapter7-source-variable-contract-20261104.md"
+      ],
+      "acceptance_doc": "references/chapter7-replay-map.md",
+      "tests": [
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch7_mixture_compile",
+          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+        },
+        "native_synthetic": {
+          "status": "not_started"
+        },
+        "real_data_swap": {
+          "status": "not_started"
+        },
+        "historical_replay": {
+          "status": "archived_readback_only",
+          "source": "references/chapter7-replay-map.md"
+        }
+      },
+      "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
+        "scripts/test_ch7_mixture_family_20261105.R"
+      ],
+      "thesis_refs": [
+        "第七章"
+      ],
+      "gaps": [
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选"
+      ]
+    },
+    "LTA": {
+      "aliases": [],
+      "label_zh": "潜转变分析",
+      "summary": "测量不变、转移概率与三步法 Step-3。",
+      "routes": [
+        "mplus_object_syntax",
+        "template_bundle"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "csv",
+        "archived_dat"
+      ],
+      "docs": [
+        "references/lta-workflow.md",
+        "references/chapter7-replay-map.md",
+        "references/chapter7-source-variable-contract-20261104.md"
+      ],
+      "acceptance_doc": "references/chapter7-replay-map.md",
+      "tests": [
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch7_mixture_compile",
+          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+        },
+        "native_synthetic": {
+          "status": "not_started"
+        },
+        "real_data_swap": {
+          "status": "not_started"
+        },
+        "historical_replay": {
+          "status": "archived_readback_only",
+          "source": "references/chapter7-replay-map.md"
+        }
+      },
+      "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
+        "scripts/test_ch7_mixture_family_20261105.R"
+      ],
+      "thesis_refs": [
+        "第七章"
+      ],
+      "gaps": [
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表"
+      ]
+    },
+    "MS_LTA": {
+      "aliases": [
+        "MS-LTA",
+        "mover-stayer LTA"
+      ],
+      "label_zh": "动静潜转变分析",
+      "summary": "G(2) mover/stayer 结构、有限 logit 与精确约束的区分。",
+      "routes": [
+        "mplus_object_syntax",
+        "template_bundle"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "csv",
+        "archived_dat"
+      ],
+      "docs": [
+        "references/ms-lta-workflow.md",
+        "references/chapter7-replay-map.md",
+        "references/chapter7-source-variable-contract-20261104.md"
+      ],
+      "acceptance_doc": "references/ms-lta-workflow.md",
+      "tests": [
+        "ch7_mixture_compile",
+        "ch7_mixture_tools"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "ch7_mixture_compile",
+          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+        },
+        "native_synthetic": {
+          "status": "not_started"
+        },
+        "real_data_swap": {
+          "status": "not_started"
+        },
+        "historical_replay": {
+          "status": "archived_readback_only",
+          "source": "references/chapter7-replay-map.md"
+        }
+      },
+      "freshness_files": [
+        "scripts/ch7_mixture_syntax.R",
+        "scripts/ch7_mixture_tools.R",
+        "scripts/test_ch7_mixture_family_20261105.R"
+      ],
+      "thesis_refs": [
+        "第七章"
+      ],
+      "gaps": [
+        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
+        "stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明",
+        "流量图（sankeyNetwork）在作者的第七章 R 脚本里，未收进 skill：只找到嵌在大脚本中的绘图段，没有独立脚本"
+      ]
+    },
+    "PP_LGCM": {
+      "aliases": [
+        "PP-LGCM"
+      ],
+      "label_zh": "平行过程潜增长模型",
+      "summary": "多过程潜增长、潜交互与多重插补；CFPS 与 CHARLS 两条数据线。skill 提供执行层与验收规则，模型规格在研究项目里。",
+      "routes": [
+        "external_project",
+        "template_bundle"
+      ],
+      "code_status": "doc_only",
+      "data_formats": [
+        "archived_dat"
+      ],
+      "docs": [
+        "references/pp-lgcm-worked-example.md",
+        "references/pp-lgcm-document-reconciliation.md",
+        "references/latent-product-full-mi.md",
+        "references/mac-windows-remote.md"
+      ],
+      "acceptance_doc": "references/cfps-acceptance.md",
+      "tests": [
+        "rstudio_queue_admission_py"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "not_started",
+          "note": "合成夹具在外部项目"
+        },
+        "native_synthetic": {
+          "status": "not_started"
+        },
+        "real_data_swap": {
+          "status": "pending",
+          "note": "两条真实数据线已运行，缺白名单回执"
+        },
+        "historical_replay": {
+          "status": "pending"
+        }
+      },
+      "freshness_files": [
+        "scripts/run_rstudio_mplus_batch.R",
+        "scripts/durable_mplus_worker.py"
+      ],
+      "thesis_refs": [
+        "PP-LGCM 稿表 4.2.1、4.3.1、4.4.2.1"
+      ],
+      "gaps": [
+        "skill 内没有 PP-LGCM 建模入口或模板；历史生产脚本与审计脚本都在论文工作区",
+        "schema-2 配置编译器只接受 APIM 系家族，PP-LGCM 不能走该通道"
+      ]
+    },
+    "OTHER_GROWTH": {
+      "aliases": [],
+      "label_zh": "其他增长模型",
+      "summary": "手写 ANALYSIS 的 mplusObject 加换名映射；不规则时间载荷由 growth_model_syntax() 写成 Mplus 增长语句。",
+      "routes": [
+        "mplus_object_mapping"
+      ],
+      "code_status": "template",
+      "data_formats": [
+        "in_memory"
+      ],
+      "docs": [
+        "references/reusable-models.md",
+        "references/cross-dataset-migration.md"
+      ],
+      "acceptance_doc": "references/reusable-models.md",
+      "tests": [
+        "other_growth_compile",
+        "other_growth_native"
+      ],
+      "evidence": {
+        "synthetic_compile": {
+          "status": "pass",
+          "source": "other_growth_compile"
+        },
+        "native_synthetic": {
+          "status": "pending",
+          "note": "原生运行包已备好（线性、二次、分段及换名换序/改值复用核对共 5 个模型），等 Windows 窗口用 scripts/test_other_growth_native_20261105.R 运行"
+        },
+        "real_data_swap": {
+          "status": "not_started"
+        },
+        "historical_replay": {
+          "status": "not_applicable"
+        }
+      },
+      "freshness_files": [
+        "scripts/model_mapping.R",
+        "scripts/growth_time_basis.R",
+        "scripts/mplus_workflow.R"
+      ],
+      "thesis_refs": [],
+      "gaps": [
+        "原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）",
+        "growth_model_syntax() 只写单一过程的增长因子；并行过程、协变量、分类结果仍需手写 MODEL",
+        "真实数据换源未排期"
+      ]
+    }
+  }
+}

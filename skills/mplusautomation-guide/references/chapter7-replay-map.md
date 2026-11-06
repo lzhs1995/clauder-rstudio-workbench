@@ -95,6 +95,13 @@ Step-1→本次分类误差与 Step-3；两种证据分别标记。
 类别语义对齐仍待完成。原 64 组 warning 与解析器归入 errors 的 9 组诊断
 均保留；这不撤销原 q1604/q1629 回执，也不把历史新鲜复现算成本次运行。
 
+## 代码入口
+
+- `scripts/ch7_mixture_syntax.R`：`ch7_mixture_object()` 按显式规格生成 LPA/LCA、LTA、MS-LTA 及 Step-3 的 `mplusObject`。
+- `scripts/ch7_mixture_tools.R`：`ch7_classify_inp()` 从 INP 判定家族；`ch7_enumeration_table()` 汇总类别枚举；
+  `ch7_step3_binding()` 核 Step-1 存盘到 Step-3 输入的绑定。
+- 合成合同：`scripts/test_ch7_mixture_family_20261105.R`、`scripts/test_ch7_mixture_tools_20261105.R`。
+
 ## 可复现目录合同
 
 每批复盘目录必须有：

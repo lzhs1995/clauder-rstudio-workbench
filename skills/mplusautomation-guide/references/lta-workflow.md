@@ -53,9 +53,11 @@ Vermunt 三步法、BCH 和一步法必须区分用途。三步法用于固定�
 - [ ] 1 至 K 类别选择有完整证据；
 - [ ] 测量不变性约束和图形支持一致；
 - [ ] 转移矩阵行和为 1，类别标签已语义对齐；
-- [ ] 每个 Step-3 输入与 Step-1 savedata 具有明确 hash 关系；
+- [ ] 每个 Step-3 输入与 Step-1 savedata 具有明确 hash 关系（`scripts/ch7_mixture_tools.R` 的 `ch7_step3_binding()`：核 Step-1 正常结束与存盘名、Step-3 INP 读的 DAT、按 ID 投影的值和固定 logit；分类误差矩阵由调用方提供并记录来源）；
 - [ ] 辅助变量方法、硬分类限制和未采用 VAM 的理由写入方法；
 - [ ] 图表、表格和正文使用同一套 transition state 定义。
+
+`ch7_step3_binding()` 按 INP 所在目录解析相对 DATA FILE，核对规范化后的真实路径；同名的另一份 DAT 不视为同一文件。数值缺失码按 MISSING 的全局代码、ALL(code) 或变量清单(code) 还原，其他形式明确拒绝。
 
 ## 参考来源状态
 

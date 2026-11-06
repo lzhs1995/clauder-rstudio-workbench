@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone, timedelta
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,6 +24,8 @@ MODELS = [
 ]
 GIB = 1024**3
 MIN_RESERVE = 256 * 1024**2
+CAP_KEYS = ("max_total_bytes", "max_single_file_bytes", "min_c_free_bytes",
+            "min_ram_available_bytes", "reserve_bytes", "run_growth_upper_bound_bytes")
 
 
 class AdmissionError(ValueError):
@@ -63,7 +66,7 @@ def hash_string(value):
     return value
 
 
-def load_json(path):
+def parse_json(data):
     # 拒绝重复JSON字段，避免审批方和执行方看到不同值。
     def pairs(items):
         out = {}
@@ -71,8 +74,27 @@ def load_json(path):
             require(key not in out, "duplicate_json_key:" + key)
             out[key] = value
         return out
-    with Path(path).open(encoding="utf-8-sig") as stream:
-        return json.load(stream, object_pairs_hook=pairs)
+    def invalid_constant(value):
+        raise AdmissionError("nonfinite_json_number:" + value)
+    return json.loads(data.decode("utf-8-sig"), object_pairs_hook=pairs, parse_constant=invalid_constant)
+
+
+def load_json(path):
+    return parse_json(Path(path).read_bytes())
+
+
+def load_checked_json(descriptor):
+    """同一次读取的字节同时用于核SHA与解析，避免核验后另读不同内容。"""
+    path = Path(required(descriptor, "path"))
+    require(path.is_absolute(), "file_path_must_be_absolute")
+    reject_alias(path)
+    require(path.is_file(), "file_missing:" + str(path))
+    data = path.read_bytes()
+    require(hashlib.sha256(data).hexdigest() == hash_string(required(descriptor, "sha256")),
+            "file_hash_mismatch:" + str(path))
+    value = parse_json(data)
+    require(isinstance(value, dict), "json_object_required")
+    return path, value
 
 
 def write_new_json(path, value):
@@ -261,24 +283,77 @@ def validate_config(config, config_path=None):
     return {"source_copy_bytes": source_sizes, "growth_upper_bound_bytes": growth}
 
 
-def validate_grant(config, descriptor, expected_sha):
+def validate_request(config, config_path=None):
+    descriptor = required(config, "request")
+    path, request = load_checked_json(descriptor)
+    require(path.suffix.lower() == ".json", "request_json_required")
+    require(not inside(path, config["root"]), "request_must_be_outside_mutable_root")
+    if config_path is not None:
+        require(normalized(path) != normalized(config_path), "request_and_config_must_differ")
+    for key in ("worker", "request_id", "purpose", "models"):
+        require(required(request, key) == config[key], "request_mismatch:" + key)
+    require(Path(required(request, "root")).is_absolute() and normalized(request["root"]) == normalized(config["root"]),
+            "request_root_mismatch")
+    for key in ("est_minutes", "est_ram_gb"):
+        value = required(request, key)
+        require(type(value) in (int, float) and math.isfinite(value) and value > 0, "invalid_estimate:" + key)
+    command = required(request, "xdev_command")
+    require(isinstance(command, str) and command.strip(), "request_command_required")
+    caps = required(request, "hard_cap")
+    require(isinstance(caps, dict) and set(caps) == set(CAP_KEYS), "request_cap_keys_mismatch")
+    for key in CAP_KEYS:
+        require(type(caps[key]) is int and caps[key] == config["budget"][key], "request_cap_mismatch:" + key)
+    authority = required(config, "grant_authority")
+    issuer = required(authority, "granted_by")
+    require(isinstance(issuer, str) and issuer.strip(), "configured_grant_authority_required")
+    return path, request
+
+
+def validate_grant(config, descriptor, expected_sha, *, config_path=None, config_hash=None, now=None):
     require(hash_string(expected_sha) == required(descriptor, "sha256"), "grant_expected_sha_mismatch")
-    path = checked_file(descriptor)
-    grant = load_json(path)
+    request_path, request = validate_request(config, config_path)
+    path, grant = load_checked_json(descriptor)
+    require(path.name == request_path.name, "grant_filename_must_match_request")
+    require(normalized(path) != normalized(request_path), "request_and_grant_must_differ")
+    if config_path is not None:
+        require(normalized(path) != normalized(config_path), "grant_and_config_must_differ")
     require(required(grant, "approved") is True, "grant_not_approved")
+    require(required(grant, "request_name") == request_path.stem, "grant_request_name_mismatch")
+    require(hash_string(required(grant, "request_sha256")) == config["request"]["sha256"], "grant_request_hash_mismatch")
+    require(hash_string(required(grant, "config_sha256")) == hash_string(config_hash), "grant_config_hash_mismatch")
     for key in ("worker", "request_id", "purpose", "models"):
         require(required(grant, key) == config[key], "grant_mismatch:" + key)
     require(Path(required(grant, "root")).is_absolute() and normalized(grant["root"]) == normalized(config["root"]), "grant_root_mismatch")
     require(not inside(path, config["root"]), "grant_must_be_outside_mutable_root")
+    caps = required(grant, "hard_cap")
+    require(isinstance(caps, dict) and set(caps) == set(CAP_KEYS), "grant_cap_keys_mismatch")
+    for key in CAP_KEYS:
+        value, requested = caps[key], request["hard_cap"][key]
+        require(type(value) is int and value > 0, "invalid_grant_cap:" + key)
+        # 增长上界是估算，不能调低后少预留；本版所有预算均须与冻结配置一致。
+        if key == "run_growth_upper_bound_bytes":
+            require(value == requested, "grant_growth_estimate_mismatch")
+        else:
+            relaxed = value > requested if key.startswith("max_") else value < requested
+            require(not relaxed, "grant_cap_relaxed:" + key)
+            require(value == requested, "grant_cap_tightening_requires_new_config:" + key)
+    require(required(grant, "granted_by") == config["grant_authority"]["granted_by"], "grant_authority_mismatch")
+    issued = required(grant, "granted_taipei")
+    require(isinstance(issued, str), "invalid_grant_time")
+    try:
+        timestamp = datetime.fromisoformat(issued)
+    except ValueError as error:
+        raise AdmissionError("invalid_grant_time") from error
+    require(timestamp.utcoffset() == timedelta(hours=8), "grant_time_requires_taipei_offset")
+    require(timestamp <= (now or datetime.now(timezone.utc)), "grant_time_in_future")
     return grant
 
 
 def preflight(config_path, config_hash, grant_path, grant_hash, resources=None, require_empty=True):
-    config_path = checked_file({"path": str(config_path), "sha256": config_hash})
-    config = load_json(config_path)
+    config_path, config = load_checked_json({"path": str(config_path), "sha256": config_hash})
     sizes = validate_config(config, config_path)
     descriptor = {"path": str(Path(grant_path).absolute()), "sha256": grant_hash}
-    validate_grant(config, descriptor, grant_hash)
+    grant = validate_grant(config, descriptor, grant_hash, config_path=config_path, config_hash=config_hash)
     root = Path(config["root"])
     if require_empty:
         require(not root.exists() or not any(root.iterdir()), "run_root_not_empty_observe_original_attempt")
@@ -289,6 +364,9 @@ def preflight(config_path, config_hash, grant_path, grant_hash, resources=None, 
     return config, {"status": "PREFLIGHT_PASS_NOT_STARTED", "checked_at_taipei": taipei_now(),
                     "config_path": str(config_path), "config_sha256": config_hash,
                     "grant_path": descriptor["path"], "grant_sha256": grant_hash,
+                    "request_path": config["request"]["path"], "request_sha256": config["request"]["sha256"],
+                    "request_name": grant["request_name"], "hard_cap": grant["hard_cap"],
+                    "granted_by": grant["granted_by"], "granted_taipei": grant["granted_taipei"],
                     "resources": resources, "occupancy": occupancy, **sizes}
 
 
@@ -325,12 +403,13 @@ def gate_fit(root, attempt_id, resources=None, identity_getter=process_identity)
     intent = load_json(root / "STARTED.json")
     owner = load_json(root / "PROCESS.json")
     require(binding["attempt_id"] == intent["attempt_id"] == owner["attempt_id"] == attempt_id, "attempt_mismatch")
-    for field in ("config_sha256", "grant_sha256"):
+    for field in ("config_sha256", "grant_sha256", "request_sha256"):
         require(required(binding, field) == required(intent, field) == required(owner, field), "attempt_hash_binding_mismatch:" + field)
     require(sha256(root / "driver_request.json") == required(owner, "driver_request_sha256"), "driver_request_changed")
     config, report = preflight(binding["config_path"], binding["config_sha256"], binding["grant_path"],
                                binding["grant_sha256"], resources=resources, require_empty=False)
     require(normalized(config["root"]) == normalized(root), "binding_root_mismatch")
+    require(report["request_sha256"] == binding["request_sha256"], "attempt_request_hash_mismatch")
     verify_identity(owner["driver"], identity_getter)
     verify_identity(owner["supervisor"], identity_getter)
     require(sha256(owner["driver"]["exe"]) == config["files"]["rscript"]["sha256"], "running_rscript_hash_mismatch")
@@ -350,6 +429,7 @@ def gate_fit(root, attempt_id, resources=None, identity_getter=process_identity)
     receipt = {"schema": "CHARLS_SWAP_FIT_ADMISSION_V1", "worker": "W1", "request_id": REQUEST,
                "attempt_id": attempt_id, "models": MODELS, "config_sha256": binding["config_sha256"],
                "grant_sha256": binding["grant_sha256"], "driver": owner["driver"],
+               "request_sha256": report["request_sha256"], "hard_cap": report["hard_cap"],
                "resources": report["resources"], "occupancy": report["occupancy"],
                "admitted_at_taipei": taipei_now(), "queue": "existing_APIM_v2_serial_only"}
     write_new_json(root / "FIT_ADMITTED.json", receipt)
@@ -368,6 +448,7 @@ def launch(config_path, config_hash, grant_path, grant_hash):
               "driver_exe": config["files"]["rscript"], "runner_sha256": sha256(__file__),
               "driver_sha256": config["files"]["driver"]["sha256"], "config_sha256": config_hash,
               "grant_sha256": grant_hash, "retry_allowed": False}
+    intent["request_sha256"] = report["request_sha256"]
     write_new_json(root / "STARTED.json", intent)
     child = None
     try:
@@ -397,6 +478,7 @@ def launch(config_path, config_hash, grant_path, grant_hash):
                                                    "rscript_sha256": config["files"]["rscript"]["sha256"],
                                                    "driver_sha256": config["files"]["driver"]["sha256"],
                                                    "driver_request_sha256": sha256(request_path),
+                                                   "request_sha256": report["request_sha256"],
                                                    "config_sha256": config_hash, "grant_sha256": grant_hash})
             monitor(root, config, child, identity, attempt)
         return load_json(root / "DONE.json")
@@ -452,6 +534,7 @@ def monitor(root, config, child, identity, attempt):
     successful = child.returncode == 0 and valid_complete and unchanged and not (Path(root) / "STOP_NEW_FIT.json").exists()
     write_new_json(Path(root) / "DONE.json", {"schema": "CHARLS_SWAP_DONE_V1", "worker": "W1", "request_id": REQUEST,
                    "attempt_id": attempt, "ended_at_taipei": taipei_now(), "exit_code": child.returncode,
+                   "request_sha256": config["request"]["sha256"],
                    "status": "INTERNAL_WORKFLOW_PASS_NOT_SCIENTIFIC_RELEASE" if successful else "FAILED_OR_INCOMPLETE",
                    "driver_complete": complete, "source_hashes_unchanged": unchanged, "models": MODELS,
                    "peak_root_live_bytes": peak_bytes, "minimum_c_free_bytes": minimum_free,

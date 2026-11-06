@@ -28,6 +28,10 @@ integration comparison. Each GH15 start must come from its corresponding
 accepted GH7 endpoint. A shared start for later imputations must use an actual
 accepted high-precision endpoint, not the input values that preceded it.
 Source hashes and the parameter-to-start map make that distinction reviewable.
+The M2 full batch retained nine admissions: the accepted parent P0, four
+single-endpoint acceptances (A7/B7/A15/B15), and four comparisons
+(A7–B7, A7–A15, B7–B15, A15–B15). Bind the closed pilot ledger separately;
+its remaining allowance does not fund or reset a new full-batch budget.
 
 ## Propagate correlated products with nonzero means
 
@@ -104,8 +108,9 @@ average-RIV construction; a Wald statistic formed from Rubin's total covariance
 is not that D1 test. M2's single registered coefficient uses scalar Rubin
 inference. Save the actual package version and function source/hash when
 independently reproducing the method, including its constraint-derivative
-convention. The verified M1 case reported infinite complete-data df as primary
-and 437 community df as sensitivity; retain the study's own declared df choice.
+convention. The verified M1 and M2 cases reported infinite complete-data df as
+primary and 437 complete-data df as sensitivity; retain the study's own declared
+df choice. The sensitivity's final pooled df need not equal its complete-data df.
 
 Do not pool a successful subset, average imputation p-values or fill missing
 family tests with invented p-values. An unfinished fixed family remains
@@ -120,9 +125,25 @@ M1 reused its accepted MI01 and completed MI02–20: 19 new calls,
 1,273.1365357 engine seconds, 20 accepted imputations and 128 parameters.
 Saved-output verification covered 6,125 checks; independent full Rubin/D1
 readback covered another 306. Counts describe these artifacts, not general
-proof that every model supported by the guide is correct. M2's four calibration
-points and four full-covariance comparisons passed; its complete-MI batch was
-still running at this evidence snapshot and is not covered by that claim.
+proof that every model supported by the guide is correct.
+
+By 10:52 UTC, M2 also completed 20/20 imputations and all 127-parameter Rubin
+pooling: MI01 reused its accepted A15 endpoint; MI02–20 added 19 calls and
+1,233.2910747 engine seconds. The original ADL working MI and data hashes were
+reused without new imputation. All 7,218 saved-output checks and 292 independent
+pooling checks passed; pooling through Windows RStudio/ClaudeR added no Mplus
+calls. MI02–20 each used one GH15 run with the frozen shared MI01 A15 start;
+MI01's four-point calibration does not establish a global optimum for every MI.
+
+The registered scalar target, its primary and Barnard–Rubin sensitivity
+estimates, intervals, raw p-values and MCSE/SE ratios were independently
+reconciled against the saved study artifacts. Retain those numerical results
+in the study evidence; the reusable guide records the execution and acceptance
+method. A nonsignificant result does not establish absence of an association.
+At this snapshot, M1's joint test and M2's scalar test completed 2/12 registered
+tests; no final Holm adjustment was computed. Partial calibration of M4 does
+not count as full-MI completion. The working-MI and CFPS limitations above
+still apply.
 
 Keep pilot and full-batch budgets separate and retain all prior failed costs.
 One observed R JSON round trip changed a historical elapsed value from
@@ -132,3 +153,26 @@ and change preserved. It did not loosen statistical thresholds or input/data
 hash checks. A missing exit receipt means unknown cost, not a new zero budget.
 See [engine cost accounting](engine-cost-accounting.md) and the separate
 [batch-versus-pilot timing evidence](queue-efficiency.md#separate-batch-throughput-from-calibration-time).
+
+## Separate gender-case boundary: 2026-11-06
+
+In a separate gender working-MI continuation, both M1 and M2 completed
+independent Windows verification of all 20 saved members, pooling through the
+original Windows RStudio/ClaudeR session, and independent pooled-output
+readback. M1 retained its joint two-df D1 test and scalar intervals; M2 retained
+its sole registered scalar Rubin target. Each kept its own predeclared primary
+and sensitivity degrees of freedom. Mac collection was still pending, so these
+are Windows acceptances, not Mac returned-output acceptances.
+
+The earlier SD results do not transfer to this different sample. Each accepted
+family remains bound to its own model, saved imputations and source hashes.
+The fixed family was now 5/12 complete, without a partial Holm adjustment;
+working-MI limitations and unrelated research boundaries remained unchanged.
+
+M4's A7 audit recovered from a Windows path-representation failure by reading
+the same saved output with a separately named adapter. That recovery did not
+rerun A7 or establish the remaining calibration points, complete MI or pooling.
+Its successor entries bind the accepted A7 audit to its original source SHA
+and later stages to their own frozen auditor; a prepared or running successor
+is not an accepted result. See the
+[Windows saved-output route](remote-output-acceptance.md#windows原件独审与原rstudio合并).

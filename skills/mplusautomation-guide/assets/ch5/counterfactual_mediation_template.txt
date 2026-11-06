@@ -1,0 +1,67 @@
+[[init]]
+iterators = grp iv mv dv;
+grp = 1:2;
+iv = 1:2;
+mv = 1:2;
+dv = 1:2;
+namegrp#grp = g0 g1;
+valuegrp#grp = 0 1;
+nameiv#iv = xa xb;
+namemv#mv = ma mb;
+namedv#dv = ya yb;
+variv#iv = xa xb;
+varmv#mv = ma mb;
+vardv#dv = ya yb;
+filename = "cf_[[nameiv#iv]]-[[namemv#mv]]-[[namedv#dv]]_[[namegrp#grp]].inp";
+outputDirectory = "[[outdir]]";
+[[/init]]
+TITLE: synthetic counterfactual mediation [[nameiv#iv]]-[[namemv#mv]]-[[namedv#dv]] [[namegrp#grp]];
+! Synthetic teaching template: binary M and Y, X effect contrasted at X=0 vs X=1.
+DATA: FILE = "ch5_synthetic.dat";
+VARIABLE:
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
+MISSING = .;
+USEOBSERVATIONS = grp EQ [[valuegrp#grp]];
+USEVARIABLES = [[variv#iv]] [[varmv#mv]] [[vardv#dv]] c1 c2 intem;
+CATEGORICAL = [[varmv#mv]] [[vardv#dv]];
+DEFINE:
+intem = [[varmv#mv]] * [[variv#iv]]; ! exposure-mediator interaction
+ANALYSIS:
+estimator = ML;
+bootstrap = 1000;
+MODEL:
+[[[vardv#dv]]$1] (b0);
+[[vardv#dv]] ON [[variv#iv]] (b1);
+[[vardv#dv]] ON [[varmv#mv]] (b2);
+[[vardv#dv]] ON intem (b3);
+[[vardv#dv]] ON c1 c2;
+[[[varmv#mv]]$1] (a0);
+[[varmv#mv]] ON [[variv#iv]] (a1);
+[[varmv#mv]] ON c1 c2;
+MODEL INDIRECT:
+[[vardv#dv]] MOD [[varmv#mv]] intem [[variv#iv]];
+MODEL CONSTRAINT:
+NEW(P_M1_X0 P_M1_X1 P_M0_X0 P_M0_X1);
+NEW(E_Y00 E_Y01 E_Y10 E_Y11);
+NEW(E_Y0M0 E_Y0M1 E_Y1M0 E_Y1M1);
+NEW(TNIE PNDE TNDE PNIE TE);
+! Mplus thresholds enter with a minus sign: P(Y=1) = 1/(1+EXP(threshold - slope*x)).
+P_M1_X0 = 1/(1+EXP(a0));
+P_M1_X1 = 1/(1+EXP(a0 - a1));
+P_M0_X0 = 1 - P_M1_X0;
+P_M0_X1 = 1 - P_M1_X1;
+E_Y00 = 1/(1+EXP(b0));
+E_Y01 = 1/(1+EXP(b0 - b2));
+E_Y10 = 1/(1+EXP(b0 - b1));
+E_Y11 = 1/(1+EXP(b0 - b1 - b2 - b3));
+E_Y0M0 = E_Y00*P_M0_X0 + E_Y01*P_M1_X0;
+E_Y0M1 = E_Y00*P_M0_X1 + E_Y01*P_M1_X1;
+E_Y1M0 = E_Y10*P_M0_X0 + E_Y11*P_M1_X0;
+E_Y1M1 = E_Y10*P_M0_X1 + E_Y11*P_M1_X1;
+PNDE = E_Y1M0 - E_Y0M0;
+TNDE = E_Y1M1 - E_Y0M1;
+PNIE = E_Y0M1 - E_Y0M0;
+TNIE = E_Y1M1 - E_Y1M0;
+TE = E_Y1M1 - E_Y0M0;
+PLOT: TYPE = PLOT3;
+OUTPUT: SAMPSTAT CINTERVAL(BCBOOTSTRAP);

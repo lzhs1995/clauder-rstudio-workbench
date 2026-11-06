@@ -1,0 +1,62 @@
+[[init]]
+iterators = iv mv wv;
+iv = 1:2;
+mv = 1:2;
+wv = 1:2;
+nameiv#iv = xa xb;
+namemv#mv = ma mb;
+namewv#wv = w w2;
+variv#iv = xa xb;
+varmv#mv = ma mb;
+varwv#wv = w w2;
+wmean#wv = [[w_mean]] [[w2_mean]];
+wsd#wv = [[w_sd]] [[w2_sd]];
+filename = "modmed_mg_[[nameiv#iv]]-[[namemv#mv]]-[[namewv#wv]]-yc.inp";
+outputDirectory = "[[outdir]]";
+[[/init]]
+TITLE: synthetic second-stage moderated mediation [[nameiv#iv]]-[[namemv#mv]]-[[namewv#wv]];
+! Synthetic teaching template: continuous M, Y and W; W moderates b (M -> Y) only.
+! Categorical W needs an effect-coded variant with fixed probe codes, not mean +/- SD.
+DATA: FILE = "ch5_synthetic.dat";
+VARIABLE:
+NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;
+MISSING = .;
+USEVARIABLES = [[variv#iv]] [[varmv#mv]] [[varwv#wv]] yc c1 c2 int;
+GROUPING = grp (0 = G0 1 = G1);
+DEFINE:
+int = [[varmv#mv]] * [[varwv#wv]]; ! mediator-moderator product, built here not stored
+ANALYSIS:
+estimator = ML;
+bootstrap = 1000;
+MODEL:
+yc ON [[variv#iv]] c1 c2;
+yc ON [[varmv#mv]] [[varwv#wv]] int;
+[[varmv#mv]] ON [[variv#iv]] c1 c2;
+MODEL G0:
+yc ON [[variv#iv]] (cd0);
+yc ON [[varmv#mv]] (b1g0);
+yc ON int (b3g0);
+[[varmv#mv]] ON [[variv#iv]] (a1g0);
+MODEL G1:
+yc ON [[variv#iv]] (cd1);
+yc ON [[varmv#mv]] (b1g1);
+yc ON int (b3g1);
+[[varmv#mv]] ON [[variv#iv]] (a1g1);
+MODEL CONSTRAINT:
+! Probe values are hand-filled constants on the prepared W scale, one pair per W.
+! They must be recomputed from the current sample before generation.
+NEW(W_m W_sd);
+W_m = [[wmean#wv]];
+W_sd = [[wsd#wv]];
+NEW(ind_lo0 ind_hi0 imm0 ind_lo1 ind_hi1 imm1);
+ind_lo0 = a1g0*b1g0 + a1g0*b3g0*(W_m - W_sd);
+ind_hi0 = a1g0*b1g0 + a1g0*b3g0*(W_m + W_sd);
+imm0 = a1g0*b3g0;
+ind_lo1 = a1g1*b1g1 + a1g1*b3g1*(W_m - W_sd);
+ind_hi1 = a1g1*b1g1 + a1g1*b3g1*(W_m + W_sd);
+imm1 = a1g1*b3g1;
+NEW(dimm dint);
+dimm = imm0 - imm1; ! group difference of the index of moderated mediation
+dint = b3g0 - b3g1; ! group difference of the interaction coefficient
+PLOT: TYPE = PLOT3;
+OUTPUT: SAMPSTAT CINTERVAL(BCBOOTSTRAP);

@@ -52,6 +52,16 @@ declared outputs. Avoid a full cross-machine round trip for every MI member.
 Measure queue, R startup, estimation, polling and transfer separately. Task
 Manager can miss short-lived fits; saved process receipts provide durable proof.
 
+The receiving Mac's free-space threshold governs collection. While collection
+waits, authorized saved-output verification and pooling can remain on Windows
+when their own resource contract is satisfied. Preserve the collection floor
+and collector state. Distinguish Windows output production, independent
+saved-output acceptance, RStudio pooling, independent pooling acceptance and
+Mac receipt; one status does not imply the others. Python audits read saved
+aggregates without launching Mplus. Formal R pooling uses the original bound
+RStudio session and the same scientific R script for either agent entry point.
+See [saved-output acceptance](remote-output-acceptance.md#windows原件独审与原rstudio合并).
+
 When the user permits xdev HTTP, label it `MAC_XDEV_WINDOWS_LOOPBACK_HTTP`.
 It proves RStudio execution only after the actual Windows R identity and result
 are verified. It does not prove the Mac native `mcp__r_studio__` wrapper. A

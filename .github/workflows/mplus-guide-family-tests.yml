@@ -1,0 +1,87 @@
+name: mplus-guide family tests
+
+# 按 skills/mplusautomation-guide/families.json 跑各家族的合成合同测试；不启动 Mplus。
+# 只改 references 等文档时不跑本矩阵，注册表校验见 mplus-guide-registry.yml。
+on:
+  pull_request:
+    paths:
+      - skills/mplusautomation-guide/scripts/**
+      - skills/mplusautomation-guide/assets/**
+      - skills/mplusautomation-guide/families.json
+      - .github/workflows/mplus-guide-family-tests.yml
+  push:
+    branches: [main]
+    paths:
+      - skills/mplusautomation-guide/scripts/**
+      - skills/mplusautomation-guide/assets/**
+      - skills/mplusautomation-guide/families.json
+      - .github/workflows/mplus-guide-family-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-family-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install XQuartz for macOS template compilation
+        if: runner.os == 'macOS'
+        # MplusAutomation 的模板编译会加载 tcltk，macOS R 需要 X11 动态库。
+        run: brew install --cask xquartz
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::MplusAutomation
+            any::haven
+            any::digest
+            any::jsonlite
+            any::ps
+            any::ggplot2
+            any::officer
+            any::flextable
+            any::svglite
+            any::tidyselect
+      - name: Registry-driven synthetic family contracts
+        # 测试清单与平台限定（ci_os）都来自 families.json
+        run: Rscript skills/mplusautomation-guide/scripts/run_family_ci_tests.R mplus-guide-family-tests.yml "${{ runner.temp }}/family-ci"
+      - name: CHARLS swap synthetic data and display contracts
+        shell: Rscript {0}
+        env:
+          CHARLS_CI_ROOT: ${{ runner.temp }}/charls-swap-ci
+        run: |
+          skill <- normalizePath('skills/mplusautomation-guide', winslash='/')
+          # 输出根由测试创建，与 family-ci 同级，保持两者的新目录约束。
+          evidence <- Sys.getenv('CHARLS_CI_ROOT')
+          stopifnot(nzchar(evidence), !dir.exists(evidence))
+          # 引擎路径仅供准备/编译合同检查；合成测试不启动 Mplus 或 Stata。
+          engine <- file.path(R.home('bin'), if (.Platform$OS.type=='windows') 'Rscript.exe' else 'Rscript')
+          python <- unname(Sys.which('python'))
+          if (!nzchar(python)) python <- unname(Sys.which('python3'))
+          stopifnot(nzchar(python))
+          source(file.path(skill, 'scripts/test_charls_apim_swap.R'))
+          test_charls_apim_swap(skill, evidence, engine, python)
+      - name: CHARLS Windows admission synthetic regressions
+        # 资源快照由测试注入；不安装或验证真实运行所需的 psutil，不启动统计引擎。
+        run: python skills/mplusautomation-guide/scripts/test_charls_swap_windows_runner.py -v
+      - name: Upload synthetic contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-ci-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/family-ci
+            ${{ runner.temp }}/charls-swap-ci
+          if-no-files-found: warn
+          retention-days: 7

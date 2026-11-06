@@ -47,8 +47,9 @@ compared numerically; character codes on CSV inputs are matched exactly.
 Do not infer missingness from the sign of a value. The existing per-model
 complete-case rule still decides which rows enter each model.
 
-Runs record aggregate column-level recoding counts, reader version, source
-SHA256, and adapter SHA256 in `audit/data_adapter.json`. No respondent IDs or
+CSV and DTA runs record aggregate column-level recoding counts, reader version, source
+SHA256, and adapter SHA256 in `audit/data_adapter.json`; archived DAT runs keep
+their hash-bound identity checks and do not write this receipt. No respondent IDs or
 values are included in that receipt. Source bytes remain in the existing
 read-only snapshot; missingness and rename settings are part of the scientific
 cache contract. Archived DAT rejects these options to retain its strict

@@ -22,6 +22,14 @@ loadings for irregular times. It requires the researcher to supply a knot, and
 does not select one from significance or insert syntax into existing models.
 Check that each observed variable appears exactly once in each loading vector.
 
+`growth_model_syntax(waves, aliases, shape, knot)` writes those loadings as Mplus
+growth statements (`i s | y11@0 y13@2 ...`; piecewise uses two statements that
+share the intercept factor) and runs `check_growth_statements()`, which enforces
+the once-per-vector rule and compares every time score with the basis. Pass the
+returned `model` to `mplus_from_mapping()` after review; covariates, residual
+structure and ANALYSIS remain explicit study choices. For waves 2011, 2013, 2015,
+2018 and 2020 the time scores are 0, 2, 4, 7 and 9 years.
+
 ## Recover evidence before estimating
 
 Hash source scripts, analysis data, Mplus inputs/outputs and manuscript files.

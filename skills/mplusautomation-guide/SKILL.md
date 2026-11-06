@@ -1,6 +1,6 @@
 ---
 name: mplusautomation-guide
-description: Use when running or reproducing Mplus models from R with MplusAutomation, including Mac-to-Windows xdev execution, APIM, mediation, moderation, conditional mediation, [[init]] templates, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
+description: Use when running, reproducing or porting Mplus models from R with MplusAutomation, including APIM, mediation, moderation, conditional mediation, LPA/LCA, LTA and mover-stayer LTA, parallel-process growth models, swapping CFPS/CHARLS or other Stata/CSV sources and variables, [[init]] templates, Mac-to-Windows xdev execution, ClaudeR/RStudio execution, multiple imputation, batch recovery, diagnostics, and manuscript tables.
 ---
 
 # MplusAutomation Guide
@@ -30,6 +30,38 @@ Use [one family queue and bounded observation](references/queue-efficiency.md)
 to reuse existing drivers, carry closed costs forward, and keep current
 handoffs short. Engineering artifacts and test counts are not research progress.
 
+## Model families and data sources
+
+Start from [the family registry](references/family-registry.md), generated from
+`families.json`. It records each family's executable route, code status and
+evidence layer separately; a `doc_only` family has guidance but no executable
+entry in this skill. To change data sources or variables, follow
+[the source and variable swap contract](references/family-source-swap-contract.md):
+declare members, waves, member orientation, per-column missing codes, the
+standardization sample and the subsetting mechanism explicitly, and commit only
+whitelisted real-data receipts. After editing `families.json`, run
+`python scripts/family_registry.py check` and then
+`python scripts/family_registry.py render`.
+
+<!-- family-registry:start -->
+| Family | Code | Synthetic | Native | Real-data swap | Historical | Start here |
+|---|---|---|---|---|---|---|
+| APIM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| APIMeM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| LPA_LCA | template | pass* | — | — | readback | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
+| LTA | template | pass* | — | — | readback | [lta-workflow.md](references/lta-workflow.md) |
+| MS_LTA | template | pass* | — | — | readback | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
+| PP_LGCM | doc_only | —* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
+| OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
+
+`*`: the evidence has a stated limit; see [family-registry.md](references/family-registry.md).
+<!-- family-registry:end -->
+
 ## APIM, mediation and moderation
 
 For distinguishable-dyad APIM, APIMeM, APIMoM and conditional mediation (b, a or a+b path),
@@ -58,6 +90,20 @@ figure generation. A complete existing template is passed through the
 template-preserving compiler with a declared hash and complete expected-file
 set.
 
+For prepared couple-wave CSV or Stata inputs, use the
+[APIM v2 data adapter](references/apim-v2-data-adapter.md),
+`scripts/apim_v2_data_adapter.R`, and the
+[CFPS](assets/cfps_variable_map_v2.csv)/[CHARLS](assets/charls_variable_map_v2.csv)
+mapping templates. Declare source names, member order and per-column missing
+codes explicitly. The adapter preserves source snapshots and records aggregate
+conversion counts; it does not infer spouse links, measurement equivalence,
+historical sample identity, or scientific acceptance from successful I/O.
+
+For Stata raw DTA-to-CSV/DAT chains, read
+[Stata raw-chain reproducibility](references/stata-raw-chain-reproducibility.md)
+before replaying or diagnosing differences in actor selection, complete-case
+membership, or archive values.
+
 The v2 source boundary is strict: original sources remain read-only, every run
 uses a disjoint root and byte-hashed snapshot, and aliases/hardlinks are
 rejected. `scripts/apim_v2_io.py`, `mplus_queue.py` and
@@ -65,6 +111,11 @@ rejected. `scripts/apim_v2_io.py`, `mplus_queue.py` and
 disk, CPU and owned Mplus descendants. A second slot is enabled only after a
 native calibration receipt; high memory percentage alone does not create an
 indefinite wait when measured headroom satisfies the contract.
+
+## LPA/LCA, LTA and MS-LTA
+
+第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时使用 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，显式固定连续/分类指标、DEFINE、标准化和生产者；该文档是配置与验收合同，不是通用自动编译器入口。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
+`scripts/test_ch7_mixture_family_20261105.R` 用合成数据生成并核验 LPA/LCA、四波 LTA、MS-LTA 与 Step-3 的输入，只调用 `mplusObject()`/`mplusModeler(run=0)`，不启动 Mplus；它不说明引擎接受语法或模型收敛。
 
 ## Mac 控制 Windows
 
@@ -159,7 +210,7 @@ do not execute the estimation steps below merely to close an editorial issue.
 
 - [latent-product-full-mi.md](references/latent-product-full-mi.md): correlated
   latent-product propagation, semantic full-covariance calibration, complete-MI
-  Rubin/D1 inference and the verified M1 versus calibrated-only M2 boundary.
+  Rubin/D1 inference, verified full-MI M1/M2 results and the unfinished-family boundary.
 
 - [durable-windows-worker.md](references/durable-windows-worker.md)：
   Windows 原目录恢复、独立引擎监督、永久预算和实际进程退出判断；

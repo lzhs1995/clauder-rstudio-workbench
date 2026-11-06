@@ -1,5 +1,6 @@
 """外层准入的合成回归；不启动 R、Mplus、Stata 或远程命令。"""
 from copy import deepcopy
+from datetime import datetime, timezone
 import importlib.util
 import json
 from pathlib import Path
@@ -50,18 +51,33 @@ class RunnerAdmissionTests(unittest.TestCase):
                                   "min_c_free_bytes": 10 * runner.GIB, "min_ram_available_bytes": 3 * runner.GIB,
                                   "reserve_bytes": runner.MIN_RESERVE, "run_growth_upper_bound_bytes": 1000000,
                                   "growth_bound_basis": "synthetic budget boundary fixture"}}
+        self.request_dir = self.package / "requests"
+        self.request_dir.mkdir()
+        self.grant_dir = self.package / "grants"
+        self.grant_dir.mkdir()
+        self.request_path = self.request_dir / "synthetic_request.json"
+        self.request = {key: deepcopy(self.config[key]) for key in ("worker", "request_id", "purpose", "root", "models")}
+        self.request.update(est_minutes=1, est_ram_gb=1, xdev_command="synthetic inert command",
+                            hard_cap={key: self.config["budget"][key] for key in runner.CAP_KEYS})
+        self.request_path.write_text(json.dumps(self.request))
+        self.config["request"] = {"path": str(self.request_path), "sha256": runner.sha256(self.request_path)}
+        self.config["grant_authority"] = {"granted_by": "synthetic supervisor pane and session"}
         self.grant = {key: deepcopy(self.config[key]) for key in ("worker", "request_id", "purpose", "root", "models")}
-        self.grant["approved"] = True
+        self.grant.update(approved=True, request_name=self.request_path.stem,
+                          request_sha256=self.config["request"]["sha256"], hard_cap=deepcopy(self.request["hard_cap"]),
+                          granted_by=self.config["grant_authority"]["granted_by"], granted_taipei="2020-01-01T08:00:00+08:00")
         self.config_path = self.package / "private_config.json"
-        self.grant_path = self.package / "formal_grant.json"
+        self.grant_path = self.grant_dir / self.request_path.name
         self.resources = {"native_platform": "Windows", "ram_available_bytes": 5 * runner.GIB,
                           "c_free_bytes": 20 * runner.GIB, "engines": []}
         self.persist()
 
     def persist(self):
+        # 只冻结配置和授权，绝不自动重写请求或修复其绑定SHA。
         self.config_path.write_text(json.dumps(self.config))
-        self.grant_path.write_text(json.dumps(self.grant))
         self.config_hash = runner.sha256(self.config_path)
+        self.grant.setdefault("config_sha256", self.config_hash)
+        self.grant_path.write_text(json.dumps(self.grant))
         self.grant_hash = runner.sha256(self.grant_path)
 
     def preflight(self, resources=None):
@@ -223,7 +239,8 @@ class RunnerAdmissionTests(unittest.TestCase):
         identities = {11: {"pid": 11, "birth_epoch": 100.0, "exe": self.runtime["rscript"]["path"]},
                       12: {"pid": 12, "birth_epoch": 99.0, "exe": self.runtime["python"]["path"]}}
         runner.write_new_json(self.root / "RUN_BINDING.json", {"attempt_id": "one", **report})
-        binding_hashes = {"config_sha256": self.config_hash, "grant_sha256": self.grant_hash}
+        binding_hashes = {"config_sha256": self.config_hash, "grant_sha256": self.grant_hash,
+                          "request_sha256": self.config["request"]["sha256"]}
         runner.write_new_json(self.root / "STARTED.json", {"attempt_id": "one", **binding_hashes})
         runner.write_new_json(self.root / "driver_request.json", {"attempt_id": "one"})
         runner.write_new_json(self.root / "PROCESS.json", {"attempt_id": "one", "driver": identities[11], "supervisor": identities[12],
@@ -242,6 +259,159 @@ class RunnerAdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.AdmissionError, "windows_native_runtime_required"):
                 runner.launch(self.config_path, self.config_hash, self.grant_path, self.grant_hash)
             popen.assert_not_called()
+
+    def test_request_bytes_changed_without_rebinding_are_rejected(self):
+        self.request_path.write_text(json.dumps({**self.request, "purpose": "tampered"}))
+        with self.assertRaisesRegex(runner.AdmissionError, "file_hash_mismatch"):
+            self.preflight()
+        self.assertFalse(self.root.exists())
+
+    def test_request_missing_wrong_hash_and_duplicate_keys(self):
+        original = self.request_path.read_bytes()
+        self.request_path.unlink()
+        with self.assertRaisesRegex(runner.AdmissionError, "file_missing"):
+            self.preflight()
+        self.request_path.write_bytes(original)
+        self.config["request"]["sha256"] = "a" * 64
+        with self.assertRaisesRegex(runner.AdmissionError, "hash_mismatch"):
+            self.preflight()
+        self.request_path.write_text('{"worker":"W1","worker":"W2"}')
+        self.config["request"]["sha256"] = runner.sha256(self.request_path)
+        with self.assertRaisesRegex(runner.AdmissionError, "duplicate_json_key"):
+            self.preflight()
+
+    def test_request_relative_root_internal_and_symlink_paths(self):
+        descriptor = deepcopy(self.config["request"])
+        self.config["request"]["path"] = "relative.json"
+        with self.assertRaisesRegex(runner.AdmissionError, "absolute"):
+            self.preflight()
+        self.root.mkdir()
+        internal = self.root / self.request_path.name
+        internal.write_bytes(self.request_path.read_bytes())
+        self.config["request"] = {**descriptor, "path": str(internal)}
+        with self.assertRaisesRegex(runner.AdmissionError, "request_must_be_outside"):
+            self.preflight()
+        alias = self.package / "request_alias.json"
+        try:
+            alias.symlink_to(self.request_path)
+        except OSError:
+            return  # 本平台不支持链接时，上述两项仍已经验证。
+        self.config["request"] = {**descriptor, "path": str(alias)}
+        with self.assertRaisesRegex(runner.AdmissionError, "symlink|reparse"):
+            self.preflight()
+
+    def test_request_semantics_and_estimates_must_match(self):
+        for key, value in (("worker", "W2"), ("request_id", "another"), ("purpose", "other"),
+                           ("models", list(reversed(runner.MODELS))), ("root", str(self.folder / "elsewhere")),
+                           ("est_minutes", True), ("est_minutes", 0), ("est_ram_gb", -1),
+                           ("est_ram_gb", "1"), ("xdev_command", " ")):
+            with self.subTest(key=key, value=value):
+                changed = {**self.request, key: value}
+                self.request_path.write_text(json.dumps(changed))
+                self.config["request"]["sha256"] = runner.sha256(self.request_path)
+                with self.assertRaises(runner.AdmissionError):
+                    runner.validate_request(self.config, self.config_path)
+
+    def test_request_cap_keys_types_and_values_are_exact(self):
+        for caps in ({}, {**self.request["hard_cap"], "unknown": 1},
+                     {**self.request["hard_cap"], "reserve_bytes": True},
+                     {**self.request["hard_cap"], "max_total_bytes": 1}):
+            with self.subTest(caps=caps):
+                self.request_path.write_text(json.dumps({**self.request, "hard_cap": caps}))
+                self.config["request"]["sha256"] = runner.sha256(self.request_path)
+                with self.assertRaisesRegex(runner.AdmissionError, "request_cap"):
+                    runner.validate_request(self.config, self.config_path)
+
+    def test_grant_required_binding_fields_and_issuer(self):
+        valid = deepcopy(self.grant)
+        for key in ("request_name", "request_sha256", "config_sha256", "hard_cap", "granted_by", "granted_taipei"):
+            with self.subTest(missing=key):
+                changed = deepcopy(valid)
+                del changed[key]
+                self.grant_path.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(runner.AdmissionError, "missing_field:" + key):
+                    self.check_grant_bytes()
+        for key, value in (("request_name", "wrong"), ("request_sha256", "b" * 64),
+                           ("config_sha256", "c" * 64), ("granted_by", "another session"),
+                           ("granted_by", "")):
+            with self.subTest(key=key):
+                self.grant_path.write_text(json.dumps({**valid, key: value}))
+                with self.assertRaises(runner.AdmissionError):
+                    self.check_grant_bytes()
+
+    def check_grant_bytes(self, now=None):
+        # 原件篡改负例不调用persist；只改变外部预期grant SHA，保留内部全部绑定。
+        digest = runner.sha256(self.grant_path)
+        return runner.validate_grant(self.config, {"path": str(self.grant_path), "sha256": digest}, digest,
+                                     config_path=self.config_path, config_hash=self.config_hash, now=now)
+
+    def test_grant_filename_and_mutable_root_are_rejected(self):
+        original = self.grant_path
+        self.grant_path = self.grant_dir / "wrong_name.json"
+        self.grant_path.write_bytes(original.read_bytes())
+        with self.assertRaisesRegex(runner.AdmissionError, "filename"):
+            self.check_grant_bytes()
+        self.root.mkdir()
+        self.grant_path = self.root / self.request_path.name
+        self.grant_path.write_bytes(original.read_bytes())
+        with self.assertRaisesRegex(runner.AdmissionError, "grant_must_be_outside"):
+            self.check_grant_bytes()
+
+    def test_grant_taipei_timestamp_is_valid_and_not_future(self):
+        now = datetime(2021, 1, 1, tzinfo=timezone.utc)
+        self.assertEqual(self.check_grant_bytes(now)["granted_taipei"], self.grant["granted_taipei"])
+        for value in ("", 12, "nonsense", "2020-01-01T00:00:00", "2020-01-01T00:00:00+00:00",
+                      "2022-01-01T08:00:00+08:00"):
+            with self.subTest(value=value):
+                self.grant_path.write_text(json.dumps({**self.grant, "granted_taipei": value}))
+                with self.assertRaises(runner.AdmissionError):
+                    self.check_grant_bytes(now)
+
+    def test_grant_caps_cannot_be_ignored_or_understate_growth(self):
+        for key in runner.CAP_KEYS:
+            for delta in (-1, 1):
+                with self.subTest(key=key, delta=delta):
+                    caps = {**self.grant["hard_cap"], key: self.grant["hard_cap"][key] + delta}
+                    self.grant_path.write_text(json.dumps({**self.grant, "hard_cap": caps}))
+                    with self.assertRaisesRegex(runner.AdmissionError, "grant_cap_|grant_growth_estimate"):
+                        self.check_grant_bytes()
+        for caps in ({}, {**self.grant["hard_cap"], "extra": 1},
+                     {**self.grant["hard_cap"], "max_total_bytes": True},
+                     {**self.grant["hard_cap"], "max_total_bytes": None},
+                     {**self.grant["hard_cap"], "max_total_bytes": "1"}):
+            with self.subTest(caps=caps):
+                self.grant_path.write_text(json.dumps({**self.grant, "hard_cap": caps}))
+                with self.assertRaises(runner.AdmissionError):
+                    self.check_grant_bytes()
+
+    def test_checked_json_parses_the_hashed_bytes_only(self):
+        # 模拟核SHA后路径内容被替换；只能解析本次已核验的读取结果。
+        original = self.config_path.read_bytes()
+        with patch.object(Path, "read_bytes", return_value=original) as read:
+            _, value = runner.load_checked_json({"path": str(self.config_path), "sha256": self.config_hash})
+        self.assertEqual(read.call_count, 1)
+        self.assertEqual(value, self.config)
+        with self.assertRaisesRegex(runner.AdmissionError, "nonfinite_json"):
+            runner.parse_json(b'{"estimated":NaN}')
+
+    def test_fit_gate_rechecks_request_before_admission(self):
+        _, report = self.preflight()
+        self.root.mkdir()
+        hashes = {key: report[key] for key in ("config_sha256", "grant_sha256", "request_sha256")}
+        runner.write_new_json(self.root / "RUN_BINDING.json", {"attempt_id": "one", **report})
+        runner.write_new_json(self.root / "STARTED.json", {"attempt_id": "one", **hashes})
+        runner.write_new_json(self.root / "driver_request.json", {"attempt_id": "one"})
+        owner = {"attempt_id": "one", **hashes, "driver_request_sha256": runner.sha256(self.root / "driver_request.json")}
+        runner.write_new_json(self.root / "PROCESS.json", owner)
+        self.request_path.write_text(json.dumps({**self.request, "purpose": "changed after start"}))
+        with self.assertRaisesRegex(runner.AdmissionError, "file_hash_mismatch"):
+            runner.gate_fit(self.root, "one", self.resources)
+        self.assertFalse((self.root / "FIT_ADMITTED.json").exists())
+        owner["request_sha256"] = "d" * 64
+        (self.root / "PROCESS.json").write_text(json.dumps(owner))
+        with self.assertRaisesRegex(runner.AdmissionError, "attempt_hash_binding_mismatch:request_sha256"):
+            runner.gate_fit(self.root, "one", self.resources)
+        self.assertFalse((self.root / "FIT_ADMITTED.json").exists())
 
 
 if __name__ == "__main__":
