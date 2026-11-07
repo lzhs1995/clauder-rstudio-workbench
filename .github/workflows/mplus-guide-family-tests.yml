@@ -48,14 +48,40 @@ jobs:
             any::digest
             any::jsonlite
             any::ps
+            any::ggplot2
+            any::officer
+            any::flextable
+            any::svglite
+            any::tidyselect
       - name: Registry-driven synthetic family contracts
         # 测试清单与平台限定（ci_os）都来自 families.json
         run: Rscript skills/mplusautomation-guide/scripts/run_family_ci_tests.R mplus-guide-family-tests.yml "${{ runner.temp }}/family-ci"
+      - name: CHARLS swap synthetic data and display contracts
+        shell: Rscript {0}
+        env:
+          CHARLS_CI_ROOT: ${{ runner.temp }}/charls-swap-ci
+        run: |
+          skill <- normalizePath('skills/mplusautomation-guide', winslash='/')
+          # 输出根由测试创建，与 family-ci 同级，保持两者的新目录约束。
+          evidence <- Sys.getenv('CHARLS_CI_ROOT')
+          stopifnot(nzchar(evidence), !dir.exists(evidence))
+          # 引擎路径仅供准备/编译合同检查；合成测试不启动 Mplus 或 Stata。
+          engine <- file.path(R.home('bin'), if (.Platform$OS.type=='windows') 'Rscript.exe' else 'Rscript')
+          python <- unname(Sys.which('python'))
+          if (!nzchar(python)) python <- unname(Sys.which('python3'))
+          stopifnot(nzchar(python))
+          source(file.path(skill, 'scripts/test_charls_apim_swap.R'))
+          test_charls_apim_swap(skill, evidence, engine, python)
+      - name: CHARLS Windows admission synthetic regressions
+        # 资源快照由测试注入；不安装或验证真实运行所需的 psutil，不启动统计引擎。
+        run: python skills/mplusautomation-guide/scripts/test_charls_swap_windows_runner.py -v
       - name: Upload synthetic contract evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: family-ci-${{ runner.os }}
-          path: ${{ runner.temp }}/family-ci
+          path: |
+            ${{ runner.temp }}/family-ci
+            ${{ runner.temp }}/charls-swap-ci
           if-no-files-found: warn
           retention-days: 7
