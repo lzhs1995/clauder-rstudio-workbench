@@ -56,14 +56,6 @@ jobs:
       - name: Registry-driven synthetic family contracts
         # 测试清单与平台限定（ci_os）都来自 families.json
         run: Rscript skills/mplusautomation-guide/scripts/run_family_ci_tests.R mplus-guide-family-tests.yml "${{ runner.temp }}/family-ci"
-      - name: PP-LGCM source column mapping compile contract
-        shell: Rscript {0}
-        env:
-          PP_LGCM_CI_ROOT: ${{ runner.temp }}/pp-lgcm-ci
-        run: |
-          skill <- normalizePath('skills/mplusautomation-guide', winslash='/')
-          source(file.path(skill, 'scripts/test_pp_lgcm_compile_20261108.R'))
-          test_pp_lgcm_compile(Sys.getenv('PP_LGCM_CI_ROOT'), skill)
       - name: CHARLS swap synthetic data and display contracts
         shell: Rscript {0}
         env:
@@ -91,6 +83,5 @@ jobs:
           path: |
             ${{ runner.temp }}/family-ci
             ${{ runner.temp }}/charls-swap-ci
-            ${{ runner.temp }}/pp-lgcm-ci
           if-no-files-found: warn
           retention-days: 7

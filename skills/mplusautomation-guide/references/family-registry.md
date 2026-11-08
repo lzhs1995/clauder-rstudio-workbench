@@ -31,7 +31,7 @@ For changing data sources or variables, follow
 | LPA_LCA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
 | MS_LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | readback |
-| PP_LGCM | doc_only | external_project, template_bundle | —* | — | pending* | pending |
+| PP_LGCM | template | external_project, template_bundle, mplus_object_mapping | pass* | — | pending* | pending |
 | OTHER_GROWTH | template | mplus_object_mapping | pass | pending* | — | n/a |
 
 ## APIM
@@ -223,18 +223,19 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 平行过程潜增长模型：多过程潜增长、潜交互与多重插补；CFPS 与 CHARLS 两条数据线。skill 提供执行层与验收规则，模型规格在研究项目里。
 
 - Aliases: PP-LGCM
-- Data formats: archived_dat
+- Data formats: archived_dat, in_memory
 - Route `external_project`: `scripts/run_rstudio_mplus_batch.R:run_rstudio_mplus_batch`, `scripts/run_rstudio_family_queue.R:run_rstudio_family_queue`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [pp-lgcm-worked-example.md](pp-lgcm-worked-example.md), [pp-lgcm-document-reconciliation.md](pp-lgcm-document-reconciliation.md), [latent-product-full-mi.md](latent-product-full-mi.md), [mac-windows-remote.md](mac-windows-remote.md)
+- Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
+- Docs: [pp-lgcm-worked-example.md](pp-lgcm-worked-example.md), [pp-lgcm-source-variable-mapping.md](pp-lgcm-source-variable-mapping.md), [pp-lgcm-document-reconciliation.md](pp-lgcm-document-reconciliation.md), [latent-product-full-mi.md](latent-product-full-mi.md), [mac-windows-remote.md](mac-windows-remote.md)
 - Acceptance: [cfps-acceptance.md](cfps-acceptance.md)
-- Tests: `scripts/test_rstudio_queue_admission.py` (CI mplus-guide-registry.yml)
-- synthetic_compile: not_started; 合成夹具在外部项目
+- Tests: `scripts/test_rstudio_queue_admission.py` (CI mplus-guide-registry.yml), `scripts/test_pp_lgcm_compile_20261108.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `pp_lgcm_compile`; 只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计
 - native_synthetic: not_started
 - real_data_swap: pending; 两条真实数据线已运行，缺白名单回执
 - historical_replay: pending
 - Thesis: PP-LGCM 稿表 4.2.1、4.3.1、4.4.2.1
-- Gap: skill 内没有 PP-LGCM 建模入口或模板；历史生产脚本与审计脚本都在论文工作区
+- Gap: parallel_growth_model_syntax() 只编译固定时间的双过程协变型 LGCM；自由载荷、跨过程定向路径、观测残差相关、交互与多重插补仍要外部已审规格，历史生产脚本在论文工作区
 - Gap: schema-2 配置编译器只接受 APIM 系家族，PP-LGCM 不能走该通道
 
 ## OTHER_GROWTH
@@ -242,7 +243,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 其他增长模型：手写 ANALYSIS 的 mplusObject 加换名映射；不规则时间载荷由 growth_model_syntax() 写成 Mplus 增长语句。
 
 - Data formats: in_memory
-- Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`
+- Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
 - Docs: [reusable-models.md](reusable-models.md), [cross-dataset-migration.md](cross-dataset-migration.md)
 - Acceptance: [reusable-models.md](reusable-models.md)
 - Tests: `scripts/test_other_growth_compile_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_other_growth_native_20261105.R` (needs Mplus)
@@ -251,7 +252,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - real_data_swap: not_started
 - historical_replay: not_applicable
 - Gap: 原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）
-- Gap: growth_model_syntax() 只写单一过程的增长因子；并行过程、协变量、分类结果仍需手写 MODEL
+- Gap: growth_model_syntax() 只写单一过程的增长因子；固定时间的双过程协变型模型见 PP_LGCM 的 parallel_growth_model_syntax()，跨过程定向路径、交互、分类结果仍需手写 MODEL
 - Gap: 真实数据换源未排期
 
 ## Shared layers
