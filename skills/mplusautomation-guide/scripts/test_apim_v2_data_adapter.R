@@ -106,3 +106,110 @@ test_apim_v2_data_adapter <- function(skill_root,test_root,engine,python) {
   cat('APIM_V2_DATA_ADAPTER_PASS',length(checks),'checks; Mplus calls: 0\n')
   invisible(result)
 }
+
+# 追加：2026-11-08 通用source_spec双源合同测试；独立函数，不依赖原APIM测试对象。
+# 依赖：source_spec.R与haven/digest/jsonlite；调用者提供全新的out_dir，不运行任何模型。
+test_source_spec <- function(skill_root, out_dir) {
+  for (p in c('haven','digest','jsonlite')) stopifnot(requireNamespace(p, quietly=TRUE))
+  source(file.path(skill_root, 'scripts', 'source_spec.R'), local=TRUE)
+  stopifnot(!file.exists(out_dir), !dir.exists(out_dir))
+  dir.create(out_dir, recursive=TRUE)
+  fixtures <- file.path(out_dir, 'fixtures'); dir.create(fixtures)
+  outputs <- file.path(out_dir, 'outputs'); dir.create(outputs)
+  sha <- function(p) digest::digest(p, algo='sha256', file=TRUE)
+  checks <- list()
+  check <- function(name, ok) {
+    stopifnot(isTRUE(ok)); checks[[name]] <<- TRUE; cat('PASS', name, '\n'); flush.console()
+  }
+  rejects <- function(name, spec, message) {
+    target <- file.path(outputs, name)
+    error <- tryCatch({prepare_mplus_source(spec, target); NULL}, error=identity)
+    check(name, inherits(error,'error') && grepl(message, conditionMessage(error), fixed=TRUE))
+    check(paste0(name,'_writes_nothing'), !file.exists(target))
+  }
+  values <- data.frame(a=c(.10000000000000002, -9, -7, pi), b=c(2, NA_real_, 4, 5),
+    c=c(6, 7, haven::tagged_na('a'), 9), unused=letters[1:4])
+  values$a <- haven::labelled(values$a, c(refused=-9))
+  csv_data <- values
+  for (n in c('a','b','c')) csv_data[[n]] <- ifelse(is.na(values[[n]]), '', sprintf('%.17g', as.numeric(values[[n]])))
+  names(csv_data) <- paste0('csv_', names(values))
+  csv <- file.path(fixtures, 'source.csv'); write.csv(csv_data, csv, row.names=FALSE, na='')
+  dta <- file.path(fixtures, 'source.dta'); dta_data <- values[,rev(names(values))]
+  names(dta_data) <- paste0('dta_', names(dta_data)); haven::write_dta(dta_data, dta)
+  make_spec <- function(path, mode, prefix) list(schema_version=1L, data=path, data_mode=mode,
+    data_expected_sha256=sha(path), columns=c('c','a','b'), column_map=setNames(paste0(prefix,c('a','b','c')),c('a','b','c')),
+    missing_codes=list(a=c('', '-9'), b='', c=''), missing=character(), missing_value=-999)
+  cs <- make_spec(csv, 'csv', 'csv_'); ds <- make_spec(dta, 'dta', 'dta_')
+  csv_out <- file.path(outputs,'csv'); dta_out <- file.path(outputs,'dta')
+  cr <- prepare_mplus_source(cs,csv_out); dr <- prepare_mplus_source(ds,dta_out)
+  check('two_sources_same_dat', identical(cr$dat_sha256,dr$dat_sha256))
+  check('two_sources_same_column_order', identical(cr$column_order_sha256,dr$column_order_sha256))
+  check('columns_in_declared_order', identical(readLines(file.path(csv_out,'column_order.txt')),c('c','a','b')))
+  result <- read.table(file.path(csv_out,'data.dat'),na.strings='-999',colClasses='numeric')
+  check('no_row_filtering_or_imputation', nrow(result)==4L && is.na(result[2,2]) && is.na(result[2,3]) && is.na(result[3,1]))
+  check('numeric_precision_17_digit_roundtrip', identical(result[1,2],.10000000000000002) && identical(result[4,2],pi))
+  check('undeclared_negative_value_preserved', identical(result[3,2],-7))
+  check('dta_tagged_missing_counted', dr$missing_recode_counts$c$tagged_missing==1L)
+  check('source_hashes_unchanged', identical(sha(csv),cs$data_expected_sha256) && identical(sha(dta),ds$data_expected_sha256))
+  check('receipt_has_no_source_path_or_row_values', !grepl(normalizePath(out_dir,winslash='/'),
+    paste(readLines(file.path(csv_out,'source_receipt.json')),collapse='\n'),fixed=TRUE) &&
+    identical(cr$rows_removed,0L) && !cr$model_generated && cr$mplus_calls==0L)
+  check('source_order_hash_is_raw_utf8_lf', identical(cr$column_order_sha256,digest::digest(charToRaw('c\na\nb\n'),algo='sha256',serialize=FALSE)))
+  check('dat_fragment_has_only_data_and_names_missing', !any(grepl('MODEL:|ANALYSIS:|OUTPUT:',readLines(file.path(csv_out,'data_block.inp')))))
+  bad <- cs; bad$column_map['b'] <- 'csv_a'; rejects('duplicate_mapping',bad,'one-to-one')
+  bad <- cs; bad$column_map <- c(csv_b='csv_a'); rejects('unmapped_collision',bad,'collides')
+  bad <- cs; bad$column_map['a'] <- 'absent'; rejects('missing_source_mapping',bad,'missing source')
+  bad <- cs; bad$columns <- c('a','A'); bad$missing_codes <- list(a=character(),A=character()); rejects('duplicate_case_names',bad,'unique Mplus names')
+  bad <- cs; bad$columns[1] <- 'bad-name'; rejects('illegal_output_name',bad,'unique Mplus names')
+  bad <- cs; bad$columns[1] <- 'toolongname'; rejects('long_output_name',bad,'unique Mplus names')
+  bad <- cs; bad$missing_codes$b <- NULL; rejects('missing_code_declaration',bad,'every output column')
+  bad <- cs; bad$missing_value <- -7; rejects('sentinel_collision',bad,'collides with observed')
+  bad <- cs; bad$data_expected_sha256 <- paste(rep('0',64),collapse=''); rejects('wrong_source_sha',bad,'SHA256 mismatch')
+  bad <- cs; bad$data_mode <- 'archived_dat'; rejects('unsupported_archived_dat',bad,'CSV or DTA only')
+  bad <- cs; bad$filter <- list(a=1); rejects('filter_not_supported',bad,'fields')
+  malformed <- file.path(fixtures,'nonnumeric.csv'); writeLines(c('csv_a,csv_b,csv_c','word,2,3'),malformed)
+  bad <- cs; bad$data <- malformed; bad$data_expected_sha256 <- sha(malformed); rejects('nonnumeric_output',bad,'Non-numeric')
+  duplicate <- file.path(fixtures,'duplicate.csv'); writeLines(c('csv_a,csv_a,csv_c','1,2,3'),duplicate)
+  bad <- cs; bad$data <- duplicate; bad$data_expected_sha256 <- sha(duplicate); rejects('duplicate_source_names',bad,'unique nonempty')
+  for (kind in c('long','short','blank')) {
+    path <- file.path(fixtures,paste0('bad_width_',kind,'.csv'))
+    body <- switch(kind,long=c('1,2,3,4','2,3,4,5'),short=c('1,2,3','4,5'),blank=c('1,2,3','','4,5,6'))
+    writeLines(c('csv_a,csv_b,csv_c',body),path)
+    bad <- cs; bad$data <- path; bad$data_expected_sha256 <- sha(path)
+    rejects(paste0('csv_',kind,'_record'),bad,'CSV records must match')
+  }
+  quoted <- file.path(fixtures,'quoted.csv')
+  writeLines(c('csv_a,csv_b,csv_c,note','1,2,3,"comma,quoted"','4,5,6,"multi','line"'),quoted)
+  quoted_spec <- cs; quoted_spec$data <- quoted; quoted_spec$data_expected_sha256 <- sha(quoted)
+  quoted_receipt <- prepare_mplus_source(quoted_spec,file.path(outputs,'quoted'))
+  check('quoted_commas_and_multiline_unselected_text',quoted_receipt$rows==2L)
+  dated <- dta_data; dated$dta_a <- as.Date('2000-01-01')+1:4
+  date_path <- file.path(fixtures,'date.dta'); haven::write_dta(dated,date_path)
+  bad <- ds; bad$data <- date_path; bad$data_expected_sha256 <- sha(date_path); rejects('date_requires_upstream_processing',bad,'date/time preprocessing')
+  prior <- vapply(list.files(csv_out,full.names=TRUE),sha,'')
+  error <- tryCatch({prepare_mplus_source(cs,csv_out); NULL},error=identity)
+  check('existing_output_rejected_unchanged',inherits(error,'error') && identical(prior,vapply(list.files(csv_out,full.names=TRUE),sha,'')))
+  # 故障注入更改合成源正文，保留原期望SHA；验证失败不会“自动重算修好”请求。
+  changed <- file.path(fixtures,'changed.csv'); file.copy(csv,changed)
+  bad <- cs; bad$data <- changed; bad$data_expected_sha256 <- sha(changed)
+  original_reader <- source_spec_runtime$apim_v2_read_source
+  source_spec_runtime$apim_v2_read_source <- function(config,path) {
+    result <- original_reader(config,path); cat('\n',file=path,append=TRUE); result
+  }
+  tryCatch(rejects('source_changed_while_reading',bad,'Source changed during reading'),
+    finally={source_spec_runtime$apim_v2_read_source <- original_reader})
+  # 空码向量是显式“无额外缺失码”，允许它而不把空声明偷换为默认值。
+  tiny <- file.path(fixtures,'tiny.csv'); writeLines(c('x','0.10000000000000002','-7'),tiny)
+  tiny_spec <- list(schema_version=1L,data=tiny,data_mode='csv',data_expected_sha256=sha(tiny),columns='x',
+    missing_codes=list(x=character()),missing_value=-999)
+  tiny_receipt <- prepare_mplus_source(tiny_spec,file.path(outputs,'one_column'))
+  check('single_column_and_empty_codes_work',tiny_receipt$rows==2L && tiny_receipt$columns==1L)
+  tiny_json <- jsonlite::read_json(file.path(outputs,'one_column','source_receipt.json'))
+  check('single_column_receipt_keeps_ordered_array',is.list(tiny_json$column_names) && identical(tiny_json$column_names[[1]],'x'))
+  report <- list(status='PASS_SOURCE_SPEC_SYNTHETIC_ONLY',checks=checks,mplus_calls=0L,real_data_read=FALSE,
+    source_spec_sha256=sha(file.path(skill_root,'scripts/source_spec.R')),
+    test_script_sha256=sha(file.path(skill_root,'scripts/test_apim_v2_data_adapter.R')))
+  jsonlite::write_json(report,file.path(out_dir,'SOURCE_SPEC_TEST_RECEIPT.json'),auto_unbox=TRUE,pretty=TRUE)
+  cat('SOURCE_SPEC_PASS',length(checks),'checks; Mplus calls: 0\n'); flush.console()
+  invisible(report)
+}

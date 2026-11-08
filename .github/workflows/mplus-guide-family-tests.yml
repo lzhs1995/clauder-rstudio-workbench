@@ -75,6 +75,15 @@ jobs:
       - name: CHARLS Windows admission synthetic regressions
         # 资源快照由测试注入；不安装或验证真实运行所需的 psutil，不启动统计引擎。
         run: python skills/mplusautomation-guide/scripts/test_charls_swap_windows_runner.py -v
+      - name: Source specification CSV and DTA synthetic contracts
+        shell: Rscript {0}
+        env:
+          SOURCE_SPEC_CI_ROOT: ${{ runner.temp }}/source-spec-ci
+        run: |
+          skill <- normalizePath('skills/mplusautomation-guide', winslash='/')
+          # 新函数放在已有登记测试文件中；注册表仍由W4维护。
+          source(file.path(skill, 'scripts/test_apim_v2_data_adapter.R'))
+          test_source_spec(skill, Sys.getenv('SOURCE_SPEC_CI_ROOT'))
       - name: Upload synthetic contract evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -83,5 +92,6 @@ jobs:
           path: |
             ${{ runner.temp }}/family-ci
             ${{ runner.temp }}/charls-swap-ci
+            ${{ runner.temp }}/source-spec-ci
           if-no-files-found: warn
           retention-days: 7
