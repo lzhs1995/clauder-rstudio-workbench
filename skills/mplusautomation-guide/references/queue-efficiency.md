@@ -66,6 +66,50 @@ limit separately passed five native Windows cases, including UTF-8, failure,
 unknown outcome and identical cached replies. These are control checks, not
 proof that every queued scientific family completed.
 
+## Start an approved batch promptly when its window opens
+
+Prepare and approve the exact `PLAN`, scientific R driver, input hashes,
+RStudio owner binding, closed prior costs and remaining budget before waiting
+for a shared compute window. Freeze the submission script and its original
+request/job IDs. The grant must bind those same identities and limits; a ready
+script is not itself a window grant or proof of current resource headroom.
+
+Use one lightweight local observer to check the task's grant file, for example
+every two seconds, without a remote status request on every check or another
+agent reasoning round trip. This short interval is for window admission; keep
+the running-model observer at its existing bounded cadence. Verify the grant's
+issuer, source hashes, matching budget, expiry and other active windows. Persist
+an exclusive submission claim before invoking the existing submit entry once.
+Recheck the grant and pinned sources immediately before submission. If a crash
+leaves a claim without a queue receipt, retain UNKNOWN and reconcile it; do not
+delete the claim or assign a new ID to try again.
+
+Queue acceptance may precede R execution. In the Windows R worker, check the
+grant's latest-start time again before evaluating the byte-hashed original
+submission script. Expiry blocks a late start; it does not extend or replace
+the original engine cap or absolute deadline. The scientific driver still
+checks live ancestry, resources, attempt identity and budget. This time check
+does not guarantee detection of a revocation issued after enqueueing; retain
+the original task's explicit stop and confirmed-exit procedure.
+
+For a missing or delayed submit response, reconcile only the original request
+and job. Match the returned request, payload and RStudio identity, then require
+the original job ID and `success=true`; an HTTP/CLI return code alone is not
+acceptance. A successful submit body need not contain a separate `status` key.
+Stop the admission observer after confirmed acceptance and hand the same job
+to the existing terminal observer. Submission, engine startup and scientific
+acceptance remain separate evidence. A Windows-local agent and a Mac agent
+controlling Windows use the [same scientific R driver and acceptance rules](rstudio-two-entry-workflow.md).
+
+One actual batch on 2026-11-08 recorded one submission intent: grant to durable
+claim was 0.599 seconds, grant to original HTTP acceptance 4.933 seconds, and
+grant to Mplus process birth 39.791 seconds. These are cumulative intervals
+from the same grant, not three additive phase durations. The evidence includes
+the frozen grant, claim, original HTTP receipt and live engine process record.
+This single-batch observation is not a controlled benchmark, a general latency
+guarantee or evidence of model convergence; scientific acceptance was pending
+when the startup receipt was recorded.
+
 ## Separate batch throughput from calibration time
 
 The 2026-11-04 M1 continuation completed 19 new imputations in one Windows
