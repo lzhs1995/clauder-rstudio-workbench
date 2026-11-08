@@ -39,6 +39,11 @@ and imputations must be prepared explicitly. This helper handles one numeric
 data frame; pooled multiple-imputation workflows still require the documented
 staged-data and imputation-count contract.
 
+`mplus_from_mapping()` accepts only an in-memory data frame. It does not read
+files or recognize missing-value codes: the caller reads the CSV/DTA source,
+declares each column's missing codes and converts them to `NA` upstream, as in
+sections 2 and 4.3 of [the source and variable swap contract](family-source-swap-contract.md).
+
 For a two-process covariance LGCM with fixed time scores, compose the existing
 growth and mapping helpers with `parallel_growth_model_syntax()` in
 `scripts/growth_time_basis.R`. The [PP-LGCM mapping contract](pp-lgcm-source-variable-mapping.md)

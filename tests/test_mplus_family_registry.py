@@ -1,9 +1,11 @@
 """mplusautomation-guide 家族注册表、白名单回执与公开边界扫描的合同测试。"""
 from __future__ import annotations
 
+import contextlib
 import copy
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -12,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,6 +61,46 @@ class RegistryContractTests(unittest.TestCase):
         registered = {t["path"] for t in self.reg["tests"].values()}
         on_disk = {f"scripts/{p.name}" for p in (registry.SKILL_ROOT / "scripts").glob("test_*")}
         self.assertLessEqual(on_disk, registered)
+
+    def test_every_shipped_family_has_freshness_files(self):
+        # 没有代码新鲜度锚点的家族写不出可核的回执
+        self.assertEqual([fid for fid, fam in self.reg["families"].items() if not fam["freshness_files"]], [])
+
+    def test_every_test_has_a_family_or_shared_purpose(self):
+        # 反向校验正例：每个测试恰好有一种归属；不属于家族的测试在生成视图里单列用途
+        owned = {tid for fam in self.reg["families"].values() for tid in fam["tests"]}
+        for tid, test in self.reg["tests"].items():
+            self.assertTrue((tid in owned) != ("shared_purpose" in test), tid)
+        doc = registry.render_doc(self.reg)
+        for test in self.reg["tests"].values():
+            if "shared_purpose" in test:
+                self.assertIn(f"- Shared test `{test['path']}` ", doc)
+
+    def test_test_without_family_or_purpose_rejected(self):
+        reg = copy.deepcopy(self.reg)
+        for fid in ("APIMoM", "APIMeMoM"):
+            reg["families"][fid]["tests"].remove("charls_apim_moderated_swap")
+        self.assertIn("tests.charls_apim_moderated_swap: no family lists this test; "
+                      "add it to a family's tests or set shared_purpose", self.errors_for(reg))
+        # 只从一个家族摘掉，另一个家族仍引用，不算孤儿
+        reg = copy.deepcopy(self.reg)
+        reg["families"]["APIMoM"]["tests"].remove("charls_apim_moderated_swap")
+        self.assertEqual(self.errors_for(reg), [])
+
+    def test_shared_purpose_must_be_one_line_and_exclusive(self):
+        reg = copy.deepcopy(self.reg)
+        reg["tests"]["apim_v2_contract"]["shared_purpose"] = "synthetic purpose"
+        self.assertIn("tests.apim_v2_contract: has shared_purpose but is also listed by a family; keep one",
+                      self.errors_for(reg))
+        for value in ("", "two\nlines", "x" * (registry.LABEL_MAX + 1), {"purpose": "nested"}):
+            reg = copy.deepcopy(self.reg)
+            reg["tests"]["windows_coordinator_py"]["shared_purpose"] = value
+            self.assertTrue(any(e.startswith("tests.windows_coordinator_py: shared_purpose must be a one-line string")
+                                for e in self.errors_for(reg)), value)
+        reg = copy.deepcopy(self.reg)
+        del reg["tests"]["windows_coordinator_py"]["shared_purpose"]
+        self.assertTrue(any(e.startswith("tests.windows_coordinator_py: no family lists this test")
+                            for e in self.errors_for(reg)))
 
     def test_unknown_route_rejected(self):
         reg = copy.deepcopy(self.reg)
@@ -149,9 +192,15 @@ class ReceiptWhitelistTests(unittest.TestCase):
         self.assertEqual(registry.validate_receipt(receipt), [])
 
     def test_template_refuses_family_without_freshness_files(self):
+        # 合成夹具：复制一个家族并清空 freshness_files，不依赖发布注册表里哪个家族恰好为空
+        reg = registry.load()
+        reg["families"]["SYNTHETIC_NO_FRESHNESS"] = dict(copy.deepcopy(reg["families"]["MED"]), freshness_files=[])
         with self.assertRaises(ValueError):
-            registry.receipt_template(registry.load(), "MED", "CFPS", "template_bundle")
-        self.assertEqual(registry.main(["receipt-template", "MED", "CFPS", "template_bundle"]), 1)
+            registry.receipt_template(reg, "SYNTHETIC_NO_FRESHNESS", "CFPS", "template_bundle")
+        stdout = io.StringIO()
+        with mock.patch.object(registry, "load", return_value=reg), contextlib.redirect_stdout(stdout):
+            self.assertEqual(registry.main(["receipt-template", "SYNTHETIC_NO_FRESHNESS", "CFPS", "template_bundle"]), 1)
+        self.assertIn("family SYNTHETIC_NO_FRESHNESS has no freshness_files", stdout.getvalue())
 
     def test_nested_payload_rejected_in_every_allowed_field(self):
         # REVIEW-PR80-001 R1：允许的字段里塞对象或数组，也不能带出估计值或 ID（合成值）

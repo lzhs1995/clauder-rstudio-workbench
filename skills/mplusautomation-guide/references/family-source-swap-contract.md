@@ -9,6 +9,8 @@
 
 APIM 系已有实现：[APIM v2 data adapter](apim-v2-data-adapter.md)（`data_mode`、`column_map`、`missing_codes`）。其他家族在通用 `source_spec` 落地前，由研究脚本生成 DAT，但必须满足下面第 2 节的全部声明。
 
+OTHER_GROWTH 与 MOD 只接收内存数据框：文件读取和缺失码处理由调用方在上游完成，同样要满足第 2 节。OTHER_GROWTH 的 DAT 由 `run_mplus_model()` 从映射后的数据框写出；MOD 在 R 中拟合，不写 DAT。
+
 ## 2. 必须显式声明的六件事
 1. **成员与波次**：一行映射对应一个模型列，写明 member 与 wave。不从列名后缀推断：同一研究的不同数据层可能用 `_f/_m`、`f/m`、`actor_/partner_` 前缀加 `_`/`_c_` 后缀、`_t1.._t4` 等不同约定，派生列的词干也可能不规则。
 2. **成员朝向**：用性别或配偶 ID 列核实「member 1 是谁」，把核对方法写进映射表的 `verification` 列。同名的本人/配偶列在不同版本或不同年份可能互换。
@@ -44,6 +46,17 @@ APIM 系已有实现：[APIM v2 data adapter](apim-v2-data-adapter.md)（`data_m
 6. 在获准窗口经共用执行层一次性提交，按原 job 接回，不因等待超时重复提交。
 7. `readModels()` 读出，按家族验收文档比对。
 8. 出图出表；写第 5 节的回执。
+
+### 4.3 内存数据框路线（OTHER_GROWTH）
+`mplus_from_mapping()` 只接收内存数据框，不读文件，也不认缺失码。
+1. 上游链读入 CSV 或 DTA，按第 2 节逐列声明缺失码并转成 `NA`，按内容 SHA-256 钉住源文件；分类变量先显式编码成数值。
+2. 按实际观测时间用 `growth_time_basis()` / `growth_model_syntax()` 写增长语句，分段节点由研究者给出；它只写单一过程，并行过程和协变量仍要手写 MODEL。
+3. 写 `Mplus 别名 = 源列名` 的命名向量（别名以字母开头、最多 8 个字符、忽略大小写唯一），连同数据框和显式 ANALYSIS 传给 `mplus_from_mapping()`。它只换名，保留行序、取值与 `NA`。
+4. 先用小合成数据做换名、换序检查：INP 与 DAT 应逐字节相同，改值只改变 DAT。`scripts/test_other_growth_compile_20261105.R` 在 CI 里跑同样的检查。
+5. 在获准窗口经 `run_mplus_model()` 提交。数据或规格一变就换新的模型 ID 与运行目录，见[模型复用说明](reusable-models.md)。
+6. 读回后按家族验收文档比对，出图出表；写第 5 节的回执。
+
+MOD（`r_glm_moderation`）同样只接收数据框，文件读取和缺失码处理在上游完成，之后的步骤见[第五章合同](mediation-moderation-workflow.md)第 5 节。
 
 ## 5. 公开回执（白名单）
 真实数据只在本机运行，仓库只收汇总回执：`assets/real_data_receipts/<family>__<dataset>__<日期>.json`。

@@ -98,6 +98,13 @@ mapping templates. Declare source names, member order and per-column missing
 codes explicitly. The adapter preserves source snapshots and records aggregate
 conversion counts; it does not infer spouse links, measurement equivalence,
 historical sample identity, or scientific acceptance from successful I/O.
+The [CHARLS baseline dyad swap](references/charls-apim-swap-v2.md) (APIM,
+APIMeM) and its [moderated extension](references/charls-apim-moderated-swap-v1.md)
+(APIMoM, APIMeMoM) are documented source swaps; both stay blocked until spouse
+links and missing codes are verified against real documentation. The baseline
+swap's official `ID_w1 → ID` crosswalk and whole-pair exclusion
+(`pair_eligibility = "exclude_ineligible_pairs"`) apply only when set explicitly
+in the contract; the preparation receipt records per-reason exclusion counts.
 
 For Stata raw DTA-to-CSV/DAT chains, read
 [Stata raw-chain reproducibility](references/stata-raw-chain-reproducibility.md)
