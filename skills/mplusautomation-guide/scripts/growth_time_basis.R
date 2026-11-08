@@ -95,3 +95,85 @@ check_growth_statements <- function(syntax, aliases) {
   }
   invisible(TRUE)
 }
+
+# 组合两个过程的固定时间增长语句；返回的 variables/model 交给 mplus_from_mapping()。
+# 这里只编译协变型 PP-LGCM：所有增长因子两两协变，并回归到各过程声明的协变量。
+# 不推断生产模型的跨过程定向路径、逐波残差相关、自由载荷、交互或插补规则。
+parallel_growth_model_syntax <- function(processes, covariates = character(), width = 80L) {
+  if (!is.list(processes) || is.data.frame(processes) || length(processes) != 2L ||
+      is.null(names(processes)) || anyNA(names(processes)) ||
+      any(!nzchar(trimws(names(processes)))) || anyDuplicated(toupper(names(processes))))
+    stop("processes must contain exactly two uniquely named process roles")
+  if (!is.numeric(width) || length(width) != 1L || !is.finite(width) ||
+      width != as.integer(width) || width < 40L || width > 90L)
+    stop("width must be an integer between 40 and 90 characters")
+  valid_names <- function(x) is.character(x) && !anyNA(x) &&
+    all(grepl("^[A-Za-z][A-Za-z0-9_]{0,7}$", x))
+  check_mapping <- function(x, allow_empty = FALSE) {
+    if (!is.character(x) || (!allow_empty && !length(x)) ||
+        (length(x) && (is.null(names(x)) || !valid_names(names(x)))) ||
+        anyNA(x) || any(!nzchar(trimws(x))))
+      stop("Role mappings must be named character vectors: Mplus alias = source column")
+  }
+  check_mapping(covariates, allow_empty = TRUE)
+  syntax <- lapply(processes, function(spec) {
+    required <- c("variables", "waves", "factors")
+    if (!is.list(spec) || is.data.frame(spec) || is.null(names(spec)) ||
+        anyNA(names(spec)) || anyDuplicated(names(spec)) ||
+        !all(required %in% names(spec)) ||
+        any(!names(spec) %in% c(required, "shape", "knot", "adjust_for")))
+      stop("Each process requires variables, waves and factors; only shape, knot and adjust_for are optional")
+    check_mapping(spec[["variables"]])
+    if (!valid_names(spec[["factors"]]) || !length(spec[["factors"]]))
+      stop("Each process requires explicit valid growth factor names")
+    # 省略shape只采用linear；明确传NULL/向量/自由载荷类型不能静默回退。
+    shape <- if ("shape" %in% names(spec)) spec[["shape"]] else "linear"
+    if (!is.character(shape) || length(shape) != 1L || is.na(shape) ||
+        !shape %in% c("linear", "quadratic", "piecewise"))
+      stop("Parallel growth supports fixed linear, quadratic or piecewise time scores only")
+    growth_model_syntax(spec[["waves"]], names(spec[["variables"]]), shape,
+      knot = spec[["knot"]], factors = spec[["factors"]], width = width)
+  })
+  # 去掉过程角色前缀，只保留真正的Mplus别名；声明的波次顺序不能随源列序改变。
+  variables <- c(do.call(c, unname(lapply(processes, function(p) p[["variables"]]))), covariates)
+  factors <- unname(unlist(lapply(syntax, function(s) s$factors)))
+  all_names <- c(names(variables), factors)
+  if (anyDuplicated(toupper(all_names)))
+    stop("Observed aliases, covariate aliases and growth factors must be globally unique ignoring case")
+  if (anyDuplicated(unname(variables)))
+    stop("Source columns must have a one-to-one mapping across both processes and covariates")
+  covariates_by_process <- lapply(processes, function(spec) {
+    # 未写adjust_for时两过程都用全体协变量；显式空向量允许某过程不作调整。
+    chosen <- if ("adjust_for" %in% names(spec)) spec[["adjust_for"]] else names(covariates)
+    if (is.null(chosen) && !"adjust_for" %in% names(spec)) chosen <- character()
+    if (!valid_names(chosen) || anyDuplicated(toupper(chosen)) ||
+        any(!toupper(chosen) %in% toupper(names(covariates))))
+      stop("adjust_for must select unique declared covariate aliases")
+    unname(names(covariates)[match(toupper(chosen), toupper(names(covariates)))])
+  })
+  if (any(!names(covariates) %in% unlist(covariates_by_process)))
+    stop("Each declared covariate must be used by at least one process")
+  statements <- unname(unlist(lapply(syntax, function(s) s$statements)))
+  # 显式写出协方差，不依赖Mplus对潜变量协方差的隐含默认值。
+  pairs <- utils::combn(factors, 2L)
+  statements <- c(statements, apply(pairs, 2L, function(pair)
+    paste0(pair[[1L]], " WITH ", pair[[2L]], ";")))
+  if (length(covariates)) {
+    on_statement <- function(factor, aliases) {
+      lines <- character(); current <- paste(factor, "ON")
+      for (alias in aliases) {
+        if (nchar(current) + 1L + nchar(alias) + 1L > width) {
+          lines <- c(lines, current); current <- paste0("  ", alias)
+        } else current <- paste(current, alias)
+      }
+      paste(c(lines, paste0(current, ";")), collapse = "\n")
+    }
+    for (k in seq_along(syntax)) {
+      aliases <- covariates_by_process[[k]]
+      if (length(aliases)) statements <- c(statements,
+        vapply(syntax[[k]]$factors, on_statement, character(1), aliases = aliases))
+    }
+  }
+  list(model = paste(statements, collapse = "\n"), variables = variables,
+       processes = syntax, factors = factors, covariates_by_process = covariates_by_process)
+}
