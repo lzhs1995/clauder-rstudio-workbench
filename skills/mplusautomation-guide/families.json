@@ -412,6 +412,27 @@
       ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml"
+    },
+    "charls_apim_swap": {
+      "path": "scripts/test_charls_apim_swap.R",
+      "lang": "R",
+      "function": "test_charls_apim_swap",
+      "args": [
+        "skill_root",
+        "out_dir",
+        "engine",
+        "python"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "charls_swap_windows_runner_py": {
+      "path": "scripts/test_charls_swap_windows_runner.py",
+      "lang": "python",
+      "function": null,
+      "args": [],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
     }
   },
   "families": {
