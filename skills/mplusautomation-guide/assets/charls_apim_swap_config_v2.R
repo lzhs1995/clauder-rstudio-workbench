@@ -9,6 +9,7 @@ charls_apim_swap_contract <- function() {
     key_modes=list(harmonized='as_is',demographic='charls2011_household_person',health='charls2011_household_person'),
     spouse_link=list(source='harmonized',person_id_column='ID',spouse_id_column=NULL,
       person_id_mode='as_is',spouse_id_mode='as_is',household_column=NULL,
+      crosswalk=NULL,spouse_missing_values=character(),
       verified=FALSE,relationship_semantics=NULL,documentation_sha256=NULL,documentation_locator=NULL,
       reciprocity_required=TRUE),
     # 范围仅作数据有效性检查；不沿用既有轨迹研究的双方 60 岁筛选。
@@ -20,7 +21,7 @@ charls_apim_swap_contract <- function() {
     missing_codes_verified=FALSE,missing_codes_documentation_sha256=NULL,missing_codes_documentation_locator=NULL,
     identity_codes_verified=FALSE,identity_documentation_sha256=NULL,identity_documentation_locator=NULL,
     identity_policy='normalized_12_digit_person_ids_native_or_empty_spouse_missing_only',
-    join_policy='baseline_demographic_anchor_require_paired_health',
+    join_policy='baseline_demographic_anchor_require_paired_health',pair_eligibility='strict',
     invalid_birth_year_policy='missing_without_fallback',
     adl_completeness='unknown_from_harmonized_score',
     scientific_boundary='2011 cross-sectional technical demonstration; indirect associations are not causal mediation')
