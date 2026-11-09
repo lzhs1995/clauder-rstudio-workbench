@@ -71,9 +71,194 @@ test_ch5_templates_extended <- function(output_dir, skill_root) {
   check('cat_conditional_indirect_algebra', max(abs(c(env$ind_W1, env$ind_W3, env$ind_W2) - want)) < 1e-12)
   n <- vapply(1:3, function(k) sum(d$wcat == k), numeric(1))
   check('cat_weighted_average_algebra', abs(env$ind_avg - sum(n * c(env$ind_W1, env$ind_W2, env$ind_W3)) / sum(n)) < 1e-12)
+
+  # ---- 换变量合同：name*/var* 两套列表、NAMES、DATA: FILE 与 DAT 列序一起改名、换序（四个模板） ----
+  # 模拟用户按 references/mediation-moderation-workflow.md §3 第 1、5 条手改模板；守卫函数在 ch5_mediation_moderation.R
+  reject_as <- function(name, expr, want) {
+    e <- tryCatch({ force(expr); NULL }, ch5_swap_error = identity)
+    got <- if (is.null(e)) character() else sort(e$reasons)
+    if (!identical(got, sort(want))) stop('Contract failed: ', name, ' reasons [', paste(got, collapse = ' '),
+                                          '] want [', paste(want, collapse = ' '), ']')
+    checks[[name]] <<- TRUE
+  }
+  swap_dir <- file.path(output_dir, 'swap'); dir.create(swap_dir)
+  tpls <- c(cf = 'counterfactual_mediation', lin = 'linear_mediation', cat = 'moderated_mediation_cat', mg = 'moderated_mediation_mg')
+  tpls <- setNames(file.path(skill_root, 'assets/ch5', paste0(tpls, '_template.txt')), names(tpls))
+  cols <- CH5_SYNTHETIC_COLUMNS
+  ren <- setNames(sprintf('r%02d%s', seq_along(cols), substr(cols, 1, 5)), cols)  # 新名 ≤ 8 字符
+  idm <- setNames(cols, cols); inv <- setNames(names(ren), unname(ren))
+  # 只换整词标识符；[[...]] 标签与 ! 注释不动；file_mode 时 _ 也算词界（文件名字面量）
+  swap_ids <- function(x, map, file_mode = FALSE) {
+    wc <- if (file_mode) 'A-Za-z0-9' else 'A-Za-z0-9_'
+    for (k in names(map)[order(-nchar(names(map)))])
+      x <- gsub(sprintf('(?<![%s])%s(?![%s])', wc, k, wc), map[[k]], x, perl = TRUE)
+    x
+  }
+  swap_line <- function(ln, map, file_mode = FALSE) {
+    code <- sub('!.*$', '', ln); com <- substring(ln, nchar(code) + 1L)
+    m <- gregexpr('\\[\\[[^]]*\\]\\]', code)
+    keep <- regmatches(code, m)[[1]]; rest <- regmatches(code, m, invert = TRUE)[[1]]
+    rest <- vapply(rest, swap_ids, '', map = map, file_mode = file_mode, USE.NAMES = FALSE)
+    paste0(paste0(rest, c(keep, ''), collapse = ''), com)
+  }
+  # rename_name / rename_var 分别控制 name* 列表（及文件名字面量）与 var* 列表（及模型语句）；NAMES 写 names_order
+  swap_template <- function(tpl, out, map, names_order, dat_name, rename_name = TRUE, rename_var = TRUE,
+                            update_data_file = TRUE) {
+    x <- readLines(tpl, warn = FALSE); a <- which(x == '[[init]]'); b <- which(x == '[[/init]]')
+    for (i in seq_along(x)) {
+      ln <- x[i]
+      if (i > a && i < b) {
+        if (grepl('^name[A-Za-z0-9_]*#', ln) && rename_name || grepl('^var[A-Za-z0-9_]*#', ln) && rename_var)
+          x[i] <- paste0(sub('=.*$', '=', ln), swap_line(sub('^[^=]*=', '', ln), map))
+        else if (grepl('^filename', ln) && rename_name) x[i] <- swap_line(ln, map, file_mode = TRUE)
+      } else if (i > b) {
+        if (grepl('^NAMES =', ln)) {
+          g <- split(names_order, ceiling(seq_along(names_order) / 6))
+          x[i] <- paste0('NAMES = ', paste(vapply(g, paste, '', collapse = ' '), collapse = '\n  '), ';')
+        } else if (grepl('^DATA: FILE =', ln)) {
+          if (update_data_file) x[i] <- sprintf('DATA: FILE = "%s";', dat_name)
+        } else if (rename_var) x[i] <- swap_line(ln, map)
+      }
+    }
+    writeLines(x, out); out
+  }
+  # 手填常量按本轮数据和映射重算（换源后不得沿用旧值）
+  constants <- function(dd, map) {
+    v <- list(w_mean = mean(dd[[map[['w']]]]), w_sd = sd(dd[[map[['w']]]]),
+              w2_mean = mean(dd[[map[['w2']]]]), w2_sd = sd(dd[[map[['w2']]]]))
+    for (s in c('tt', 'g0', 'g1')) {
+      ss <- switch(s, tt = dd, g0 = dd[dd[[map[['grp']]]] == 0, ], g1 = dd[dd[[map[['grp']]]] == 1, ])
+      for (k in 1:3) v[[sprintf('n_w%d_%s', k, s)]] <- sum(ss[[map[['wcat']]]] == k)
+    }
+    v
+  }
+  # 一轮：写 DAT（列序即 names(dd)）、改写并填模板、展开
+  gen_round <- function(tag, dd, map, dat_name, only = names(tpls), rewrite = TRUE, ...) {
+    g <- file.path(swap_dir, tag); dir.create(g)
+    MplusAutomation::prepareMplusData(dd, file.path(g, dat_name), inpfile = FALSE)
+    used <- character()
+    for (t in only) {
+      used[[t]] <- if (rewrite) swap_template(tpls[[t]], file.path(g, paste0(t, '_template.txt')), map, names(dd), dat_name, ...)
+                   else tpls[[t]]
+      MplusAutomation::createModels(ch5_fill_template(used[[t]], file.path(g, paste0(t, '_filled.txt')),
+                                                      c(list(outdir = g), constants(dd, map))))
+    }
+    list(data = dd, dat = file.path(g, dat_name), templates = used, inps = list.files(g, pattern = '\\.inp$', full.names = TRUE))
+  }
+  d0 <- d
+  d1 <- d[, rev(cols)]; names(d1) <- unname(ren[names(d1)])
+  rounds <- list(original = gen_round('original', d0, idm, 'ch5_synthetic.dat', rewrite = FALSE),
+                 renamed_reordered = gen_round('renamed_reordered', d1, ren, 'swap_source.dat'))
+  lab <- list(original = NULL, renamed_reordered = setNames(unname(ren), unname(ren)))
+  for (r in names(rounds)) {
+    R <- rounds[[r]]
+    for (t in names(R$templates))
+      check(paste0('swap:', r, ':', t, ':name_var_pairs'), nrow(ch5_check_template_lists(R$templates[[t]], lab[[r]])) > 0L)
+    check(paste0('swap:', r, ':expansion_count'), length(R$inps) == 42L)
+    for (f in R$inps) { ch5_check_inp_columns(f, R$data, R$dat); check(paste0('swap:', r, ':', basename(f), ':columns_aligned'), TRUE) }
+  }
+  # 两轮语义相同：改名轮按逆映射还原后，除 NAMES 与 DATA: FILE 外逐句相同
+  canon <- function(f, map) {
+    st <- ch5_inp_statements(vapply(readLines(f, warn = FALSE), swap_line, '', map = map, USE.NAMES = FALSE))
+    st <- Filter(function(s) !(s$section == 'VARIABLE' && grepl('^NAMES', s$text)) && !(s$section == 'DATA' && grepl('^FILE', s$text)), st)
+    vapply(st, function(s) paste(s$section, s$text), '')
+  }
+  ro <- rounds$original$inps; rr <- rounds$renamed_reordered$inps
+  rr_key <- setNames(rr, vapply(basename(rr), swap_ids, '', map = inv, file_mode = TRUE, USE.NAMES = FALSE))
+  check('swap:filenames_map_back', identical(sort(names(rr_key)), sort(basename(ro))))
+  for (f in ro) {
+    g <- rr_key[[basename(f)]]; id <- basename(f)
+    check(paste0('swap:', id, ':renamed_syntax_changed'), !identical(readLines(f, warn = FALSE), readLines(g, warn = FALSE)))
+    check(paste0('swap:', id, ':canonical_semantics_equal'), identical(canon(f, character()), canon(g, inv)))
+    n0 <- ch5_check_inp_columns(f, d0, rounds$original$dat)$names
+    n1 <- unname(inv[ch5_check_inp_columns(g, d1, rounds$renamed_reordered$dat)$names])
+    check(paste0('swap:', id, ':names_reordered_same_set'), !identical(n0, n1) && setequal(n0, n1))
+  }
+  # 负例：只改一侧，必须被拒绝且原因精确
+  mutate_tpl <- function(tag, tpl, from, to) {
+    x <- readLines(tpl, warn = FALSE); y <- sub(from, to, x, fixed = TRUE)
+    check(paste0('swap_reject_', tag, ':mutation_applied'), !identical(x, y))
+    out <- file.path(swap_dir, paste0('neg_', tag, '.txt')); writeLines(y, out); out
+  }
+  # 1 只改 var* 不改 name*：.inp 各自自洽（文件名标签过时），只有模板层能抓到
+  t1 <- swap_template(tpls[['cf']], file.path(swap_dir, 'neg_var_only.txt'), ren, names(d1), 'swap_source.dat', rename_name = FALSE)
+  reject_as('swap_reject_var_renamed_name_kept', ch5_check_template_lists(t1), 'NAME_VAR_MISMATCH')
+  reject_as('swap_reject_var_renamed_name_kept_labels', ch5_check_template_lists(t1, lab$renamed_reordered), 'NAME_VAR_MISMATCH')
+  n1 <- gen_round('neg_var_only', d1, ren, 'swap_source.dat', only = 'cf', rename_name = FALSE)
+  reject_as('swap_neg_var_only_inp_layer_alone_passes', for (f in n1$inps) ch5_check_inp_columns(f, n1$data, n1$dat), character())
+  # 1b 不改名、只把 var* 换序：文件名 ma 装的是 mb 的模型
+  reject_as('swap_reject_var_reordered_name_kept',
+            ch5_check_template_lists(mutate_tpl('var_reorder', tpls[['lin']], 'varmv#mv = mc ma;', 'varmv#mv = ma mc;')), 'NAME_VAR_MISMATCH')
+  # 2 只改 name*（及文件名）不改 var* 和模型语句：NAMES 已是新名
+  t2 <- swap_template(tpls[['cf']], file.path(swap_dir, 'neg_name_only.txt'), ren, names(d1), 'swap_source.dat', rename_var = FALSE)
+  reject_as('swap_reject_name_renamed_var_kept', ch5_check_template_lists(t2, lab$renamed_reordered), 'VAR_NOT_IN_LABELS')
+  n2 <- gen_round('neg_name_only', d1, ren, 'swap_source.dat', only = 'cf', rename_var = FALSE)
+  check('swap_neg_name_only:expansion_count', length(n2$inps) == 16L)
+  for (f in n2$inps) reject_as(paste0('swap_reject_name_renamed_var_kept:', basename(f)), ch5_check_inp_columns(f, n2$data, n2$dat),
+                               c('DEFINE_NOT_IN_NAMES', 'USEOBSERVATIONS_NOT_IN_NAMES', 'USEVARIABLES_NOT_IN_NAMES'))
+  # 3 NAMES 与 DAT 列序错位：DAT 按倒序写，模板 NAMES 未改
+  lin0 <- ro[basename(ro) == 'lin_xc-mc-ycc_tt.inp']; check('swap_neg_fixture_unique', length(lin0) == 1L)
+  fx <- file.path(swap_dir, 'neg_order'); dir.create(fx); file.copy(lin0, fx)
+  dr <- d0[, rev(cols)]; MplusAutomation::prepareMplusData(dr, file.path(fx, 'ch5_synthetic.dat'), inpfile = FALSE)
+  reject_as('swap_reject_names_dat_order', ch5_check_inp_columns(file.path(fx, basename(lin0)), dr, file.path(fx, 'ch5_synthetic.dat')),
+            'NAMES_DAT_ORDER_MISMATCH')
+  reject_as('swap_reject_dat_written_in_other_order', ch5_check_inp_columns(file.path(fx, basename(lin0)), d0, file.path(fx, 'ch5_synthetic.dat')),
+            'DAT_CONTENT_MISMATCH')
+  # 4 数据删了一列，NAMES 没跟着删
+  fm <- file.path(swap_dir, 'neg_dropped'); dir.create(fm); file.copy(lin0, fm)
+  dm <- d0[, setdiff(cols, 'yb')]; MplusAutomation::prepareMplusData(dm, file.path(fm, 'ch5_synthetic.dat'), inpfile = FALSE)
+  reject_as('swap_reject_names_dat_set', ch5_check_inp_columns(file.path(fm, basename(lin0)), dm, file.path(fm, 'ch5_synthetic.dat')),
+            c('DAT_FIELD_COUNT_MISMATCH', 'NAMES_DAT_SET_MISMATCH'))
+  # 5 换了 DAT 文件名，模板 DATA: FILE 还是旧文本
+  n5 <- gen_round('neg_stale_file', d1, ren, 'swap_source.dat', only = 'lin', update_data_file = FALSE)
+  for (f in n5$inps) reject_as(paste0('swap_reject_stale_data_file:', basename(f)), ch5_check_inp_columns(f, n5$data, n5$dat), 'DATA_FILE_MISMATCH')
+  # 6 手改 .inp 时把更长的新名写成一行：超过 90 字节的部分 Mplus 不读（createModels 生成时自己会折行，所以夹具直接改 .inp）
+  lin1 <- unname(rr_key['lin_xc-mc-ycc_tt.inp']); f6 <- file.path(swap_dir, 'neg_long_line'); dir.create(f6)
+  x6 <- readLines(lin1, warn = FALSE); i6 <- grep('^NAMES =', x6); j6 <- i6 + which(grepl(';', x6[i6:length(x6)]))[1] - 1L
+  x6 <- c(x6[seq_len(i6 - 1L)], paste0('NAMES = ', paste(names(d1), collapse = ' '), ';'), x6[-seq_len(j6)])
+  writeLines(x6, file.path(f6, basename(lin1))); file.copy(rounds$renamed_reordered$dat, f6)
+  check('swap_neg_long_line_fixture_over_90', max(nchar(x6, type = 'bytes')) > 90L)
+  reject_as('swap_reject_names_line_too_long', ch5_check_inp_columns(file.path(f6, basename(lin1)), d1, file.path(f6, 'swap_source.dat')),
+            'LINE_TOO_LONG')
+  # 7 两个变量配成同一个文件名标签：后一个模型覆盖前一个
+  lab7 <- idm; lab7[['mb']] <- 'ma'
+  reject_as('swap_reject_duplicate_label', ch5_check_template_lists(mutate_tpl('dup_label', tpls[['cf']], 'namemv#mv = ma mb;', 'namemv#mv = ma ma;'), lab7),
+            'DUPLICATE_NAME_LABEL')
+  # 8 name* 比 var* 多一个；9 没有成对列表时不得空过
+  reject_as('swap_reject_name_var_length', ch5_check_template_lists(mutate_tpl('len', tpls[['lin']], 'nameiv#iv = xc xa;', 'nameiv#iv = xc xa xb;')),
+            'NAME_VAR_LENGTH_MISMATCH')
+  t9 <- mutate_tpl('no_pairs', mutate_tpl('no_pairs_a', tpls[['lin']], 'nameiv#iv', 'labeliv#iv'), 'namemv#mv', 'labelmv#mv')
+  reject_as('swap_reject_no_pairs', ch5_check_template_lists(t9), 'NO_NAME_VAR_PAIRS')
+  # 10 直接改 .inp 的 VARIABLE 语句：CATEGORICAL 列了不在 USEVARIABLES 的变量、GROUPING 变量不在 NAMES、NAMES 用 a-b 简写
+  inp_neg <- function(tag, src, from, to, data, dat) {
+    dd <- file.path(swap_dir, paste0('neg_', tag)); dir.create(dd)
+    x <- readLines(src, warn = FALSE); y <- sub(from, to, x, fixed = TRUE)
+    check(paste0('swap_reject_', tag, ':mutation_applied'), !identical(x, y))
+    writeLines(y, file.path(dd, basename(src))); file.copy(dat, dd); file.path(dd, basename(src))
+  }
+  cf0 <- ro[basename(ro) == 'cf_xa-ma-ya_g0.inp']; mg0 <- ro[basename(ro) == 'modmed_mg_xa-ma-w-yc.inp']
+  check('swap_neg_inp_fixtures_unique', length(cf0) == 1L && length(mg0) == 1L)
+  reject_as('swap_reject_categorical_not_used', ch5_check_inp_columns(
+    inp_neg('categorical', cf0, 'CATEGORICAL = ma ya;', 'CATEGORICAL = ma ya w;', d0, rounds$original$dat), d0,
+    file.path(swap_dir, 'neg_categorical', 'ch5_synthetic.dat')), 'CATEGORICAL_NOT_IN_USEVARIABLES')
+  reject_as('swap_reject_grouping_not_in_names', ch5_check_inp_columns(
+    inp_neg('grouping', mg0, 'GROUPING = grp (', 'GROUPING = grq (', d0, rounds$original$dat), d0,
+    file.path(swap_dir, 'neg_grouping', 'ch5_synthetic.dat')), 'GROUPING_NOT_IN_NAMES')
+  rng <- inp_neg('range', lin0, 'NAMES = id cl grp xa xb ma mb ya yb w wc1 wc3 c1 c2 yc w2 xc mc wcat ycc;',
+                 'NAMES = id-ycc;', d0, rounds$original$dat)
+  reject_as('swap_reject_names_range_syntax', ch5_check_inp_columns(rng, d0, file.path(swap_dir, 'neg_range', 'ch5_synthetic.dat')),
+            c('DAT_FIELD_COUNT_MISMATCH', 'NAMES_DAT_SET_MISMATCH', 'UNSUPPORTED_LIST_SYNTAX', 'USEVARIABLES_NOT_IN_NAMES'))
+  # 11 核的是别处同名 DAT（内容相同）：Mplus 读的是 .inp 旁边那份，必须按路径判，不按文件名
+  od <- file.path(swap_dir, 'neg_other_dir'); dir.create(od); file.copy(rounds$original$dat, od)
+  reject_as('swap_reject_same_basename_other_dir', ch5_check_inp_columns(lin0, d0, file.path(od, 'ch5_synthetic.dat')), 'DATA_FILE_MISMATCH')
+  # 12 Mplus 变量名不分大小写：数据列名大写、NAMES 小写仍算对齐
+  du <- d0; names(du) <- toupper(names(du))
+  reject_as('swap_columns_case_insensitive', ch5_check_inp_columns(lin0, du, rounds$original$dat), character())
   check('no_engine_outputs', length(list.files(output_dir, pattern = '\\.(out|gh5)$', recursive = TRUE)) == 0L)
   jsonlite::write_json(list(test = 'test_ch5_templates_extended', status = 'PASS', checks = length(checks),
-                            generated_inp = length(inps), engine_calls = 0L),
+                            generated_inp = length(inps), engine_calls = 0L,
+                            swap_rounds = lapply(rounds, function(R) length(R$inps)),
+                            swap_reject_checks = sum(grepl('^swap_reject_', names(checks)) & !grepl(':mutation_applied$', names(checks)))),
                        file.path(output_dir, 'receipt.json'), auto_unbox = TRUE, pretty = TRUE)
   invisible(checks)
 }

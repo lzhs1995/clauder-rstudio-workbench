@@ -62,7 +62,12 @@ SE 逐位一致；去掉协方差项的 SE 会被判错。
 ## 3. 模板与手填常量的陷阱
 
 1. `name*` 进文件名，`var*` 进模型语句，同一下标同时索引两者。`readModels()` 按文件名
-   拼路径读取时依赖 `name*`，改变量时两套列表都要改。
+   拼路径读取时依赖 `name*`，改变量时两套列表都要改。只改一侧时每个 `.inp` 各自仍然自洽，
+   错误只体现在文件名标签上：文件名写的是 ma，模型里却是 mb。所以要在模板层检查：
+   `ch5_check_template_lists(template, labels)` 按同后缀、同迭代器把 `name*`/`var*` 成对，逐下标核对
+   “标签 = labels[变量]”（`labels` 缺省表示标签与变量名相同）。原因代码有 `NAME_VAR_MISMATCH`、
+   `VAR_NOT_IN_LABELS`、`NAME_VAR_LENGTH_MISMATCH`、`DUPLICATE_NAME_LABEL`（同一文件名，后一个模型覆盖前一个）、
+   `NO_NAME_VAR_PAIRS`（找不到任何成对列表，防止检查空过）。
 2. 同名模板在不同结果目录里字节可以不同：`[[init]]` 与常量段按家族、样本被手工改过。
    复现以每个结果目录内实际存在的模板为准，不按文件名合并。
 3. 模板文件名里的 `1n`/`2n` 不可靠地表示调节变量类型；判断看 `namewv#wv` 的内容与有无
@@ -71,7 +76,14 @@ SE 逐位一致；去掉协方差项的 SE 会被判错。
    换源或换样本时必须重算；`ch5_fill_template()` 会拒绝缺任何一个常量标签的填充，
    合成测试另核填入值等于当前样本的均值/标准差。
 5. `outputDirectory` 与 R 侧工作目录必须一致；只改一侧会把 `.inp` 写到不存在的位置。
-   `prepareMplusData()` 决定 DAT 列序，模板 `NAMES` 必须逐列一致。
+   `prepareMplusData()` 决定 DAT 列序，模板 `NAMES` 必须逐列一致。Mplus 按位置读自由格式 DAT，列序错了不报错。
+   生成后对每个 `.inp` 跑 `ch5_check_inp_columns(inp, data, dat_file)`（`data` 是写 DAT 用的 data.frame）。它检查：
+   - `NAMES` 与 DAT 的列集合、列序（`NAMES_DAT_SET_MISMATCH`、`NAMES_DAT_ORDER_MISMATCH`，按 Mplus 规则不分大小写）；
+   - 读回 DAT，核字段数、行数和逐列内容（`DAT_FIELD_COUNT_MISMATCH`、`DAT_ROW_COUNT_MISMATCH`、`DAT_CONTENT_MISMATCH`）；
+   - `DATA: FILE` 按 `.inp` 所在目录解析后必须就是这个 DAT，按路径判，不按文件名（`DATA_FILE_MISMATCH`）；
+   - `USEVARIABLES`、`DEFINE` 右侧、`CATEGORICAL`、`USEOBSERVATIONS`、`GROUPING` 引用的变量都已声明；
+   - 每行不超过 90 字节（`LINE_TOO_LONG`；`createModels()` 生成时会自己折行，手改 `.inp` 时容易超）。
+   `NAMES` 用 `a-b` 简写时报 `UNSUPPORTED_LIST_SYNTAX`，请逐个列出变量名。失败时抛 `ch5_swap_error`，`reasons` 里列出全部原因代码。
 6. Mplus 阈值在概率式中带负号：`P(Y=1)=1/(1+EXP(τ−βx))`。反事实分解照此写；
    `ch5_counterfactual_effects()` 与模板 `MODEL CONSTRAINT` 逐式求值一致，并对大样本模拟核对。
 
