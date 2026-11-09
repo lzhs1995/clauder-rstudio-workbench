@@ -26,6 +26,34 @@
 
 APIM 与 APIMeM 使用各自完整病例，N 可能不同。不能把两模型路径的变化当作同一样本中加入中介后的比较；任何这种比较都需要另行明确且获准的共同样本设计。
 
+## 官方基期身份映射与成对资格
+
+旧合同默认仍使用已规范化的 12 位身份、只接受原生/空字符串配偶缺失，`pair_eligibility="strict"`；缺 health、角色缺失、域外或同码都会阻断。缺省 `pair_eligibility` 的既有合同按 strict 处理，不因升级自动扩大样本处理范围。
+
+当已核实的 Harmonized 版本用 `s1id` 保存 2011 原始身份时，显式设置以下合同字段：
+
+```r
+contract$identity_policy <- "official_id_w1_crosswalk_zero_spouse_missing_only"
+contract$key_modes$demographic <- "official_id_w1_crosswalk"
+contract$key_modes$health <- "official_id_w1_crosswalk"
+contract$spouse_link$source <- "harmonized"
+contract$spouse_link$person_id_column <- "ID"
+contract$spouse_link$person_id_mode <- "as_is"
+contract$spouse_link$spouse_id_column <- "s1id"
+contract$spouse_link$spouse_id_mode <- "official_id_w1_crosswalk"
+contract$spouse_link$spouse_missing_values <- "0"
+contract$spouse_link$crosswalk <- list(
+  source = "harmonized", from_column = "ID_w1", to_column = "ID",
+  sha256 = reviewed_harmonized_file_sha256
+)
+```
+
+crosswalk 是已声明的 Harmonized DTA 中的 `ID_w1→ID` 两列，配置绑定该文件的 SHA256，读取前后均核源文件哈希，回执记录相同 SHA 和两个模块成功映射的人数。所有身份保持字符与前导零；非空 `ID_w1` 和目标 `ID` 必须各自唯一。原生/空的 `ID_w1` 行不参与映射，用于保留跨波文件中无基期身份的记录。demographic 和 health 的原始人员 ID 也必须通过同一张官方映射转换；未知模块身份硬拒绝，禁止混用旧插零规则导致连接静默丢行。配偶先将且仅将 `s1id="0"` 转为缺失，再精确匹配 `ID_w1` 取对应 `ID`；不使用本人的 householdID 拼接配偶，也不按性别猜配偶。未知码、未匹配身份、格式不符和映射冲突均阻断。
+
+只有预先决定并明确写入合同的 `pair_eligibility="exclude_ineligible_pairs"` 才允许整对排除：缺 health 模块，任一角色缺失，任一角色超出声明的两值域，或双方有效角色同码。此项不会消除身份冲突、自配、不互指、多配或社区冲突；这些检查在排除之前对所有已观测互指关系执行。没有任何合格夫妻或模型完整病例不足时仍阻断。角色缺失和域外可能发生在同一夫妻的不同成员，计数不强行互斥；有效角色同码单列。
+
+`preparation_receipt.json` 的 `pair_eligibility` 记录原互指对数、各项原因、角色原因并集、缺 health 与角色原因交集、角色缺失与域外交集、排除并集及剩余对数。`reciprocal_persons` 保留排除前关系计数，`couples` 是资格筛选后宽表对数，`complete_apim/complete_apimem` 分别记录各模型实际完整病例。排除规则必须在估计前固定，不依据估计结果调整。
+
 ## 私有运行配置
 
 配置保存在公共仓库之外；公共代码不包含个人主机路径、真实数据或结果值。外层 JSON 必须包含以下字段，未知信息应保留为 `null` 并令 `ready=false`：

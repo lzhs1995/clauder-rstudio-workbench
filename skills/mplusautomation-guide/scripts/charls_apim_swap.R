@@ -22,9 +22,29 @@ charls_swap_validate_contract <- function(contract) {
     grepl('^[a-fA-F0-9]{64}$',contract$identity_documentation_sha256)&&
     is.character(contract$identity_documentation_locator)&&length(contract$identity_documentation_locator)==1&&
     nzchar(contract$identity_documentation_locator)&&
-    identical(contract$identity_policy,'normalized_12_digit_person_ids_native_or_empty_spouse_missing_only'),
+    contract$identity_policy%in%c('normalized_12_digit_person_ids_native_or_empty_spouse_missing_only',
+      'official_id_w1_crosswalk_zero_spouse_missing_only'),
     'BLOCKED_UNREVIEWED_IDENTITY_CODES: confirm ID formats and spouse missing representations')
   charls_swap_assert(s$source%in%c('harmonized','spouse_roster'),'Spouse source must be harmonized or an explicit roster')
+  crosswalk_mode<-identical(s$spouse_id_mode,'official_id_w1_crosswalk')
+  if(crosswalk_mode) {
+    w<-s$crosswalk
+    charls_swap_assert(identical(contract$identity_policy,'official_id_w1_crosswalk_zero_spouse_missing_only')&&
+      identical(s$source,'harmonized')&&identical(s$person_id_column,'ID')&&identical(s$person_id_mode,'as_is')&&
+      identical(s$spouse_id_column,'s1id')&&identical(s$spouse_missing_values,'0')&&
+      identical(contract$key_modes$harmonized,'as_is')&&
+      identical(contract$source_columns$harmonized$id,'ID')&&
+      identical(contract$key_modes$demographic,'official_id_w1_crosswalk')&&
+      identical(contract$key_modes$health,'official_id_w1_crosswalk')&&
+      is.list(w)&&identical(w$source,'harmonized')&&identical(w$from_column,'ID_w1')&&identical(w$to_column,'ID')&&
+      is.character(w$sha256)&&length(w$sha256)==1&&!is.na(w$sha256)&&grepl('^[a-fA-F0-9]{64}$',w$sha256),
+      'Declare the official ID_w1 to ID crosswalk for both person modules, source SHA and only s1id=0 as extra missing')
+  } else charls_swap_assert(identical(contract$identity_policy,'normalized_12_digit_person_ids_native_or_empty_spouse_missing_only')&&
+    is.null(s$crosswalk)&&length(s$spouse_missing_values)==0L,
+    'Extra spouse missing codes require the explicit official crosswalk contract')
+  policy<-if(is.null(contract$pair_eligibility))'strict' else contract$pair_eligibility
+  charls_swap_assert(is.character(policy)&&length(policy)==1&&policy%in%c('strict','exclude_ineligible_pairs'),
+    'Unknown pair eligibility policy')
   charls_swap_assert(length(contract$member_values)==2&&!anyDuplicated(contract$member_values)&&
     length(contract$member_labels)==2&&!anyDuplicated(contract$member_labels),'Declare two distinguishable member roles')
   charls_swap_assert(identical(as.numeric(contract$member_values),c(1,2)),
@@ -62,16 +82,21 @@ charls_swap_read_sources <- function(paths,contract) {
   needed<-c('harmonized','demographic','health',if(contract$spouse_link$source=='spouse_roster')'spouse_roster')
   charls_swap_assert(all(needed%in%names(paths))&&all(file.exists(unlist(paths[needed]))),'Missing declared source file')
   hashes<-vapply(paths[needed],charls_swap_sha,'')
+  s<-contract$spouse_link;w<-s$crosswalk;crosswalk_evidence<-NULL
+  if(identical(s$spouse_id_mode,'official_id_w1_crosswalk'))
+    charls_swap_assert(identical(tolower(w$sha256),unname(hashes[[w$source]])),'Crosswalk source SHA256 mismatch')
   audit<-list();tables<-list()
   for(name in needed) {
     columns<-unique(unlist(contract$source_columns[[name]],use.names=FALSE))
     s<-contract$spouse_link
     if(name==s$source)columns<-unique(c(columns,s$person_id_column,s$spouse_id_column,s$household_column))
+    crosswalk_columns<-if(!is.null(w)&&name==w$source)c(w$from_column,w$to_column) else character()
+    columns<-unique(c(columns,crosswalk_columns))
     charls_swap_assert(length(columns)>0,'Empty source-column contract')
     d<-as.data.frame(haven::read_dta(paths[[name]],col_select=tidyselect::all_of(columns),.name_repair='minimal'),check.names=FALSE)
     charls_swap_assert(!anyDuplicated(names(d)),'Duplicate source columns')
     identity_cols<-intersect(names(d),c(contract$source_columns[[name]]$id,contract$source_columns[[name]]$household,
-      contract$source_columns[[name]]$community,if(name==s$source)c(s$person_id_column,s$spouse_id_column,s$household_column)))
+      contract$source_columns[[name]]$community,if(name==s$source)c(s$person_id_column,s$spouse_id_column,s$household_column),crosswalk_columns))
     codes<-contract$missing_codes[[name]]
     charls_swap_assert(!length(intersect(names(codes),identity_cols)),'Identity columns cannot use missing-code recoding')
     required_codes<-setdiff(names(d),identity_cols)
@@ -90,16 +115,49 @@ charls_swap_read_sources <- function(paths,contract) {
     }
     tables[[name]]<-d;audit[[name]]<-list(rows=nrow(d),columns=ncol(d),missingness=counts)
   }
+  crosswalk_mode<-identical(s$spouse_id_mode,'official_id_w1_crosswalk')
+  if(crosswalk_mode) {
+    # 使用来源文件的官方精确映射；不能拿本人的 householdID 拼接配偶身份。
+    wd<-tables[[w$source]]
+    old<-charls_swap_id(wd[[w$from_column]],allow_missing=TRUE)
+    new<-charls_swap_id(wd[[w$to_column]])
+    present<-!is.na(old)
+    charls_swap_assert(all(grepl('^[0-9]{11}$',old[present]))&&all(grepl('^[0-9]{12}$',new)),
+      'Invalid official crosswalk ID format')
+    charls_swap_assert(!anyDuplicated(old[present])&&!anyDuplicated(new),'Conflicting official crosswalk identity')
+  }
   key<-function(name) {
     c<-contract$source_columns[[name]];d<-tables[[name]]
-    ids<-charls_swap_id(d[[c$id]],if(is.null(c$household))NULL else d[[c$household]],contract$key_modes[[name]])
+    if(identical(contract$key_modes[[name]],'official_id_w1_crosswalk')) {
+      # 模块人员与配偶使用同一张官方映射，不能混用旧插零规则后静默丢人。
+      charls_swap_assert(crosswalk_mode,'Person module crosswalk needs the official identity contract')
+      # 保留原始 ID/household 格式和前缀一致性门；插零结果不用于身份连接。
+      charls_swap_id(d[[c$id]],if(is.null(c$household))NULL else d[[c$household]],'charls2011_household_person')
+      raw<-charls_swap_id(d[[c$id]])
+      charls_swap_assert(all(grepl('^[0-9]{11}$',raw)),paste('Invalid original person ID format in',name))
+      at<-match(raw,old[present])
+      charls_swap_assert(!anyNA(at),paste('Person ID absent from official crosswalk in',name))
+      ids<-new[present][at]
+    } else ids<-charls_swap_id(d[[c$id]],if(is.null(c$household))NULL else d[[c$household]],contract$key_modes[[name]])
     charls_swap_assert(!anyDuplicated(ids),paste('Duplicate person identity in',name));ids
   }
   hi<-key('harmonized');di<-key('demographic');yi<-key('health')
   s<-contract$spouse_link;sd<-tables[[s$source]]
   sh<-if(is.null(s$household_column))NULL else sd[[s$household_column]]
   si<-charls_swap_id(sd[[s$person_id_column]],sh,s$person_id_mode)
-  sp<-charls_swap_id(sd[[s$spouse_id_column]],sh,s$spouse_id_mode,allow_missing=TRUE)
+  if(identical(s$spouse_id_mode,'official_id_w1_crosswalk')) {
+    raw_spouse<-charls_swap_id(sd[[s$spouse_id_column]],allow_missing=TRUE)
+    zero<-!is.na(raw_spouse)&raw_spouse=='0';raw_spouse[zero]<-NA_character_
+    charls_swap_assert(all(grepl('^[0-9]{11}$',raw_spouse[!is.na(raw_spouse)])),
+      'Unexpected spouse ID or unreviewed spouse missing sentinel')
+    at<-match(raw_spouse,old[present])
+    charls_swap_assert(all(is.na(raw_spouse)|!is.na(at)),'Spouse ID absent from official crosswalk')
+    sp<-new[present][at]
+    crosswalk_evidence<-list(source=w$source,from_column=w$from_column,to_column=w$to_column,
+      sha256=unname(hashes[[w$source]]),mapping_rows=sum(present),missing_old_id_rows=sum(!present),
+      spouse_zero_to_missing=sum(zero),mapped_spouse_references=sum(!is.na(at)),
+      mapped_demographic_persons=length(di),mapped_health_persons=length(yi))
+  } else sp<-charls_swap_id(sd[[s$spouse_id_column]],sh,s$spouse_id_mode,allow_missing=TRUE)
   charls_swap_assert(all(grepl('^[0-9]{12}$',c(hi,di,yi,si,sp[!is.na(sp)]))),
     'Unexpected normalized person ID format or unreviewed spouse missing sentinel')
   charls_swap_assert(!anyDuplicated(si),'Duplicate person identity in spouse source')
@@ -127,7 +185,7 @@ charls_swap_read_sources <- function(paths,contract) {
   # harmonized 可跨波；仅原始 2011 demographic 中实有个人进入基期候选。
   # 关系互指之后缺 health 模块会单独阻断，不能冒充十题题项缺失。
   persons<-persons[!is.na(dm),,drop=FALSE]
-  attr(persons,'charls_source_evidence')<-list(source_hashes=hashes,source_rows=audit,
+  attr(persons,'charls_source_evidence')<-list(source_hashes=hashes,source_rows=audit,crosswalk=crosswalk_evidence,
     harmonized_without_demographic=sum(is.na(dm)),harmonized_without_health=sum(is.na(ym)),
     harmonized_without_spouse_roster=sum(is.na(sm)),age_fallback_used=sum(use_fallback),invalid_birth_year=sum(invalid_birth),
     join_policy=contract$join_policy,baseline_persons=nrow(persons),
@@ -139,6 +197,11 @@ charls_swap_read_sources <- function(paths,contract) {
 charls_prepare_apim_swap <- function(persons,contract,output_dir,source_paths=character()) {
   charls_swap_validate_contract(contract)
   for(p in c('haven','digest','jsonlite'))charls_swap_assert(requireNamespace(p,quietly=TRUE),paste('Missing package',p))
+  if(identical(contract$spouse_link$spouse_id_mode,'official_id_w1_crosswalk')) {
+    evidence<-attr(persons,'charls_source_evidence')
+    charls_swap_assert(identical(evidence$crosswalk$sha256,tolower(contract$spouse_link$crosswalk$sha256)),
+      'Missing or mismatched official crosswalk read evidence')
+  }
   needed<-c('pid','spouse_pid','community','sex','age','adl','health_module_present',paste0('cesd',1:10))
   charls_swap_assert(is.data.frame(persons)&&all(needed%in%names(persons))&&!anyDuplicated(names(persons)), 'Missing canonical person columns')
   id<-charls_swap_id(persons$pid);spouse<-charls_swap_id(persons$spouse_pid,allow_missing=TRUE)
@@ -148,20 +211,43 @@ charls_prepare_apim_swap <- function(persons,contract,output_dir,source_paths=ch
   j<-match(spouse,id);linked<-!is.na(spouse)
   charls_swap_assert(any(linked),'No documented spouse links')
   charls_swap_assert(!any(linked&id==spouse),'Self spouse link')
+  charls_swap_assert(!anyDuplicated(spouse[linked]),'Multiple persons claim the same spouse')
   # 只有来源范围外的配偶可记录排除；存在但不互指的关系属于身份冲突，直接阻断。
   observed<-linked&!is.na(j)
   charls_swap_assert(all(!is.na(spouse[j[observed]])&spouse[j[observed]]==id[observed]),'Nonreciprocal spouse link')
   valid<-observed
   charls_swap_assert(any(valid),'No reciprocal spouses present in the declared source')
-  charls_swap_assert(is.logical(persons$health_module_present)&&all(persons$health_module_present[valid]),
-    'Missing health module for a reciprocal baseline spouse; inspect the source join before item missingness')
-  sex<-persons$sex;charls_swap_assert(is.numeric(sex)&&all(sex[valid]%in%contract$member_values),'Unknown member role code')
-  first<-which(valid&sex==contract$member_values[1]);second<-j[first]
-  charls_swap_assert(length(first)>0&&all(sex[second]==contract$member_values[2])&&length(first)*2==sum(valid),
-    'Spouse pairs do not each contain one declared member role')
+  # 先验证所有互指关系的身份与社区，再评估整对资格，排除不能掩盖冲突。
+  pair_first<-which(valid&seq_along(id)<j);pair_second<-j[pair_first]
   community<-persons$community
   charls_swap_assert(is.character(community)&&all(!is.na(community[valid])&nzchar(community[valid]))&&
-    all(community[first]==community[second]),'Missing or discordant spouse community')
+    all(community[pair_first]==community[pair_second]),'Missing or discordant spouse community')
+  health<-persons$health_module_present;sex<-persons$sex
+  charls_swap_assert(is.logical(health)&&!anyNA(health[valid]),'Health module presence must be known logical values')
+  charls_swap_assert(is.numeric(sex),'Member role codes must be numeric')
+  health_missing<-!health[pair_first]|!health[pair_second]
+  role_missing<-is.na(sex[pair_first])|is.na(sex[pair_second])
+  outside<-!is.na(sex)&!sex%in%contract$member_values
+  role_outside<-outside[pair_first]|outside[pair_second]
+  role_same<-!role_missing&!role_outside&sex[pair_first]==sex[pair_second]
+  role_invalid<-role_missing|role_outside|role_same
+  ineligible<-health_missing|role_invalid
+  policy<-if(is.null(contract$pair_eligibility))'strict' else contract$pair_eligibility
+  if(identical(policy,'strict')) {
+    charls_swap_assert(!any(health_missing),'Missing health module for a reciprocal baseline spouse; inspect the source join before item missingness')
+    charls_swap_assert(!any(role_missing|role_outside),'Unknown member role code')
+    charls_swap_assert(!any(role_same),'Spouse pairs do not each contain one declared member role')
+  }
+  exclusions<-list(policy=policy,reciprocal_pairs=length(pair_first),missing_health=sum(health_missing),
+    missing_role=sum(role_missing),outside_role=sum(role_outside),same_role=sum(role_same),
+    invalid_role=sum(role_invalid),health_role_overlap=sum(health_missing&role_invalid),
+    missing_outside_role_overlap=sum(role_missing&role_outside),
+    excluded_pairs=sum(ineligible),remaining_pairs=sum(!ineligible))
+  eligible<-valid
+  eligible[c(pair_first[ineligible],pair_second[ineligible])]<-FALSE
+  first<-which(eligible&sex==contract$member_values[1]);second<-j[first]
+  charls_swap_assert(length(first)>0&&all(sex[second]==contract$member_values[2])&&length(first)*2==sum(eligible),
+    'No eligible distinguishable spouse pairs remain')
   # CESD 十项全有效才计总分，第 5/8 项反向；保留逐项无效计数，不填补。
   item_cols<-paste0('cesd',1:10);charls_swap_assert(all(vapply(persons[item_cols],is.numeric,logical(1))),'CESD items must be numeric codes')
   raw<-as.matrix(persons[item_cols]);ok<-is.finite(raw)&raw%in%1:4
@@ -207,7 +293,7 @@ charls_prepare_apim_swap <- function(persons,contract,output_dir,source_paths=ch
   # 输出仅本机私有证据；公开仓库只提交生成器。
   receipt<-list(status='PASS_PREPARE_ONLY',wave=contract$wave,persons=nrow(persons),
     absent_spouse=sum(!linked),spouse_outside_source=sum(linked&is.na(j)),reciprocal_persons=sum(valid),
-    couples=nrow(wide),complete_apim=sum(cc_apim),complete_apimem=sum(cc_med),
+    pair_eligibility=exclusions,couples=nrow(wide),complete_apim=sum(cc_apim),complete_apimem=sum(cc_med),
     invalid_cesd_by_item=as.list(setNames(colSums(invalid),item_cols)),invalid_adl=sum(bad_adl),invalid_age=sum(bad_age),
     predictor_rank_checks=ranks,join_policy=contract$join_policy,
     adl_completeness=contract$adl_completeness,member_labels=contract$member_labels,
