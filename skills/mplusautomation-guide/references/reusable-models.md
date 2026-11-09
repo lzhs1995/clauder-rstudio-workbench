@@ -39,6 +39,12 @@ and imputations must be prepared explicitly. This helper handles one numeric
 data frame; pooled multiple-imputation workflows still require the documented
 staged-data and imputation-count contract.
 
+For a two-process covariance LGCM with fixed time scores, compose the existing
+growth and mapping helpers with `parallel_growth_model_syntax()` in
+`scripts/growth_time_basis.R`. The [PP-LGCM mapping contract](pp-lgcm-source-variable-mapping.md)
+specifies the two process roles, covariates and compile-only reuse check. This
+entry does not generate directed cross-process paths or latent interactions.
+
 Save the mapping and reviewed syntax alongside the study's input manifest.
 Use a new model ID/run directory when data or scientific specifications change.
 The fingerprint changes with the mapped model object; a renamed source column

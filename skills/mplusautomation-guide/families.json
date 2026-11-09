@@ -55,7 +55,8 @@
         "scripts/mplus_workflow.R:run_mplus_model",
         "scripts/growth_time_basis.R:growth_time_basis",
         "scripts/growth_time_basis.R:growth_model_syntax",
-        "scripts/growth_time_basis.R:check_growth_statements"
+        "scripts/growth_time_basis.R:check_growth_statements",
+        "scripts/growth_time_basis.R:parallel_growth_model_syntax"
       ],
       "config_example": null,
       "docs": [
@@ -431,6 +432,17 @@
       "lang": "python",
       "function": null,
       "args": [],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "pp_lgcm_compile": {
+      "path": "scripts/test_pp_lgcm_compile_20261108.R",
+      "lang": "R",
+      "function": "test_pp_lgcm_compile",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml"
     }
@@ -1024,26 +1036,31 @@
       "summary": "多过程潜增长、潜交互与多重插补；CFPS 与 CHARLS 两条数据线。skill 提供执行层与验收规则，模型规格在研究项目里。",
       "routes": [
         "external_project",
-        "template_bundle"
+        "template_bundle",
+        "mplus_object_mapping"
       ],
-      "code_status": "doc_only",
+      "code_status": "template",
       "data_formats": [
-        "archived_dat"
+        "archived_dat",
+        "in_memory"
       ],
       "docs": [
         "references/pp-lgcm-worked-example.md",
+        "references/pp-lgcm-source-variable-mapping.md",
         "references/pp-lgcm-document-reconciliation.md",
         "references/latent-product-full-mi.md",
         "references/mac-windows-remote.md"
       ],
       "acceptance_doc": "references/cfps-acceptance.md",
       "tests": [
-        "rstudio_queue_admission_py"
+        "rstudio_queue_admission_py",
+        "pp_lgcm_compile"
       ],
       "evidence": {
         "synthetic_compile": {
-          "status": "not_started",
-          "note": "合成夹具在外部项目"
+          "status": "pass",
+          "source": "pp_lgcm_compile",
+          "note": "只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计"
         },
         "native_synthetic": {
           "status": "not_started"
@@ -1058,13 +1075,15 @@
       },
       "freshness_files": [
         "scripts/run_rstudio_mplus_batch.R",
-        "scripts/durable_mplus_worker.py"
+        "scripts/durable_mplus_worker.py",
+        "scripts/growth_time_basis.R",
+        "scripts/model_mapping.R"
       ],
       "thesis_refs": [
         "PP-LGCM 稿表 4.2.1、4.3.1、4.4.2.1"
       ],
       "gaps": [
-        "skill 内没有 PP-LGCM 建模入口或模板；历史生产脚本与审计脚本都在论文工作区",
+        "parallel_growth_model_syntax() 只编译固定时间的双过程协变型 LGCM；自由载荷、跨过程定向路径、观测残差相关、交互与多重插补仍要外部已审规格，历史生产脚本在论文工作区",
         "schema-2 配置编译器只接受 APIM 系家族，PP-LGCM 不能走该通道"
       ]
     },
@@ -1112,7 +1131,7 @@
       "thesis_refs": [],
       "gaps": [
         "原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）",
-        "growth_model_syntax() 只写单一过程的增长因子；并行过程、协变量、分类结果仍需手写 MODEL",
+        "growth_model_syntax() 只写单一过程的增长因子；固定时间的双过程协变型模型见 PP_LGCM 的 parallel_growth_model_syntax()，跨过程定向路径、交互、分类结果仍需手写 MODEL",
         "真实数据换源未排期"
       ]
     }

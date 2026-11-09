@@ -5,6 +5,12 @@ R branches `absolutive`, `relative`, `relative2` and `relative3`. It is a
 project-specific example inside the general MplusAutomation guide. It does
 not claim that the manuscript has been fully reproduced.
 
+For the portable two-process covariance LGCM compiler and a synthetic column
+rename/reorder example, see [PP-LGCM source and variable mapping](pp-lgcm-source-variable-mapping.md).
+That fixed-time compiler covers a limited model specification; the production
+paths, free loadings, interactions and imputation workflows below require
+their own reviewed study specifications.
+
 ## Model graph from the manuscript
 
 The manuscript tables define independent model families. A table row is not a

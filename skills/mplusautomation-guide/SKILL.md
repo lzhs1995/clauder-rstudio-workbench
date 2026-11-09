@@ -56,7 +56,7 @@ whitelisted real-data receipts. After editing `families.json`, run
 | LPA_LCA | template | pass* | — | — | readback | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
 | LTA | template | pass* | — | — | readback | [lta-workflow.md](references/lta-workflow.md) |
 | MS_LTA | template | pass* | — | — | readback | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
-| PP_LGCM | doc_only | —* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
+| PP_LGCM | template | pass* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
 | OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
 
 `*`: the evidence has a stated limit; see [family-registry.md](references/family-registry.md).
@@ -116,6 +116,16 @@ indefinite wait when measured headroom satisfies the contract.
 
 第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时使用 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，显式固定连续/分类指标、DEFINE、标准化和生产者；该文档是配置与验收合同，不是通用自动编译器入口。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
 `scripts/test_ch7_mixture_family_20261105.R` 用合成数据生成并核验 LPA/LCA、四波 LTA、MS-LTA 与 Step-3 的输入，只调用 `mplusObject()`/`mplusModeler(run=0)`，不启动 Mplus；它不说明引擎接受语法或模型收敛。
+
+## Parallel-process growth (PP-LGCM)
+
+For a two-process covariance LGCM with fixed time scores, use
+`parallel_growth_model_syntax()` in `scripts/growth_time_basis.R`, then pass its
+`variables` and `model` to `mplus_from_mapping()`. See
+[PP-LGCM source and variable mapping](references/pp-lgcm-source-variable-mapping.md)
+for process roles, time coding and covariate subsets. The synthetic fixture
+proves column rename/reorder compilation only; native execution and advanced
+production PP-LGCM specifications require separate evidence.
 
 ## Mac 控制 Windows
 
