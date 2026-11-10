@@ -122,6 +122,8 @@ MS-LTA 2/2打印一致；唯一最终失败为 `MI_4W_FREE`，按既有裁定结
   `ch7_step3_binding()` 核 Step-1 存盘到 Step-3 输入的绑定。
 - 合成合同：`scripts/test_ch7_mixture_family_20261105.R`、`scripts/test_ch7_mixture_tools_20261105.R`。
 
+- `scripts/ch7_transition_flow.R`：显式波次/类别语义映射下的节点、加权转移流与 networkD3 widget；见[独立流量图合同](chapter7-transition-flow.md)。合成合同通过与历史 F30/F31、原稿绑定及真实换源分别验收。
+
 ## 可复现目录合同
 
 每批复盘目录必须有：

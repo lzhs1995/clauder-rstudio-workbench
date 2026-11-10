@@ -47,6 +47,7 @@ jobs:
             any::haven
             any::digest
             any::jsonlite
+            any::networkD3
             any::ps
             any::ggplot2
             any::officer

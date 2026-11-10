@@ -271,3 +271,4 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Shared test `scripts/test_compile_template_bundle.R` (CI mplus-guide-family-tests.yml): template_bundle 路线的保持式编译器合同（合成模板，不针对某个家族）
 - Shared test `scripts/test_template_contracts.py` (CI comparegroups-guide.yml): template_bundle 路线的执行规格读取与模板语句盘点合同（合成输入，不针对某个家族）
 - Shared test `scripts/test_windows_coordinator.py` (CI comparegroups-guide.yml): 共用 Windows 执行层的调度所有权与回滚合同（假进程，不针对某个家族）
+- Shared test `scripts/test_ch7_transition_flow.R` (CI mplus-guide-family-tests.yml): 显式波次/类别映射下的普通posterior加权流与Movers缩放条件流；合成数据和widget载荷合同，不作为F30/F31或真实换源验收

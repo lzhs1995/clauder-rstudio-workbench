@@ -124,6 +124,8 @@ indefinite wait when measured headroom satisfies the contract.
 第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时使用 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，显式固定连续/分类指标、DEFINE、标准化和生产者；该文档是配置与验收合同，不是通用自动编译器入口。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
 `scripts/test_ch7_mixture_family_20261105.R` 用合成数据生成并核验 LPA/LCA、四波 LTA、MS-LTA 与 Step-3 的输入，只调用 `mplusObject()`/`mplusModeler(run=0)`，不启动 Mplus；它不说明引擎接受语法或模型收敛。
 
+For existing transition estimates, use the [explicit transition-flow contract](references/chapter7-transition-flow.md) and `scripts/ch7_transition_flow.R` to prepare nodes/links and a Sankey widget. Overall posterior-weighted flows and scaled mover-conditional flows are separate modes. This synthetic-tested interface does not close historical F30/F31 or real-data source swaps.
+
 ## Parallel-process growth (PP-LGCM)
 
 For a two-process covariance LGCM with fixed time scores, use

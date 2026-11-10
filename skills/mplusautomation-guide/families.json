@@ -462,6 +462,18 @@
       ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml"
+    },
+    "ch7_transition_flow": {
+      "path": "scripts/test_ch7_transition_flow.R",
+      "lang": "R",
+      "function": "test_ch7_transition_flow",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml",
+      "shared_purpose": "显式波次/类别映射下的普通posterior加权流与Movers缩放条件流；合成数据和widget载荷合同，不作为F30/F31或真实换源验收"
     }
   },
   "families": {
