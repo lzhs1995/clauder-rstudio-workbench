@@ -96,10 +96,20 @@ test_charls_apim_swap <- function(skill_root,test_root,engine,python) {
   check('harmonized_future_only_rows_excluded_by_baseline_anchor',nrow(anchored)==46L&&
     attr(anchored,'charls_source_evidence')$harmonized_without_demographic==2L)
   # 显式整对资格策略：各原因与交集按互指夫妻计数，默认仍逐项阻断。
-  blocks_with<-function(expr,message) {
+  blocks_with<-function(expr,message,exact=FALSE) {
     error<-tryCatch({force(expr);NULL},error=identity)
-    inherits(error,'error')&&grepl(message,conditionMessage(error),fixed=TRUE)
+    inherits(error,'error')&&if(exact)identical(conditionMessage(error),message) else
+      grepl(message,conditionMessage(error),fixed=TRUE)
   }
+  # 旧合同不能仅靠新增字段偷开官方映射或零缺失；两个拒绝原因分别精确断言。
+  bad_contract<-contract;bad_contract$spouse_link$spouse_missing_values<-'0'
+  check('legacy_contract_rejects_declared_zero_missing',blocks_with(charls_swap_validate_contract(bad_contract),
+    'Extra spouse missing codes require the explicit official crosswalk contract',exact=TRUE))
+  bad_contract<-contract
+  bad_contract$spouse_link$crosswalk<-list(source='harmonized',from_column='ID_w1',to_column='ID',
+    sha256=charls_swap_sha(paths[['harmonized']]))
+  check('legacy_contract_rejects_crosswalk_declaration',blocks_with(charls_swap_validate_contract(bad_contract),
+    'Extra spouse missing codes require the explicit official crosswalk contract',exact=TRUE))
   optional<-contract;optional$pair_eligibility<-'exclude_ineligible_pairs'
   check('pair_policy_default_remains_strict',identical(contract$pair_eligibility,'strict'))
   old_contract<-contract;old_contract$pair_eligibility<-NULL
@@ -118,6 +128,14 @@ test_charls_apim_swap <- function(skill_root,test_root,engine,python) {
     check(paste0('whole_pair_excluded_',label),audit[[case$reason]]==1&&audit$excluded_pairs==1&&
       audit$remaining_pairs==23&&nrow(table)==23&&!any(c(pid[1],pid[2])%in%c(table$member1_id,table$member2_id)))
   }
+  # 双方同为域外码也只属于域外角色，不能重复记到有效角色同码原因。
+  bad<-persons;bad$sex[1:2]<-0
+  result<-charls_prepare_apim_swap(bad,optional,file.path(test_root,'both_outside_roles'),paths)
+  audit<-result$receipt$pair_eligibility;table<-haven::read_dta(result$data_path)
+  check('both_outside_roles_not_counted_as_same_role',audit$outside_role==1&&audit$same_role==0&&
+    audit$missing_role==0&&audit$invalid_role==1&&audit$missing_health==0&&audit$health_role_overlap==0&&
+    audit$excluded_pairs==1&&audit$remaining_pairs==23&&nrow(table)==23&&
+    !any(c(pid[1],pid[2])%in%c(table$member1_id,table$member2_id)))
   bad<-persons;bad$health_module_present[c(1,3)]<-FALSE;bad$sex[c(3,5)]<-NA;bad$sex[4]<-0;bad$sex[7]<-2
   result<-charls_prepare_apim_swap(bad,optional,file.path(test_root,'exclude_overlap'),paths)
   audit<-result$receipt$pair_eligibility
@@ -171,6 +189,14 @@ test_charls_apim_swap <- function(skill_root,test_root,engine,python) {
   result<-charls_prepare_apim_swap(crosswalk_persons,crosswalk_contract,file.path(test_root,'crosswalk_prepared'),crosswalk_paths)
   check('crosswalk_preparation_preserves_source_hash',identical(result$receipt$source_evidence$crosswalk$sha256,
     crosswalk_contract$spouse_link$crosswalk$sha256)&&result$receipt$absent_spouse==2&&result$receipt$couples==23)
+  # 新增冲突行排在前面且保留全部原行；删掉唯一性门后不会靠缺键门侥幸拒绝。
+  duplicate_old<-crosswalk_data[1,,drop=FALSE];duplicate_old$ID<-sprintf('%012d',n+100L)
+  duplicate_old<-rbind(duplicate_old,crosswalk_data)
+  duplicate_path<-file.path(fixture,'crosswalk_duplicate_old_retained.dta');haven::write_dta(duplicate_old,duplicate_path)
+  duplicate_paths<-crosswalk_paths;duplicate_paths[['harmonized']]<-duplicate_path
+  duplicate_contract<-crosswalk_contract;duplicate_contract$spouse_link$crosswalk$sha256<-charls_swap_sha(duplicate_path)
+  check('duplicate_crosswalk_old_id_rejected_by_uniqueness_gate',blocks_with(
+    charls_swap_read_sources(duplicate_paths,duplicate_contract),'Conflicting official crosswalk identity',exact=TRUE))
   # 官方目标身份允许与旧插零结果不同，两个模块必须跟随官方目标，不能静默掉行。
   remapped<-crosswalk_data;remapped$ID[1:2]<-sprintf('%012d',n+c(2L,3L))
   remap_path<-file.path(fixture,'official_remapped_synthetic_v2.dta');haven::write_dta(remapped,remap_path)
