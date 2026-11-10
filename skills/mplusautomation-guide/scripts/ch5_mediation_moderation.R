@@ -213,18 +213,49 @@ ch5_check_inp_columns <- function(inp, data, dat_file, max_width = 90L) {
       if (length(off)) add("DAT_CONTENT_MISMATCH", sprintf("DAT columns differ from data for: %s", paste(off, collapse = " ")))
     }
   }
-  # DEFINE 左侧是新变量；右侧引用必须已在 NAMES 或前面的 DEFINE 里
+  # DEFINE 按出现顺序核声明；仅支持单变量赋值与 IF (...) THEN 单变量赋值。
   reserved <- c("log", "log10", "exp", "sqrt", "abs", "sin", "cos", "tan", "asin", "acos", "atan", "eq", "ne", "gt",
                 "lt", "ge", "le", "and", "or", "not", "if", "then", "else", "center", "grandmean", "groupmean", "cut",
                 "mean", "sum", "standardize", "do", "missing")
-  ids <- function(s) setdiff(unique(tolower(unlist(regmatches(s, gregexpr("\\b[A-Za-z][A-Za-z0-9_]*\\b",
-                                                                          gsub("\\b[0-9.]+([eE][-+]?[0-9]+)?\\b", " ", s), perl = TRUE))))), reserved)
+  ids <- function(s, ignored = reserved) setdiff(unique(tolower(unlist(regmatches(s, gregexpr("\\b[A-Za-z][A-Za-z0-9_]*\\b",
+                                                                          gsub("\\b[0-9.]+([eE][-+]?[0-9]+)?\\b", " ", s), perl = TRUE))))), ignored)
+  define_ids <- function(s) {
+    # 只排除真正的函数调用；裸 log/mean 等仍是需要声明的变量。_MISSING 是 Mplus 常量。
+    functions <- c("log", "log10", "exp", "sqrt", "abs", "sin", "cos", "tan", "asin", "acos", "atan", "mean", "sum")
+    s <- gsub(paste0("(?i)\\b(?:", paste(functions, collapse = "|"), ")\\b(?=\\s*\\()"), " ", s, perl = TRUE)
+    s <- gsub("(?i)\\b_MISSING\\b", " ", s, perl = TRUE)
+    ids(s, c("eq", "ne", "gt", "lt", "ge", "le", "and", "or", "not"))
+  }
+  balanced <- function(s) {
+    chars <- strsplit(s, "", fixed = TRUE)[[1]]
+    depth <- cumsum((chars == "(") - (chars == ")"))
+    !length(depth) || (all(depth >= 0L) && tail(depth, 1L) == 0L)
+  }
+  assignment <- "^([A-Za-z][A-Za-z0-9_]*)\\s*=\\s*(.+)$"
   defined <- character()
   for (s in Filter(function(s) s$section == "DEFINE", st)) {
-    m <- regmatches(s$text, regexec("^([A-Za-z][A-Za-z0-9_]*)\\s*=\\s*(.*)$", s$text, perl = TRUE))[[1]]
-    if (!length(m)) next
-    miss <- setdiff(ids(m[3]), c(nm, defined))
-    if (length(miss)) add("DEFINE_NOT_IN_NAMES", sprintf("%s = ... uses %s", m[2], paste(miss, collapse = " ")))
+    text <- s$text; condition <- ""; supported <- TRUE
+    if (grepl("^(?i:IF)\\b", text, perl = TRUE)) {
+      rest <- trimws(sub("^(?i:IF)\\s*", "", text, perl = TRUE))
+      chars <- strsplit(rest, "", fixed = TRUE)[[1]]
+      depth <- cumsum((chars == "(") - (chars == ")"))
+      end <- which(depth == 0L)[1]
+      supported <- startsWith(rest, "(") && !is.na(end) && end > 2L
+      if (supported) {
+        # 找到最外层条件的首个闭括号，支持嵌套；不让贪婪正则吞掉后续控制语句。
+        condition <- trimws(substr(rest, 2L, end - 1L))
+        suffix <- trimws(substring(rest, end + 1L))
+        supported <- nzchar(condition) && grepl("^(?i:THEN)\\s+", suffix, perl = TRUE)
+        text <- sub("^(?i:THEN)\\s+", "", suffix, perl = TRUE)
+      }
+    }
+    m <- regmatches(text, regexec(assignment, text, perl = TRUE))[[1]]
+    if (!supported || !length(m) || !nzchar(trimws(m[3])) || !balanced(condition) || !balanced(m[3]) ||
+        grepl("(?i)\\b(if|then|else|do|enddo)\\b", paste(condition, m[3]), perl = TRUE)) {
+      add("UNSUPPORTED_DEFINE_SYNTAX", s$text); next
+    }
+    miss <- setdiff(define_ids(paste(condition, m[3])), c(nm, defined))
+    if (length(miss)) add("DEFINE_NOT_IN_NAMES", sprintf("%s condition/RHS uses %s", m[2], paste(miss, collapse = " ")))
     defined <- c(defined, tolower(m[2]))
   }
   uv <- toks(kv("VARIABLE", "usev"))

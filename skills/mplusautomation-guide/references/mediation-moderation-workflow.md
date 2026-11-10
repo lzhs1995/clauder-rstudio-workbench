@@ -81,7 +81,13 @@ SE 逐位一致；去掉协方差项的 SE 会被判错。
    - `NAMES` 与 DAT 的列集合、列序（`NAMES_DAT_SET_MISMATCH`、`NAMES_DAT_ORDER_MISMATCH`，按 Mplus 规则不分大小写）；
    - 读回 DAT，核字段数、行数和逐列内容（`DAT_FIELD_COUNT_MISMATCH`、`DAT_ROW_COUNT_MISMATCH`、`DAT_CONTENT_MISMATCH`）；
    - `DATA: FILE` 按 `.inp` 所在目录解析后必须就是这个 DAT，按路径判，不按文件名（`DATA_FILE_MISMATCH`）；
-   - `USEVARIABLES`、`DEFINE` 右侧、`CATEGORICAL`、`USEOBSERVATIONS`、`GROUPING` 引用的变量都已声明；
+   - `USEVARIABLES`、`CATEGORICAL`、`USEOBSERVATIONS`、`GROUPING` 引用的变量都已声明；
+   - `DEFINE` 支持单变量赋值 `target = expression;` 和 `IF (condition) THEN target = expression;`。
+     条件与右侧引用都必须出现在 `NAMES` 或前序 `DEFINE`；本条核完引用后才登记 target，合法派生变量可进入
+     `USEVARIABLES`。支持多行、嵌套括号、不分大小写和 `_MISSING` 常量；函数名只有作为调用时才免于变量声明检查。
+     其余 DEFINE 命令（如 `CENTER`、`STANDARDIZE`、`DO`、`ELSE`）及残缺语句明确报
+     `UNSUPPORTED_DEFINE_SYNTAX`，不静默跳过。此守卫核变量声明与上述语句形状，不替代完整表达式语法检查，
+     也不证明条件赋值覆盖每一行。IF-THEN 与缺失常量写法见[官方 DEFINE 说明](https://www.statmodel.com/HTML_UG/chapter15v8.htm)；
    - 每行不超过 90 字节（`LINE_TOO_LONG`；`createModels()` 生成时会自己折行，手改 `.inp` 时容易超）。
    `NAMES` 用 `a-b` 简写时报 `UNSUPPORTED_LIST_SYNTAX`，请逐个列出变量名。失败时抛 `ch5_swap_error`，`reasons` 里列出全部原因代码。
 6. Mplus 阈值在概率式中带负号：`P(Y=1)=1/(1+EXP(τ−βx))`。反事实分解照此写；

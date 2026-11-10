@@ -254,6 +254,73 @@ test_ch5_templates_extended <- function(output_dir, skill_root) {
   # 12 Mplus 变量名不分大小写：数据列名大写、NAMES 小写仍算对齐
   du <- d0; names(du) <- toupper(names(du))
   reject_as('swap_columns_case_insensitive', ch5_check_inp_columns(lin0, du, rounds$original$dat), character())
+  # 13 列数/列序与内容不变，只删 DAT 最后一行；仍用完整 data 比较，单独覆盖行数门。
+  short_dir <- file.path(swap_dir, 'neg_one_row_short'); dir.create(short_dir); file.copy(lin0, short_dir)
+  short_dat <- file.path(short_dir, 'ch5_synthetic.dat')
+  dat_lines <- readLines(rounds$original$dat, warn = FALSE)
+  writeLines(head(dat_lines, -1L), short_dat)
+  short_shape <- utils::read.table(short_dat, header = FALSE, na.strings = '.', colClasses = 'numeric')
+  check('swap_one_row_short_fixture', ncol(short_shape) == ncol(d0) && nrow(short_shape) == nrow(d0) - 1L)
+  reject_as('swap_reject_dat_one_row_short',
+            ch5_check_inp_columns(file.path(short_dir, basename(lin0)), d0, short_dat), 'DAT_ROW_COUNT_MISMATCH')
+  # 14 条件 DEFINE：条件和 RHS 均按语句进入前的 NAMES/derived 核声明，不静默跳过未知语句。
+  define_dir <- file.path(swap_dir, 'define_probes'); dir.create(define_dir)
+  file.copy(rounds$original$dat, define_dir)
+  define_dat <- file.path(define_dir, 'ch5_synthetic.dat')
+  define_base <- readLines(cf0, warn = FALSE)
+  check('swap_define_fixture_headers', sum(grepl('^DEFINE:', define_base)) == 1L &&
+          sum(grepl('^USEVARIABLES =', define_base)) == 1L)
+  probe_define <- function(tag, statements, use = character()) {
+    x <- append(define_base, statements, after = grep('^DEFINE:', define_base))
+    if (length(use)) {
+      i <- grep('^USEVARIABLES =', x)
+      x[i] <- sub(';', paste0(' ', paste(use, collapse = ' '), ';'), x[i], fixed = TRUE)
+    }
+    if (any(nchar(x, type = 'bytes') > 90L)) stop('DEFINE fixture exceeds line limit: ', tag)
+    path <- file.path(define_dir, paste0(tag, '.inp')); writeLines(x, path)
+    ch5_check_inp_columns(path, d0, define_dat)
+  }
+  got <- probe_define('conditional_target', 'IF (xa EQ 1) THEN flag = 1;', 'flag')
+  check('swap_define_if_target_in_usevariables', 'flag' %in% got$defined && 'flag' %in% got$usevariables)
+  got <- probe_define('nested_multiline_prior', c('base = xa;', 'iF ((base EQ 1) AND',
+    ' (xb GT 0 OR NOT (ma EQ 1))) tHeN flag = base + log(abs(xb) + 1e-3);',
+    'nextvar = flag + 1;'), c('flag', 'nextvar'))
+  check('swap_define_nested_multiline_prior', all(c('base', 'flag', 'nextvar') %in% got$defined))
+  got <- probe_define('missing_constant', 'IF (xa EQ _MISSING) THEN flag = _MISSING;', 'flag')
+  check('swap_define_missing_constant', 'flag' %in% got$defined)
+  got <- probe_define('declared_reassignment', c('flag = xa;', 'IF (flag GE 0) THEN flag = flag + 1;'), 'flag')
+  check('swap_define_declared_reassignment', 'flag' %in% got$defined)
+  got <- probe_define('function_named_variable', c('log = xa;', 'IF (log EQ 1) THEN flag = log;'), 'flag')
+  check('swap_define_declared_function_named_variable', all(c('log', 'flag') %in% got$defined))
+  missing_reference <- list(
+    condition = 'IF (zzundecl EQ 1) THEN flag = 1;',
+    rhs = 'IF (xa EQ 1) THEN flag = zzundecl;',
+    condition_forward = c('IF (future EQ 1) THEN flag = 1;', 'future = xa;'),
+    rhs_forward = c('IF (xa EQ 1) THEN flag = future;', 'future = xa;'),
+    self_reference = 'IF (xa EQ 1) THEN flag = flag + 1;',
+    bare_function_condition = 'IF (log EQ 1) THEN flag = 1;',
+    bare_function_rhs = 'IF (xa EQ 1) THEN flag = mean;',
+    unknown_function = 'IF (xa EQ 1) THEN flag = unknown(xa);'
+  )
+  # 每例只允许声明缺失这一个原因，避免其它门误杀。
+  for (tag in names(missing_reference))
+    reject_as(paste0('swap_reject_define_reference_', tag), probe_define(tag, missing_reference[[tag]]), 'DEFINE_NOT_IN_NAMES')
+  unsupported <- list(
+    no_close = 'IF (xa EQ 1 THEN flag = 1;',
+    extra_close = 'IF (xa EQ 1)) THEN flag = 1;',
+    empty_condition = 'IF ( ) THEN flag = 1;',
+    empty_rhs = 'IF (xa EQ 1) THEN flag = ;',
+    no_then = 'IF (xa EQ 1) flag = 1;',
+    no_target = 'IF (xa EQ 1) THEN = 1;',
+    no_equals = 'IF (xa EQ 1) THEN flag 1;',
+    rhs_parentheses = 'IF (xa EQ 1) THEN flag = log(xa;',
+    else_branch = 'IF (xa EQ 1) THEN flag = 1 ELSE flag = 0;',
+    empty_assignment = 'flag = ;',
+    center = 'CENTER xa (GRANDMEAN);',
+    standardize = 'STANDARDIZE xa;',
+    do_loop = 'DO #i = 1 TO 2;')
+  for (tag in names(unsupported))
+    reject_as(paste0('swap_reject_define_unsupported_', tag), probe_define(tag, unsupported[[tag]]), 'UNSUPPORTED_DEFINE_SYNTAX')
   check('no_engine_outputs', length(list.files(output_dir, pattern = '\\.(out|gh5)$', recursive = TRUE)) == 0L)
   jsonlite::write_json(list(test = 'test_ch5_templates_extended', status = 'PASS', checks = length(checks),
                             generated_inp = length(inps), engine_calls = 0L,
