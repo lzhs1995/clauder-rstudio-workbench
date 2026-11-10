@@ -150,6 +150,53 @@ def checked_file(record):
     return path
 
 
+def windows_long_path(path):
+    """只展开现存目录项的 Windows 短名；不把其他硬链接名称视为同一路径。"""
+    import ctypes
+    from ctypes import wintypes
+    function = ctypes.WinDLL("kernel32", use_last_error=True).GetLongPathNameW
+    function.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    function.restype = wintypes.DWORD
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = function(str(path), buffer, len(buffer))
+    require(0 < length < len(buffer), "python_long_path_resolution_failed")
+    return buffer.value
+
+
+def validate_python_identity(record, executable=None):
+    """兼容 R system2 的短名；目录项、文件对象和固定 SHA 必须同时一致。"""
+    expected = hash_string(required(record, "sha256"))
+    paths = [Path(required(record, "path")), Path(sys.executable if executable is None else executable)]
+
+    def snapshot():
+        values = []
+        for path in paths:
+            require(path.is_absolute(), "python_executable_absolute_path_required")
+            reject_alias(path)
+            info = path.stat()
+            require(stat.S_ISREG(info.st_mode), "python_executable_regular_file_required")
+            values.append((info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns))
+        return values
+
+    def entries():
+        # 非 Windows 保留原有精确规范路径门；不改变其它配置路径的全局语义。
+        values = [Path(windows_long_path(path)) if os.name == "nt" else path for path in paths]
+        for path in values:
+            require(path.is_absolute(), "python_long_path_must_be_absolute")
+            reject_alias(path)
+        return [normalized(path) for path in values]
+
+    before, names = snapshot(), entries()
+    require(names[0] == names[1], "runner_python_differs_from_pinned_python")
+    require(os.path.samefile(*paths), "runner_python_file_identity_mismatch")
+    for path in paths:
+        require(sha256(path) == expected, "python_executable_hash_mismatch")
+    require(snapshot() == before and entries() == names and os.path.samefile(*paths),
+            "python_executable_changed_during_check")
+    return {"pinned_path": str(paths[0]), "executable_path": str(paths[1]), "expanded_path": names[0],
+            "sha256": expected}
+
+
 def tree_bytes(root):
     """只扫描本次隔离根；活动文件瞬时消失可忽略，其他读错误失败关闭。"""
     total = maximum = count = 0
@@ -244,7 +291,7 @@ def validate_config(config, config_path=None):
     for descriptor in files.values():
         path = checked_file(descriptor)
         require(not inside(path, root), "runtime_file_inside_mutable_root")
-    require(normalized(files["python"]["path"]) == normalized(sys.executable), "runner_python_differs_from_pinned_python")
+    validate_python_identity(files["python"])
     code = required(config, "code_files")
     require(isinstance(code, list) and len(code) >= 2, "code_files_empty_or_incomplete")
     code_paths = []
