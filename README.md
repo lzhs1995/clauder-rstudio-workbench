@@ -1,5 +1,9 @@
 # clauder-rstudio-workbench
 
+![ClaudeR RStudio Workbench — connect, describe, decompose, verify](docs/assets/workbench-logo.svg)
+
+[English](README.md) · [繁體中文](README.zh-TW.md)
+
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
 The `v0.6.7` release line targets the published ClaudeR
@@ -28,15 +32,47 @@ It supersedes the Windows-first development diary while preserving a
 
 Both installers discover every `skills/<name>/` directory that contains a `SKILL.md`:
 
-- **`clauder-rstudio-workbench`** — core skill: connect/preflight/async-guard/resource-gate/completion gates plus the parallel **fan-out** harness (one RStudio driving N async R workers with autonomous merge).
-- **`cmaverse-paired-mval`** — domain skill: a worked, executable example of the fan-out workflow for paired M=0/M=1 CMAverse bootstrap (7 mediators in parallel), with a generator and a validation gate.
-- **`comparegroups-guide`** — descriptive-statistics skill: contract-driven
+- **[`clauder-rstudio-workbench`](skills/clauder-rstudio-workbench/SKILL.md)** — core skill: connect/preflight/async-guard/resource-gate/completion gates plus the parallel **fan-out** harness (one RStudio driving N async R workers with autonomous merge).
+- **[`cmaverse-paired-mval`](skills/cmaverse-paired-mval/SKILL.md)** — domain skill: a worked, executable example of the fan-out workflow for paired M=0/M=1 CMAverse bootstrap (7 mediators in parallel), with a generator and a validation gate.
+- **[`comparegroups-guide`](skills/comparegroups-guide/SKILL.md)** — descriptive-statistics skill: contract-driven
   `compareGroups` computation, labelled-data audit, panel-safe dual output,
   true three-line DOCX rendering, numeric reconciliation, validation, and hashes.
-- **`mplusautomation-guide`** — MplusAutomation/Mplus 9 reproduction skill:
+- **[`mplusautomation-guide`](skills/mplusautomation-guide/SKILL.md)** — MplusAutomation/Mplus 9 reproduction skill:
   isolated Windows/macOS/WSL execution, ClaudeR/RStudio async polling,
   resource-gated parallel model batches, readModels diagnostics, MI/LRT
   acceptance, CFPS/CHARLS provenance, and manuscript/NLM release boundaries.
+
+The table of contents above describes this source tree. The pinned `v0.6.7`
+release contains the first three skills; `mplusautomation-guide` is a later
+addition on `main`. Use a reviewed commit containing that directory when you
+need it, rather than assuming an older release includes every current skill.
+
+## Using the skills with different agents
+
+Each `SKILL.md` is a readable entry point with relative links to its references
+and scripts. An agent with filesystem access and the required command or MCP
+capabilities can follow it explicitly. Automatic discovery, `$skill-name`
+shortcuts, native tool names, and config reload behaviour depend on the client;
+installing files does not prove that the current agent has loaded them.
+
+| Client or entry point | Supported setup in this repository | Verify before use |
+|---|---|---|
+| Codex | Installer-managed skills and optional `r-studio` MCP configuration; `agents/openai.yaml` where provided | Select the actual RStudio target and verify the current native tool chain |
+| Claude Code / GitHub Copilot CLI | Optional client-specific MCP configuration; read the skill explicitly if it is not discovered | Check that client's effective config and exposed tools |
+| Other capable agents | Read the selected `skills/<name>/SKILL.md` and resolve its relative files; configure MCP using the client's own supported mechanism | Treat compatibility as unverified until real calls succeed; no universal auto-install or native-call guarantee |
+
+Shared skill copies use `--sync-agents-skill` on macOS/Linux or
+`-SyncAgentsSkill` on Windows. A shared directory is a distribution location,
+not a promise that every client scans it. For example, ask an agent:
+
+```text
+Read skills/clauder-rstudio-workbench/SKILL.md from this checkout, select the
+intended RStudio session, and follow its connection and evidence workflow.
+```
+
+Installation, HTTP connectivity, independent MCP stdio, and agent-native calls
+remain distinct evidence layers. Preserve the existing task's permissions and
+scientific scope when following any skill.
 
 ## What This Installs
 
@@ -47,7 +83,7 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
 
 Neither installer modifies MCP client configuration unless an explicit configure switch is passed.
 
-The optional legacy `$clauder` alias is a thin adapter, not a fourth domain
+The optional legacy `$clauder` alias is a thin adapter, not a separate domain
 skill. Use `--sync-clauder-alias` (macOS/Linux) or `-SyncClaudeRAlias` (Windows)
 to refresh an old alias with backup. New users can invoke the core skill directly.
 
@@ -149,11 +185,12 @@ if ($LASTEXITCODE -ne 0) { throw "Installer failed with exit code $LASTEXITCODE"
 
 ## Running the CMAverse fan-out workflow
 
-Once installed, the `cmaverse-paired-mval` skill auto-loads in any agent that reads
-`skills/<name>/SKILL.md`. To trigger it, ask the agent to run the paired-mval
-CMAverse 4-way decomposition (the SKILL `description` matches on "CMAverse",
-"paired mval", "fan-out", "4-way decomposition"). The agent then drives this command
-chain (one RStudio session, N async R workers, autonomous merge):
+Read [the `cmaverse-paired-mval` skill](skills/cmaverse-paired-mval/SKILL.md)
+explicitly, or invoke it through a client that has discovered the installed
+skill. Its description includes "CMAverse", "paired mval", "fan-out", and
+"4-way decomposition"; those keywords do not guarantee automatic loading in
+all clients. The workflow uses the following command chain (one RStudio session,
+N async R workers, autonomous merge):
 
 ```powershell
 # 1. generate + validate a fan-out contract from your paired worker .R
@@ -369,7 +406,7 @@ After installation:
 1. Restart Codex only when MCP configuration or bridge source changed; an
    existing task cannot reliably hot-add a new native tool registry.
 2. Start the ClaudeR Addin in RStudio.
-3. Ask Codex to connect with `$clauder 连接Rstudio`.
+3. Ask Codex to connect with `$clauder-rstudio-workbench 连接RStudio` (or the optional installed `$clauder` alias).
 4. Verify `list_sessions`, `execute_r`, and a short `execute_r_async -> get_async_result` smoke test.
 5. For long tasks, require visible `Latest progress:` or final progress before claiming MCP async readiness.
 6. For formal completion, run the harness gate, for example:

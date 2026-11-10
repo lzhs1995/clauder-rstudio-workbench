@@ -7,3 +7,13 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+
+# Machine-local secrets/configuration; tracked history still requires review.
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+.secrets/
+secrets.local.*

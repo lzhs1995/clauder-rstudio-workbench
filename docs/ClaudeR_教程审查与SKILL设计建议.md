@@ -1,5 +1,7 @@
 # ClaudeR 教程审查与 SKILL 设计建议
 
+> 公開版去識別說明：下列原生證據與工作編號以明示別名呈現；原始憑據與完整映射保留於本機，不可把公開別名用作執行驗收。
+
 审查日期：2026-09-07。本文是版本化审查与整改台账，不替代 Release 验收记录。
 审查配对：workbench v0.6.1、ClaudeR 0.14.1.9002、bridge 0.14.5.post1。文中整改前基线和阶段证据均保留时间边界；部署状态须同时检查 Release、INSTALL_INFO 和当前原生证据。
 协作状态：用户因 Claude 欠费明确授权 Codex 独立接管；不再调用 Claude，也不声称有本轮联合终审。
@@ -95,8 +97,8 @@
 
 - list_sessions、connect_session、execute_r 成功。
 - 绑定既有 basic-regression-independent-v1，R PID 61484；另一既有会话 PID 67906 仍存活。
-- 单次提交异步 job 1e5188b3。24 秒时 get_async_result 返回 running，并有 Latest progress: stage=stage_5；之后原 job 完成 stage_7 / NATIVE_ASYNC_DONE。
-- native-smoke PASS evidence_id：291181f5-8956-4940-a8ab-045f650ae062；包含四个原生步骤的原始结果与哈希链。
+- 单次提交异步 job ASYNC_SMOKE_A。24 秒时 get_async_result 返回 running，并有 Latest progress: stage=stage_5；之后原 job 完成 stage_7 / NATIVE_ASYNC_DONE。
+- native-smoke PASS evidence_id：NATIVE_SMOKE_A；包含四个原生步骤的原始结果与哈希链。
 - 本轮没有重新启动 RStudio、取消研究任务或重复提交该异步任务。
 - 当前 Codex PID 为 35361，启动于 15:52:29 IST；之前诊断的 PID 45422 已不在。本轮未实施这次进程切换。因此不能宣称“旧进程原位热加载已修复”。
 - Codex 配置 SHA-256 仍为 cca37f6dcaf5a4d857fd1b97493153fe7a4943830d386952a09cad367c5d5382；本轮未修改。
@@ -116,7 +118,7 @@
 - 独立 MCP 60 分钟持续连接测试已启动，明确标为协议新建/绑定/关闭/重连，不冒充新建或恢复真实 agent 会话。最终时长、样本数和原 PID 存活情况留在本机报告。
 - 配置丢失时间附近，本 session 日志只显示只读工具调用；缺少进程级写文件审计，不能据此认定写入者。新日志只证明 workbench 自己的未来写入，不替未知历史行为补造因果链。
 - 本机已安装新 R 包和持久 bridge。安装后的新 R 进程确实加载 0.14.1.9002；原研究 R PID 保留并继续运行已加载的 0.14.1.9001。INSTALL_INFO 明确只是来源声明及入口哈希，不能替代 namespace/已运行 bridge 版本证明。
-- 新原生制表 job a6d3d73b 单次提交并完成，后台加载 0.14.1.9002，七阶段及面板三种输出通过。新四步证据 816b68ab-4dde-4f5c-b5a5-10b9a36ca8f5 被进程绑定 ensure-ready 接受；另一个独立进度测试 job 115186e9 在 10 秒时可见 stage_2，原 job 完成 stage_7。
+- 新原生制表 job TABLE_JOB_A 单次提交并完成，后台加载 0.14.1.9002，七阶段及面板三种输出通过。新四步证据 NATIVE_SMOKE_B 被进程绑定 ensure-ready 接受；另一个独立进度测试 job PROGRESS_JOB_A 在 10 秒时可见 stage_2，原 job 完成 stage_7。
 - 五类真实数据以最终统计源码重新生成：显式采用横向 9.5 磅的面板规格副本后 50/50 通过，展示 CSV 和有效统计数值未变。原规格及两次密度阻断证据保留；不把版式修改说成完全原样复现。
 - 通用修复已单独提交 [上游 PR #30](https://github.com/IMNMV/ClaudeR/pull/30)，基于 0.15.0 保留 plot_auto/tool_sets。移植版 bridge 37/37、发现层 11/11、R 功能与双进程回归通过，fork 分支三平台 CI 34125603582 通过；上游是否接受由维护者决定。
 - config_store 的锁只协调采用同一协议的写入者，外部写入冲突检测是有限时间点检查，不是对任意不合作程序的系统级写入拦截。没有“未来任何程序都不可能删配置”的保证。

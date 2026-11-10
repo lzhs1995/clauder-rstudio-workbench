@@ -52,7 +52,8 @@ class PlatformRuntimeTests(unittest.TestCase):
     def test_runtime_has_no_shared_user_path(self) -> None:
         for system in ("win32", "darwin", "linux"):
             runtime = resolve_runtime(system=system, environ={"HOME": "/portable", "USERPROFILE": "C:/portable"})
-            self.assertNotIn("/Users/lzhs", str(runtime.home))
+            expected_home = "C:/portable" if system == "win32" else "/portable"
+            self.assertEqual(runtime.home.as_posix(), expected_home)
         # Path.__str__ uses the host separator when the test runs under
         # Windows; compare the portable representation so the contract is
         # identical on Windows, macOS, and Linux.
