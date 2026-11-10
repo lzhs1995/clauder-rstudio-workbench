@@ -43,9 +43,9 @@ For changing data sources or variables, follow
 - Route `apim_v1_config`: `scripts/workflow.R:validate_apim_config`, `scripts/workflow.R:run_apim_workflow`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `archived_replay`: `scripts/durable_mplus_worker.py:main`, `scripts/verify_saved_batch.py:main`
-- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [apim-v2-data-adapter.md](apim-v2-data-adapter.md), [apim-paths.md](apim-paths.md)
+- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [apim-v2-data-adapter.md](apim-v2-data-adapter.md), [apim-paths.md](apim-paths.md), [charls-apim-swap-v2.md](charls-apim-swap-v2.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [synthetic-acceptance.md](synthetic-acceptance.md)
-- Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus)
+- Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
 - real_data_swap: pending; CFPS → CHARLS 换源已排期
@@ -61,9 +61,9 @@ APIM 中介模型：在 APIM 中加入成员中介变量（a/b 路径与间接�
 - Route `apim_v1_config`: `scripts/workflow.R:validate_apim_config`, `scripts/workflow.R:run_apim_workflow`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `archived_replay`: `scripts/durable_mplus_worker.py:main`, `scripts/verify_saved_batch.py:main`
-- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [effect-extraction-and-testing-families.md](effect-extraction-and-testing-families.md)
+- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [effect-extraction-and-testing-families.md](effect-extraction-and-testing-families.md), [charls-apim-swap-v2.md](charls-apim-swap-v2.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [synthetic-acceptance.md](synthetic-acceptance.md)
-- Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus)
+- Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
 - real_data_swap: pending; CFPS → CHARLS 换源已排期
@@ -79,12 +79,12 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Route `apim_v1_config`: `scripts/workflow.R:validate_apim_config`, `scripts/workflow.R:run_apim_workflow`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `archived_replay`: `scripts/durable_mplus_worker.py:main`, `scripts/verify_saved_batch.py:main`
-- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [binary-observed-interaction-computation.md](binary-observed-interaction-computation.md)
+- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [binary-observed-interaction-computation.md](binary-observed-interaction-computation.md), [charls-apim-moderated-swap-v1.md](charls-apim-moderated-swap-v1.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [synthetic-acceptance.md](synthetic-acceptance.md)
-- Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus)
+- Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_moderated_swap_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; 准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
+- real_data_swap: pending; 准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放
 - Thesis: 第四章
 - Gap: 没有排期的真实数据换源测试
@@ -98,12 +98,12 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Route `apim_v2_config`: `scripts/apim_v2_config.R:plan_apim_workflow`, `scripts/apim_v2_runtime.R:run_apim_workflow_v2`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `archived_replay`: `scripts/durable_mplus_worker.py:main`, `scripts/verify_saved_batch.py:main`
-- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md)
+- Docs: [APIM.md](../APIM.md), [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md), [charls-apim-moderated-swap-v1.md](charls-apim-moderated-swap-v1.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [apim-v2-implementation-acceptance.md](apim-v2-implementation-acceptance.md)
-- Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml)
+- Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_apim_moderated_swap_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `references/apim-v2-implementation-acceptance.md`; a 与 ab 路径为后加
-- real_data_swap: pending; 准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
+- real_data_swap: pending; 准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 历史模型只有 b 路径
 - Thesis: 第四章
 - Gap: 没有排期的真实数据换源测试
@@ -115,7 +115,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: mediation
 - Data formats: csv, dta
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖
@@ -124,7 +124,6 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
 - Gap: 原生合成验收等 Windows 计算窗口
-- Gap: freshness_files 暂空：tests/test_mplus_family_registry.py 以 MED 作无 freshness_files 的夹具
 
 ## MOD
 
@@ -133,7 +132,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: moderation
 - Data formats: csv, dta
 - Route `r_glm_moderation`: `scripts/ch5_moderation_route.R:ch5_moderation_spec`, `scripts/ch5_moderation_route.R:ch5_fit_moderation_spec`, `scripts/ch5_moderation_route.R:ch5_simple_slopes`, `scripts/ch5_moderation_route.R:ch5_plot_simple_slopes`
-- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_moderation_route_20261105.R` (CI mplus-ch5-synthetic.yml)
 - synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus
@@ -150,7 +149,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Aliases: moderated mediation
 - Data formats: csv, dta
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md)
+- Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对
@@ -169,7 +168,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Data formats: csv, archived_dat
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
+- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
 - Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
@@ -187,7 +186,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Data formats: csv, archived_dat
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
+- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
 - Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
@@ -206,7 +205,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Data formats: csv, archived_dat
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md)
+- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [ms-lta-workflow.md](ms-lta-workflow.md)
 - Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `ch7_mixture_compile`; 合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
@@ -227,7 +226,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Route `external_project`: `scripts/run_rstudio_mplus_batch.R:run_rstudio_mplus_batch`, `scripts/run_rstudio_family_queue.R:run_rstudio_family_queue`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
-- Docs: [pp-lgcm-worked-example.md](pp-lgcm-worked-example.md), [pp-lgcm-source-variable-mapping.md](pp-lgcm-source-variable-mapping.md), [pp-lgcm-document-reconciliation.md](pp-lgcm-document-reconciliation.md), [latent-product-full-mi.md](latent-product-full-mi.md), [mac-windows-remote.md](mac-windows-remote.md)
+- Docs: [pp-lgcm-worked-example.md](pp-lgcm-worked-example.md), [pp-lgcm-source-variable-mapping.md](pp-lgcm-source-variable-mapping.md), [pp-lgcm-document-reconciliation.md](pp-lgcm-document-reconciliation.md), [latent-product-full-mi.md](latent-product-full-mi.md), [mac-windows-remote.md](mac-windows-remote.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [cfps-acceptance.md](cfps-acceptance.md)
 - Tests: `scripts/test_rstudio_queue_admission.py` (CI mplus-guide-registry.yml), `scripts/test_pp_lgcm_compile_20261108.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `pp_lgcm_compile`; 只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计
@@ -244,7 +243,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 
 - Data formats: in_memory
 - Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
-- Docs: [reusable-models.md](reusable-models.md), [cross-dataset-migration.md](cross-dataset-migration.md)
+- Docs: [reusable-models.md](reusable-models.md), [cross-dataset-migration.md](cross-dataset-migration.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [reusable-models.md](reusable-models.md)
 - Tests: `scripts/test_other_growth_compile_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_other_growth_native_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `other_growth_compile`
@@ -268,3 +267,6 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Execution `remote_client`: `scripts/remote_batch_client.py`; [durable-remote-client.md](durable-remote-client.md), [mac-windows-remote.md](mac-windows-remote.md)
 - Execution `resource_admission`: `scripts/resource_admission.py`, `scripts/resource_gate.R`, `scripts/windows_host_profile.py`; [mplus-priority-resource-workflow.md](mplus-priority-resource-workflow.md), [windows-resource-coordination.md](windows-resource-coordination.md)
 - Execution `recovery`: `scripts/orphan_output_guard.py`, `scripts/verify_saved_batch.py`; [recovery-runbook.md](recovery-runbook.md), [remote-output-acceptance.md](remote-output-acceptance.md)
+- Shared test `scripts/test_compile_template_bundle.R` (CI mplus-guide-family-tests.yml): template_bundle 路线的保持式编译器合同（合成模板，不针对某个家族）
+- Shared test `scripts/test_template_contracts.py` (CI comparegroups-guide.yml): template_bundle 路线的执行规格读取与模板语句盘点合同（合成输入，不针对某个家族）
+- Shared test `scripts/test_windows_coordinator.py` (CI comparegroups-guide.yml): 共用 Windows 执行层的调度所有权与回滚合同（假进程，不针对某个家族）

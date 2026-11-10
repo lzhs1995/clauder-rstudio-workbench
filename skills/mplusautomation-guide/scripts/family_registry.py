@@ -339,6 +339,7 @@ def validate(reg: dict, root: Path = SKILL_ROOT, repo: Path = REPO_ROOT) -> tupl
             _rel_file(rel, f"execution.{eid}", errors, root)
     _validate_tests(reg["tests"], errors, root, repo)
     _validate_families(reg, errors, warnings, root)
+    _validate_test_ownership(reg, errors)
     return errors, warnings
 
 
@@ -413,6 +414,22 @@ def _validate_families(reg: dict, errors: list[str], warnings: list[str], root: 
         if fam["code_status"] != "none" and not fam["docs"]:
             errors.append(f"{where}: families with code need docs")
         _validate_evidence(fid, fam, reg, errors, root)
+
+
+def _validate_test_ownership(reg: dict, errors: list[str]) -> None:
+    """反向校验：每个登记的测试至少被一个家族引用，或用 shared_purpose 写明它不属于家族、用途是什么。"""
+    owned = {tid for fam in reg["families"].values() if isinstance(fam.get("tests"), list)
+             for tid in fam["tests"] if isinstance(tid, str)}
+    for tid, test in reg["tests"].items():
+        where = f"tests.{tid}"
+        if "shared_purpose" in test:
+            if not _label(test["shared_purpose"]):
+                errors.append(f"{where}: shared_purpose must be a one-line string of at most {LABEL_MAX} characters")
+            elif tid in owned:
+                # 两种说法同时存在时，读者不知道它算不算家族证据
+                errors.append(f"{where}: has shared_purpose but is also listed by a family; keep one")
+        elif tid not in owned:
+            errors.append(f"{where}: no family lists this test; add it to a family's tests or set shared_purpose")
 
 
 def _validate_evidence(fid: str, fam: dict, reg: dict, errors: list[str], root: Path) -> None:
@@ -667,6 +684,10 @@ def _link(rel: str, from_dir: str) -> str:
     return f"[{target.name}]({up.as_posix()})"
 
 
+def _test_run(test: dict) -> str:
+    return "needs Mplus" if test["needs_mplus"] else "CI " + test["ci"] if test["ci"] else "local"
+
+
 def _ev(item: dict) -> str:
     # 带限定说明的格子加 *，避免短表把有条件的结论读成无条件
     return EVIDENCE_LABEL[item["status"]] + ("*" if item.get("note") else "")
@@ -716,8 +737,7 @@ def render_doc(reg: dict) -> str:
             lines.append(f"- Acceptance: {_link(fam['acceptance_doc'], 'references')}")
         tests = [reg["tests"][t] for t in fam["tests"]]
         if tests:
-            lines.append("- Tests: " + ", ".join(
-                f"`{t['path']}` ({'needs Mplus' if t['needs_mplus'] else 'CI ' + t['ci'] if t['ci'] else 'local'})" for t in tests))
+            lines.append("- Tests: " + ", ".join(f"`{t['path']}` ({_test_run(t)})" for t in tests))
         for kind in EVIDENCE_KINDS:
             item = fam["evidence"][kind]
             note = f"; {item['note']}" if item.get("note") else ""
@@ -737,6 +757,10 @@ def render_doc(reg: dict) -> str:
     for eid, layer in reg["execution"].items():
         lines.append(f"- Execution `{eid}`: " + ", ".join(f"`{s}`" for s in layer["scripts"]) + "; " +
                      ", ".join(_link(d, "references") for d in layer["docs"]))
+    # 不属于任何家族的测试单列用途，不计入家族证据
+    for test in reg["tests"].values():
+        if "shared_purpose" in test:
+            lines.append(f"- Shared test `{test['path']}` ({_test_run(test)}): {test['shared_purpose']}")
     return "\n".join(lines) + "\n"
 
 

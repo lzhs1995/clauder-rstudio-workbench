@@ -50,11 +50,11 @@ X 为双方年龄，Y 为双方 CESD10 总分，M 为双方 ADL 困难数，W �
 
 驱动读取私有请求 JSON：`request_name`、`root`、`attempt_id`、`couples_data`/`couples_receipt`/`couples_contract`/`moderator_source`（各含绝对 `path` 与当前 `sha256`）、`moderated_contract`、`engine`、`python`、`protected_roots`、`expected_models`、`grant` 与 `window_request`（各含 `path` 与 `sha256`）。请求文件含本机路径，只留本地，不进仓库。
 
-1. 需先合并 #79：main 上目前没有 `charls_prepare_apim_swap()`。先按 #79 的流程在 Windows 上核实配偶关联与缺失码，并运行到 `charls_prepare_apim_swap()` 产出 `PASS_PREPARE_ONLY` 回执；不需要先拟合 #79 的两个模型。
+1. #79 已合并，`charls_prepare_apim_swap()` 在 `scripts/charls_apim_swap.R`。先按 [#79 的流程](charls-apim-swap-v2.md) 在 Windows 上核实配偶关联与缺失码，并运行到 `charls_prepare_apim_swap()` 产出 `PASS_PREPARE_ONLY` 回执；不需要先拟合 #79 的两个模型。这三件产物出来之前，本流程在 main 上不能端到端执行。
 2. 只读核对 harmonized 文件中 `h1rural` 的标签与编码本，把编码本 SHA256 与定位写进合同；未核实就保持 `codes_verified=FALSE`。
 3. 在 `mplus_window/requests/` 提交请求，等调度者写出同名 grant。把 grant 文件的 SHA256 写进私有请求 JSON。
 4. 运行一次驱动：先准备、编译四个输入，再在原生 Windows 上由 `charls_apim_moderated_admit_grant()` 核 grant。grant 格式见 PROGRAM 计算窗口规则：文件为 `grants/<request_name>.json`，SHA256 一致且不在运行根之内；内容 `approved=true`，`request_name`、`request_sha256`（窗口请求文件的 SHA256）、`worker`、`request_id`、`purpose`、`models` 与窗口请求一致，`root` 等于本次运行根，有 `granted_by`、`granted_taipei`；`hard_cap` 照抄或收紧请求，`max_engine_starts` 不少于模型数。任何一项不符都报 `FIT_GRANT_NOT_ADMITTED`。准入后按 `hard_cap` 重建配置：`processors_per_model` 进处理器预算，`max_wall_seconds` 收紧调度等待上限（到时停调度、保留进程，不强杀）。用独占创建写 `FIT_STARTED.json` 后串行拟合、解析、计算效应并做内部校验，最后独占创建 `DRIVER_COMPLETE.json`。失败保留现场，不重提、不杀进程。
-5. 展示副本用 #79 的 `charls_render_apim_swap()`（同样需先合并 #79）改写聚类文字（v2 历史入口名会写成夫妻聚类，实际是社区聚类）；只改标签，数值缓存不变。
+5. 展示副本用 #79 的 `charls_render_apim_swap()`（同在 `scripts/charls_apim_swap.R`）改写聚类文字（v2 历史入口名会写成夫妻聚类，实际是社区聚类）；只改标签，数值缓存不变。
 
 本驱动的拟合闸门比 #79 的 `charls_swap_windows_runner.py` 简单：它不做源文件只读快照、进程身份和宿主资源检查。那个 runner 把 worker 和两模型集合写死，要用它跑这四个模型，需要先让它从配置读取 worker、请求名与模型表，这一步不在本 PR 范围内。
 

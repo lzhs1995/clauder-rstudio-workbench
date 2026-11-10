@@ -279,7 +279,8 @@
         "out_dir"
       ],
       "needs_mplus": false,
-      "ci": "mplus-guide-family-tests.yml"
+      "ci": "mplus-guide-family-tests.yml",
+      "shared_purpose": "template_bundle 路线的保持式编译器合同（合成模板，不针对某个家族）"
     },
     "apim_native_acceptance": {
       "path": "scripts/test_native_acceptance.R",
@@ -295,7 +296,8 @@
       "function": null,
       "args": [],
       "needs_mplus": false,
-      "ci": "comparegroups-guide.yml"
+      "ci": "comparegroups-guide.yml",
+      "shared_purpose": "template_bundle 路线的执行规格读取与模板语句盘点合同（合成输入，不针对某个家族）"
     },
     "windows_coordinator_py": {
       "path": "scripts/test_windows_coordinator.py",
@@ -303,7 +305,8 @@
       "function": null,
       "args": [],
       "needs_mplus": false,
-      "ci": "comparegroups-guide.yml"
+      "ci": "comparegroups-guide.yml",
+      "shared_purpose": "共用 Windows 执行层的调度所有权与回滚合同（假进程，不针对某个家族）"
     },
     "rstudio_queue_admission_py": {
       "path": "scripts/test_rstudio_queue_admission.py",
@@ -468,7 +471,9 @@
         "APIM.md",
         "references/apim-v2-implementation-acceptance.md",
         "references/apim-v2-data-adapter.md",
-        "references/apim-paths.md"
+        "references/apim-paths.md",
+        "references/charls-apim-swap-v2.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/synthetic-acceptance.md",
       "tests": [
@@ -476,7 +481,9 @@
         "apim_v2_contract",
         "apim_v1_contract",
         "apim_native_bc_contract",
-        "apim_native_acceptance"
+        "apim_native_acceptance",
+        "charls_apim_swap",
+        "charls_swap_windows_runner_py"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -530,7 +537,9 @@
       "docs": [
         "APIM.md",
         "references/apim-v2-implementation-acceptance.md",
-        "references/effect-extraction-and-testing-families.md"
+        "references/effect-extraction-and-testing-families.md",
+        "references/charls-apim-swap-v2.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/synthetic-acceptance.md",
       "tests": [
@@ -538,7 +547,9 @@
         "apim_v2_contract",
         "apim_v1_contract",
         "apim_native_bc_contract",
-        "apim_native_acceptance"
+        "apim_native_acceptance",
+        "charls_apim_swap",
+        "charls_swap_windows_runner_py"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -592,14 +603,17 @@
       "docs": [
         "APIM.md",
         "references/apim-v2-implementation-acceptance.md",
-        "references/binary-observed-interaction-computation.md"
+        "references/binary-observed-interaction-computation.md",
+        "references/charls-apim-moderated-swap-v1.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/synthetic-acceptance.md",
       "tests": [
         "apim_v2_contract",
         "apim_v1_contract",
         "apim_native_bc_contract",
-        "apim_native_acceptance"
+        "apim_native_acceptance",
+        "charls_apim_moderated_swap"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -613,7 +627,7 @@
         },
         "real_data_swap": {
           "status": "pending",
-          "note": "准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+          "note": "准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
         },
         "historical_replay": {
           "status": "pass",
@@ -655,13 +669,16 @@
       ],
       "docs": [
         "APIM.md",
-        "references/apim-v2-implementation-acceptance.md"
+        "references/apim-v2-implementation-acceptance.md",
+        "references/charls-apim-moderated-swap-v1.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/apim-v2-implementation-acceptance.md",
       "tests": [
         "apim_v2_contract",
         "apim_v1_contract",
-        "apim_native_bc_contract"
+        "apim_native_bc_contract",
+        "charls_apim_moderated_swap"
       ],
       "evidence": {
         "synthetic_compile": {
@@ -675,7 +692,7 @@
         },
         "real_data_swap": {
           "status": "pending",
-          "note": "准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；等 #79 合并并核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+          "note": "准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
         },
         "historical_replay": {
           "status": "pass",
@@ -713,7 +730,8 @@
       ],
       "docs": [
         "references/mediation-moderation-workflow.md",
-        "references/chapter5-replay-map.md"
+        "references/chapter5-replay-map.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
@@ -741,13 +759,17 @@
           "note": "读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0"
         }
       },
-      "freshness_files": [],
+      "freshness_files": [
+        "scripts/ch5_mediation_moderation.R",
+        "scripts/ch5_synthetic_data.R",
+        "assets/ch5/linear_mediation_template.txt",
+        "assets/ch5/counterfactual_mediation_template.txt"
+      ],
       "thesis_refs": [
         "第五章"
       ],
       "gaps": [
-        "原生合成验收等 Windows 计算窗口",
-        "freshness_files 暂空：tests/test_mplus_family_registry.py 以 MED 作无 freshness_files 的夹具"
+        "原生合成验收等 Windows 计算窗口"
       ]
     },
     "MOD": {
@@ -766,7 +788,8 @@
       ],
       "docs": [
         "references/mediation-moderation-workflow.md",
-        "references/chapter5-replay-map.md"
+        "references/chapter5-replay-map.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
@@ -820,7 +843,8 @@
       ],
       "docs": [
         "references/mediation-moderation-workflow.md",
-        "references/chapter5-replay-map.md"
+        "references/chapter5-replay-map.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/mediation-moderation-workflow.md",
       "tests": [
@@ -881,7 +905,8 @@
       "docs": [
         "references/lpa-lca-workflow.md",
         "references/chapter7-replay-map.md",
-        "references/chapter7-source-variable-contract-20261104.md"
+        "references/chapter7-source-variable-contract-20261104.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
@@ -934,7 +959,8 @@
       "docs": [
         "references/lta-workflow.md",
         "references/chapter7-replay-map.md",
-        "references/chapter7-source-variable-contract-20261104.md"
+        "references/chapter7-source-variable-contract-20261104.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
@@ -990,7 +1016,8 @@
       "docs": [
         "references/ms-lta-workflow.md",
         "references/chapter7-replay-map.md",
-        "references/chapter7-source-variable-contract-20261104.md"
+        "references/chapter7-source-variable-contract-20261104.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/ms-lta-workflow.md",
       "tests": [
@@ -1049,7 +1076,8 @@
         "references/pp-lgcm-source-variable-mapping.md",
         "references/pp-lgcm-document-reconciliation.md",
         "references/latent-product-full-mi.md",
-        "references/mac-windows-remote.md"
+        "references/mac-windows-remote.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/cfps-acceptance.md",
       "tests": [
@@ -1100,7 +1128,8 @@
       ],
       "docs": [
         "references/reusable-models.md",
-        "references/cross-dataset-migration.md"
+        "references/cross-dataset-migration.md",
+        "references/family-source-swap-contract.md"
       ],
       "acceptance_doc": "references/reusable-models.md",
       "tests": [
