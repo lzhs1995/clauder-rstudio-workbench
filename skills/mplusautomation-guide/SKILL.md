@@ -126,6 +126,8 @@ indefinite wait when measured headroom satisfies the contract.
 
 For existing transition estimates, use the [explicit transition-flow contract](references/chapter7-transition-flow.md) and `scripts/ch7_transition_flow.R` to prepare nodes/links and a Sankey widget. Overall posterior-weighted flows and scaled mover-conditional flows are separate modes. This synthetic-tested interface does not close historical F30/F31 or real-data source swaps.
 
+For quadratic covariate contrasts, use the [explicit log-scale curve contract](references/chapter7-quadratic-curves.md) and `scripts/ch7_quadratic_curves.R`. The interface retains named coefficients, full cross covariance, the outcome/reference contrast and the declared interval rule; it does not reinterpret a log-ratio derivative as a probability effect or certify a source/model from numeric inputs.
+
 ## Parallel-process growth (PP-LGCM)
 
 For a two-process covariance LGCM with fixed time scores, use
