@@ -2,7 +2,7 @@
 
 `scripts/source_spec.R` 的 `prepare_mplus_source(spec, output_dir)` 复用 APIM v2 的 `apim_v2_read_source()` 与 `column_map`（`canonical = source`）约定。它只准备数据和 `DATA/VARIABLE` 片段，不生成模型、不启动 Mplus、不筛行、不排序、不插补、不推导量表或夫妻身份。所有输入行按原顺序保留；只输出 `columns` 显式列出的列。
 
-目前仅支持 `csv` 与 `dta`。注册表的 `source_spec` 仍由 W4 登记；本入口不宣称实现 `archived_dat`。
+目前仅支持 `csv` 与 `dta`，已在 `families.json` 的 `source_spec` 适配层登记；本入口不宣称实现 `archived_dat`。独立 `test_source_spec()` 登记为共享数据准备测试，不计作任一家族的真实换源或原生引擎验收。
 
 ```r
 source('skills/mplusautomation-guide/scripts/source_spec.R')
@@ -39,4 +39,4 @@ CSV 的空字段、空白字符串或字面 `NA` 应按源合同显式声明，�
 - `data_block.inp`：只有相对 `DATA: FILE = data.dat`、有序 `NAMES` 与 `MISSING` 声明。它可与已审模板接合；本函数不编辑模板、不核模型的变量语义。
 - `source_receipt.json`：源/DAT/列序/数据片段/代码 SHA、行列数、列名、逐列缺失计数与未建模边界。无输入绝对路径、逐行值或个体 ID。它是准备回执，不是家族真实换源验收回执，不能直接放进 `assets/real_data_receipts`。
 
-新合成测试 `test_source_spec(skill_root, out_dir)` 位于已登记的 `scripts/test_apim_v2_data_adapter.R`。同一合成数据换列名、换源列序后分别写 CSV 与 DTA，要求 DAT 和列序 SHA 一致；两源各自核 `NAMES`、列序文件和声明列序完全相同，以及落盘回执的三个输出 SHA 分别对应正确文件。负例还覆盖错列名的空缺失码声明、加载后改动隔离源码副本、十进制等价缺失码、十六进制绕过、映射碰撞、非数值、sentinel 碰撞、非法列名、错 SHA、来源变化与已有输出拒绝。家族 CI 以独立步骤运行，输出 `source-spec-ci`。测试不调用统计引擎，不能代表真实数据或 Mplus 运行成功。
+新合成测试 `test_source_spec(skill_root, out_dir)` 位于已登记的 `scripts/test_apim_v2_data_adapter.R`。同一合成数据换列名、换源列序后分别写 CSV 与 DTA，要求 DAT 和列序 SHA 一致；两源各自核 `NAMES`、列序文件和声明列序完全相同，以及落盘回执的三个输出 SHA 分别对应正确文件。负例还覆盖错列名的空缺失码声明、加载后改动隔离源码副本、十进制等价缺失码、十六进制绕过、映射碰撞、非数值、sentinel 碰撞、非法列名、错 SHA、来源变化与已有输出拒绝。家族 CI 由 `run_family_ci_tests.R` 按注册项 `source_spec_preparation` 执行一次，输出位于 `family-ci/source_spec_preparation/`，回执为该目录的 `SOURCE_SPEC_TEST_RECEIPT.json`；随 `family-ci` 产物统一上传。测试不调用统计引擎，不能代表真实数据或 Mplus 运行成功。

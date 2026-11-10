@@ -134,14 +134,16 @@
       ]
     },
     "source_spec": {
-      "status": "planned",
+      "status": "implemented",
       "formats": [
         "csv",
-        "dta",
-        "archived_dat"
+        "dta"
       ],
-      "entry_functions": [],
+      "entry_functions": [
+        "scripts/source_spec.R:prepare_mplus_source"
+      ],
       "docs": [
+        "references/source-spec.md",
         "references/family-source-swap-contract.md"
       ]
     }
@@ -230,6 +232,18 @@
       ],
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml"
+    },
+    "source_spec_preparation": {
+      "path": "scripts/test_apim_v2_data_adapter.R",
+      "lang": "R",
+      "function": "test_source_spec",
+      "args": [
+        "skill_root",
+        "out_dir"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml",
+      "shared_purpose": "通用 CSV/DTA 数据准备：显式换名和列序、缺失码及输出身份核验；仅合成 I/O，不计入家族真实换源或引擎验收"
     },
     "apim_v2_contract": {
       "path": "scripts/test_apim_v2.R",
@@ -743,7 +757,7 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch5_templates_extended",
-          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖"
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus"
         },
         "native_synthetic": {
           "status": "pending",
@@ -856,7 +870,7 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch5_templates_extended",
-          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对"
+          "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus"
         },
         "native_synthetic": {
           "status": "pending",
@@ -917,7 +931,7 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch7_mixture_compile",
-          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
         },
         "native_synthetic": {
           "status": "not_started"
@@ -926,8 +940,9 @@
           "status": "not_started"
         },
         "historical_replay": {
-          "status": "archived_readback_only",
-          "source": "references/chapter7-replay-map.md"
+          "status": "pass",
+          "source": "references/chapter7-replay-map.md",
+          "note": "2026-11-10 历史输入新鲜重估：24/24 单期枚举模型按打印精度一致，保留诊断及两次旧超时；只覆盖原第七章混合指标，不证明纯分类 LCA 或当前编译器的新源原生验收"
         }
       },
       "freshness_files": [
@@ -971,7 +986,7 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch7_mixture_compile",
-          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
         },
         "native_synthetic": {
           "status": "not_started"
@@ -980,8 +995,9 @@
           "status": "not_started"
         },
         "historical_replay": {
-          "status": "archived_readback_only",
-          "source": "references/chapter7-replay-map.md"
+          "status": "pending",
+          "source": "references/chapter7-replay-map.md",
+          "note": "2026-11-10 历史输入新鲜重估：测量/普通LTA范围4/5打印一致；MI_4W_FREE最终TIMEOUT、已结算且不重试，故未声明全家族通过。此 pending 表示完整通过未成立，不表示尚有已授权待启动模型"
         }
       },
       "freshness_files": [
@@ -1028,7 +1044,7 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch7_mixture_compile",
-          "note": "合成数据编译，只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
         },
         "native_synthetic": {
           "status": "not_started"
@@ -1037,8 +1053,9 @@
           "status": "not_started"
         },
         "historical_replay": {
-          "status": "archived_readback_only",
-          "source": "references/chapter7-replay-map.md"
+          "status": "pass",
+          "source": "references/chapter7-replay-map.md",
+          "note": "2026-11-10 两个历史Step-3输入新鲜重估打印一致；保留两期模型自动固定参数诊断，只复现归档输入，不证明新的Step-1→分类误差→Step-3完整链或真实换源验收"
         }
       },
       "freshness_files": [
