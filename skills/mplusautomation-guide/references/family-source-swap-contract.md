@@ -7,7 +7,7 @@
 适配层只做：读入 CSV / Stata `.dta` / 已钉哈希的归档 DAT，按表换名，按列认缺失码，保留底层编码与精确 ID，按内容 SHA-256 钉数据身份，写 DAT 与有序 NAMES，写不含个体值的回执。
 不做：合并夫妻、长宽转换、派生量表、插补、选择模型。这些留在研究自己的上游 Stata/R 链。换源跑通只说明 I/O 与编译可用，不说明两套调查的测量等价或总体可比。
 
-APIM 系已有实现：[APIM v2 data adapter](apim-v2-data-adapter.md)（`data_mode`、`column_map`、`missing_codes`）。其他家族在通用 `source_spec` 落地前，由研究脚本生成 DAT，但必须满足下面第 2 节的全部声明。
+APIM 系使用 [APIM v2 data adapter](apim-v2-data-adapter.md)（`data_mode`、`column_map`、`missing_codes`）。通用 [source_spec](source-spec.md) 的 `prepare_mplus_source()` 已提供 CSV/DTA 到有序 DAT 与 DATA/VARIABLE 片段的准备入口；它不接归档 DAT、不编译模型、不推导或认证长整数 ID，也不代替家族适配和真实换源验收。归档 DAT 仍按原项目的 SHA、列序与缺失码合同处理。所有路线均须满足下面第 2 节的声明。
 
 OTHER_GROWTH 与 MOD 只接收内存数据框：文件读取和缺失码处理由调用方在上游完成，同样要满足第 2 节。OTHER_GROWTH 的 DAT 由 `run_mplus_model()` 从映射后的数据框写出；MOD 在 R 中拟合，不写 DAT。
 
@@ -39,7 +39,7 @@ OTHER_GROWTH 与 MOD 只接收内存数据框：文件读取和缺失码处理�
 
 ### 4.2 模板路线（LPA/LCA、LTA、MS-LTA、单人中介/调节、PP-LGCM）
 1. 上游链产出分析数据，按第 3 节填映射表（含波次与派生依赖）。
-2. 生成 DAT 与有序 NAMES，核列序、列数、缺失码。
+2. CSV/DTA 可用 `prepare_mplus_source(spec, output_dir)` 生成 DAT 与有序 NAMES；按 [source_spec](source-spec.md) 核列序、列数、缺失码和源 SHA。该准备回执不能代替第 5 节的真实换源验收。
 3. 准备已审 `[[init]]` 模板，写明其 SHA-256 与完整预期 `.inp` 清单；第七章家族另按 [第七章换源合同](chapter7-source-variable-contract-20261104.md) 固定指标类型、DEFINE、starts/seed 与 Step-1→Step-3 生产者。
 4. `python scripts/template_contracts.py <manifest> --output <output-directory>` 盘点模板语句（在该目录写 `receipt.json` 等文件）。
 5. `compile_mplus_template_bundle()` 生成全部 INP，不估计。

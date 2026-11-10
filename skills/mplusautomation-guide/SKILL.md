@@ -53,9 +53,9 @@ whitelisted real-data receipts. After editing `families.json`, run
 | MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| LPA_LCA | template | pass* | — | — | readback | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
-| LTA | template | pass* | — | — | readback | [lta-workflow.md](references/lta-workflow.md) |
-| MS_LTA | template | pass* | — | — | readback | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
+| LPA_LCA | template | pass* | — | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
+| LTA | template | pass* | — | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
+| MS_LTA | template | pass* | — | — | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
 | PP_LGCM | template | pass* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
 | OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
 
