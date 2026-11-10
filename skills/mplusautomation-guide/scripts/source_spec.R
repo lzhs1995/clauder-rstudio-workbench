@@ -48,11 +48,10 @@ prepare_mplus_source <- function(spec, output_dir) {
     'Declare missing_codes for every output column; use an empty vector for no extra codes')
   assert(all(vapply(codes, function(x) (is.character(x) || is.numeric(x)) && !anyNA(x) &&
     (!is.numeric(x) || all(is.finite(x))), logical(1))), 'Missing code entries must be finite numeric or character vectors')
-  # APIM既有接口只接受非空码向量；先核完整声明，再仅传真正要替换的码。
-  adapter_codes <- codes[lengths(codes)>0L]
-  if (!length(adapter_codes)) adapter_codes <- NULL
+  # 原APIM接口与身份列重码行为保持不变；通用入口在选取的数值列内统一核码。
+  # 禁止旧重码先把十六进制字符串当数字吞掉，导致后续十进制检查看不到原值。
   config <- list(data=spec$data, data_mode=spec$data_mode, column_map=spec$column_map,
-    missing=missing, missing_codes=adapter_codes, row_id=NULL, cluster=NULL,
+    missing=character(), missing_codes=NULL, row_id=NULL, cluster=NULL,
     # 这里只提供日期/时间列拒绝范围，不调用任何设计或建模函数。
     designs=list(list(x=columns)), output_dir=output_dir, template_bundles=list(), protected_roots=character())
   target <- runtime$apim_v2_path_check(config)
@@ -71,15 +70,50 @@ prepare_mplus_source <- function(spec, output_dir) {
   assert(nrow(raw)>0L && all(columns %in% names(raw)), 'Source must have rows and every declared output column')
   audit <- attr(raw, 'apim_source_adapter')
   data <- raw[, columns, drop=FALSE]
+  decimal <- function(x) !is.na(x) & grepl('^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$', trimws(x))
+  code_numbers <- function(x) {
+    # 数值码不能先转显示字符串，否则相邻double可能舍入成同一个码。
+    if (is.numeric(x)) return(x)
+    parsed <- suppressWarnings(as.numeric(trimws(x[decimal(x)])))
+    parsed[is.finite(parsed)]
+  }
   for (name in columns) {
     value <- data[[name]]
     # 禁止as.numeric把任意字符串变成缺失或把日期类偷换为数字。
     assert(is.character(value) || (is.numeric(value) && !is.object(value)), paste('Unsupported numeric column type:', name))
-    parsed <- suppressWarnings(as.numeric(value))
-    assert(!any(!is.na(value) & !is.finite(parsed)), paste('Non-numeric or nonfinite output value:', name))
+    native_missing <- is.na(value)
+    numeric_form <- if (is.character(value)) decimal(value) else !native_missing
+    parsed <- rep(NA_real_, length(value))
+    parsed[numeric_form] <- suppressWarnings(as.numeric(value[numeric_form]))
+    matches <- function(declared) {
+      literal <- if (is.character(value) && is.character(declared)) !native_missing & value %in% declared else rep(FALSE, length(value))
+      literal | (!native_missing & is.finite(parsed) & parsed %in% code_numbers(declared))
+    }
+    # 全局码优先，其次逐列码；原生/标签缺失不重复计数，文本码仅按原文精确匹配。
+    global_missing <- matches(missing)
+    column_missing <- !global_missing & matches(codes[[name]])
+    recoded <- global_missing | column_missing
+    assert(!any(!native_missing & !recoded & (!numeric_form | !is.finite(parsed))),
+      paste('Non-numeric or nonfinite output value:', name, '(decimal notation required)'))
+    parsed[recoded] <- NA_real_
     assert(!any(parsed[!is.na(parsed)] == missing_value), paste('Missing sentinel collides with observed value:', name))
+    audit$column_audit[[name]]$global_codes_replaced <- sum(global_missing)
+    audit$column_audit[[name]]$column_codes_replaced <- sum(column_missing)
+    audit$column_audit[[name]]$missing_after <- sum(is.na(parsed))
     data[[name]] <- parsed
   }
+  # 17位有效数字保证有限IEEE double往返；小数点固定为点，缺失只写显式sentinel。
+  sentinel <- chartr(',', '.', sprintf('%.17g', missing_value))
+  tokens <- lapply(data, function(x) {
+    result <- chartr(',', '.', sprintf('%.17g', x))
+    result[is.na(x)] <- sentinel
+    result
+  })
+  lines <- do.call(paste, c(tokens, list(sep=' ')))
+  # Mplus DATA手册规定单记录最多10000字符；此处DAT纯ASCII，按不含换行的字节数核验。
+  record_length_limit_bytes <- 10000L
+  max_record_bytes <- max(nchar(lines, type='bytes'))
+  assert(max_record_bytes<=record_length_limit_bytes, 'DAT record exceeds Mplus 10000-byte limit')
   assert(identical(vapply(runtime$code_paths, hash, ''), runtime$loaded_code_hashes), 'Loaded source adapter code changed during preparation')
   # 所有验证完成后才独占创建新目录；失败保留已写文件，不清空或恢复旧输出。
   assert(dir.create(target, recursive=TRUE, showWarnings=FALSE), 'Cannot create fresh output directory')
@@ -93,14 +127,6 @@ prepare_mplus_source <- function(spec, output_dir) {
   }
   # 每列一行、UTF-8无BOM、LF及末尾换行；列序SHA独立于R序列化和平台。
   write_utf8(paste0(paste(columns, collapse='\n'), '\n'), order_path)
-  # 17位有效数字保证有限IEEE double往返；小数点固定为点，缺失只写显式sentinel。
-  sentinel <- chartr(',', '.', sprintf('%.17g', missing_value))
-  tokens <- lapply(data, function(x) {
-    result <- chartr(',', '.', sprintf('%.17g', x))
-    result[is.na(x)] <- sentinel
-    result
-  })
-  lines <- do.call(paste, c(tokens, list(sep=' ')))
   write_utf8(paste0(paste(lines, collapse='\n'), '\n'), dat_path)
   write_utf8(paste0('DATA: FILE = data.dat;\nVARIABLE:\nNAMES =\n',
     paste0(' ', columns, collapse='\n'), '\n;\nMISSING = ALL (', sentinel, ');\n'), block_path)
@@ -117,6 +143,7 @@ prepare_mplus_source <- function(spec, output_dir) {
   receipt <- list(schema_version=1L, status='DAT_PREPARED_NO_MODEL', source_format=spec$data_mode,
     source_sha256=spec$data_expected_sha256, dat_sha256=hash(dat_path), column_order_sha256=hash(order_path),
     data_block_sha256=hash(block_path), code_sha256=as.list(code_hashes), rows=nrow(data), columns=length(columns),
+    max_record_bytes=max_record_bytes, record_length_limit_bytes=record_length_limit_bytes,
     column_names=I(columns), missing_by_column=as.list(vapply(data, function(x) sum(is.na(x)), 0L)),
     source_column_names=setNames(lapply(columns, function(n) audit$column_audit[[n]]$source), columns),
     missing_recode_counts=setNames(lapply(columns, function(n) audit$column_audit[[n]][c('source_missing',
