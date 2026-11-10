@@ -988,7 +988,7 @@ class HarnessUnitTests(unittest.TestCase):
         good = (
             "[mcp_servers.r-studio]\n"
             "command = \"uvx\"\n\n"
-            "[projects.'C:\\Users\\LZHS\\Desktop\\开题报告']\n"
+            "[projects.'C:\\Users\\ExampleUser\\Desktop\\开题报告']\n"
             "trust_level = \"trusted\"\n"
         ).encode("utf-8")
         with tempfile.TemporaryDirectory() as td:
@@ -1010,7 +1010,7 @@ class HarnessUnitTests(unittest.TestCase):
     def test_check_codex_toml_parseable_rejects_unclosed_table(self) -> None:
         from clauder_workbench import cli as cli_mod
         # 模拟同事 1 真实事故：路径结尾的 ' 丢失 → unclosed table
-        broken = b"[projects.'C:\\Users\\LZHS\\Desktop\\bad_path]\ntrust_level = \"trusted\"\n"
+        broken = b"[projects.'C:\\Users\\ExampleUser\\Desktop\\bad_path]\ntrust_level = \"trusted\"\n"
         with tempfile.TemporaryDirectory() as td:
             cfg = Path(td) / "config.toml"
             cfg.write_bytes(broken)

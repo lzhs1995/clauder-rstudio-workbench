@@ -52,10 +52,10 @@ Earlier `local-1` SMOKE/GUARD JSON files were hand-written task summaries,
 not executable harness evidence. Preserve and label that limitation; do not
 retroactively claim a formal PASS. The recovery used the real native smoke,
 raw wrapper outputs, `pre-submit`, actual job registration and terminal
-archival. For example the native smoke evidence was
-`c26a78d3-a776-40d5-a2e4-728524764cd5`; the resumed pilot's original job was
-`61bdcf8b`. Those identifiers describe this case, not reusable admission for
-another session. Formal delivery must use an actual `completion-check`.
+archival. The public aliases `NATIVE_SMOKE_A` and `PILOT_JOB_A` identify that case
+without exposing its original local evidence or job identifiers. The original
+receipts and mapping remain local; these aliases are not reusable admission
+for another session. Formal delivery must use an actual `completion-check`.
 
 Source entry scripts with `local=TRUE`. The resumed pilot, new working MI and
 full-family job exposed native progress with the same original job IDs; no
