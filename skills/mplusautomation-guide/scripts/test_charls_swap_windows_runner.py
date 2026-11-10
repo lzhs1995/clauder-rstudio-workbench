@@ -3,9 +3,11 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -412,6 +414,158 @@ class RunnerAdmissionTests(unittest.TestCase):
         with self.assertRaisesRegex(runner.AdmissionError, "attempt_hash_binding_mismatch:request_sha256"):
             runner.gate_fit(self.root, "one", self.resources)
         self.assertFalse((self.root / "FIT_ADMITTED.json").exists())
+
+
+class PythonIdentityTests(unittest.TestCase):
+    """只创建合成普通文件；不执行夹具，不启动统计引擎。"""
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.folder = Path(self.temp.name).resolve()
+        self.python = self.folder / "synthetic interpreter with long filename.exe"
+        self.python.write_bytes(b"synthetic inert executable fixture")
+        self.pin = {"path": str(self.python), "sha256": runner.sha256(self.python)}
+
+    def check(self, executable=None):
+        return runner.validate_python_identity(self.pin, str(executable or self.python))
+
+    def test_exact_file_and_default_executable_pass(self):
+        with patch.object(runner.sys, "executable", str(self.python)):
+            report = runner.validate_python_identity(self.pin)
+        self.assertEqual(report["sha256"], self.pin["sha256"])
+
+    @unittest.skipUnless(os.name == "nt", "native Windows short-name API required")
+    def test_real_windows_short_name_same_directory_entry_passes(self):
+        import ctypes
+        from ctypes import wintypes
+        function = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+        function.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        function.restype = wintypes.DWORD
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = function(str(self.python), buffer, len(buffer))
+        self.assertGreater(length, 0, "GetShortPathNameW failed for an existing fixture")
+        self.assertLess(length, len(buffer))
+        short = buffer.value
+        if runner.normalized(short) == runner.normalized(self.python):
+            self.skipTest("fixture volume does not provide a distinct 8.3 short name")
+        self.assertTrue(os.path.samefile(short, self.python))
+        report = self.check(short)
+        self.assertEqual(report["expanded_path"], runner.normalized(runner.windows_long_path(self.python)))
+
+    def test_identical_hash_copy_is_not_the_pinned_file(self):
+        copy = self.folder / "copied.exe"
+        copy.write_bytes(self.python.read_bytes())
+        self.assertEqual(runner.sha256(copy), self.pin["sha256"])
+        self.assertFalse(os.path.samefile(copy, self.python))
+        with self.assertRaisesRegex(runner.AdmissionError, "runner_python_differs"):
+            self.check(copy)
+
+    def test_different_hardlink_name_is_not_a_short_name(self):
+        alias = self.folder / "other-name.exe"
+        try:
+            os.link(self.python, alias)
+        except OSError:
+            self.skipTest("fixture filesystem does not permit hard links")
+        self.assertTrue(os.path.samefile(alias, self.python))
+        with self.assertRaisesRegex(runner.AdmissionError, "runner_python_differs"):
+            self.check(alias)
+
+    def test_leaf_symlink_rejected_even_when_samefile(self):
+        alias = self.folder / "link.exe"
+        try:
+            alias.symlink_to(self.python)
+        except OSError:
+            self.skipTest("host does not permit synthetic symlinks")
+        self.assertTrue(os.path.samefile(alias, self.python))
+        with self.assertRaisesRegex(runner.AdmissionError, "symlink|reparse"):
+            self.check(alias)
+
+    def test_ancestor_symlink_rejected(self):
+        real = self.folder / "real"
+        real.mkdir()
+        executable = real / "python.exe"
+        executable.write_bytes(self.python.read_bytes())
+        alias = self.folder / "linked-directory"
+        try:
+            alias.symlink_to(real, target_is_directory=True)
+        except OSError:
+            self.skipTest("host does not permit synthetic directory symlinks")
+        with self.assertRaisesRegex(runner.AdmissionError, "symlink|reparse"):
+            self.check(alias / "python.exe")
+
+    def test_leaf_and_ancestor_reparse_attributes_rejected(self):
+        # 无创建junction权限的平台仍验证实际属性门，不伪造路径相等。
+        lstat = Path.lstat
+        for target in (self.python, self.folder):
+            def reparse(path, *args, **kwargs):
+                info = lstat(path, *args, **kwargs)
+                if path == target:
+                    return SimpleNamespace(st_mode=info.st_mode, st_file_attributes=0x400)
+                return info
+            with self.subTest(target=target.name), patch.object(Path, "lstat", reparse):
+                with self.assertRaisesRegex(runner.AdmissionError, "reparse_path"):
+                    self.check()
+
+    def test_relative_missing_directory_and_wrong_pin_rejected(self):
+        with self.assertRaisesRegex(runner.AdmissionError, "absolute_path_required"):
+            self.check("relative.exe")
+        with self.assertRaises(FileNotFoundError):
+            self.check(self.folder / "missing.exe")
+        with self.assertRaisesRegex(runner.AdmissionError, "regular_file_required"):
+            self.check(self.folder)
+        self.pin["sha256"] = "a" * 64
+        with self.assertRaisesRegex(runner.AdmissionError, "python_executable_hash_mismatch"):
+            self.check()
+
+    def test_windows_expansion_api_failure_is_closed(self):
+        # 只模拟平台/API结果；真实文件准入和对象/SHA门仍运行。
+        native = SimpleNamespace(name="nt", path=os.path)
+        with patch.object(runner, "os", native), patch.object(runner, "windows_long_path", side_effect=OSError("API failed")):
+            with self.assertRaisesRegex(OSError, "API failed"):
+                self.check()
+
+    def test_windows_api_zero_and_truncated_result_rejected(self):
+        import ctypes
+        for length in (0, 32768):
+            function = unittest.mock.Mock(return_value=length)
+            library = SimpleNamespace(GetLongPathNameW=function)
+            with self.subTest(length=length), patch.object(ctypes, "WinDLL", return_value=library, create=True):
+                with self.assertRaisesRegex(runner.AdmissionError, "python_long_path_resolution_failed"):
+                    runner.windows_long_path(self.python)
+
+    def test_same_entry_claim_does_not_replace_file_identity_check(self):
+        copy = self.folder / "same-hash-copy.exe"
+        copy.write_bytes(self.python.read_bytes())
+        native = SimpleNamespace(name="nt", path=os.path)
+        with patch.object(runner, "os", native), patch.object(runner, "windows_long_path", return_value=str(self.python)):
+            with self.assertRaisesRegex(runner.AdmissionError, "file_identity_mismatch"):
+                self.check(copy)
+
+    def test_samefile_read_failure_is_closed(self):
+        with patch.object(runner.os.path, "samefile", side_effect=OSError("identity unavailable")):
+            with self.assertRaisesRegex(OSError, "identity unavailable"):
+                self.check()
+
+    def test_same_hash_file_replacement_during_check_rejected(self):
+        replacement = self.folder / "replacement.exe"
+        replacement.write_bytes(self.python.read_bytes())
+        original = runner.sha256
+        replaced = False
+        def change_after_hash(path):
+            nonlocal replaced
+            result = original(path)
+            if not replaced:
+                os.replace(replacement, self.python)
+                replaced = True
+            return result
+        with patch.object(runner, "sha256", side_effect=change_after_hash):
+            with self.assertRaisesRegex(runner.AdmissionError, "changed_during_check"):
+                self.check()
+
+    @unittest.skipIf(os.name == "nt", "non-Windows exact path contract")
+    def test_nonwindows_never_uses_long_path_api(self):
+        with patch.object(runner, "windows_long_path", side_effect=AssertionError("not Windows")):
+            self.check()
 
 
 if __name__ == "__main__":
