@@ -20,12 +20,27 @@ ch7_mixture_object <- function(data, family = c("lpa", "lta", "mslta"), waves = 
     if (!is.list(step3) || !mplus_name(step3$nominal) || length(step3$nominal) < 2L)
       stop("step3$nominal must name one most-likely-class variable per wave")
     nw <- length(step3$nominal)
-    error <- if (is.matrix(step3$error)) rep(list(step3$error), nw) else step3$error
-    if (!is.list(error) || length(error) != nw) stop("step3$error must be one KxK matrix or one per wave")
-    for (e in error) {
-      if (!is.matrix(e) || !is.numeric(e) || any(dim(e) != K) || any(!is.finite(e)) || any(e <= 0) ||
-          any(abs(rowSums(e) - 1) > 1e-9))
-        stop("Each classification error matrix must be KxK, strictly positive, with rows summing to 1")
+    # 直接使用 Step-1 打印的 logit，避免先对三位小数的概率取 log 或擅自平滑零值。
+    # 行为真类别，列为赋类 1..K-1；最后一类 K 是唯一参考类。
+    if (is.null(step3$error) == is.null(step3$logits))
+      stop("Provide exactly one of step3$error and step3$logits")
+    if (!is.null(step3$logits)) {
+      logits <- if (is.matrix(step3$logits)) rep(list(step3$logits), nw) else step3$logits
+      if (!is.list(logits) || length(logits) != nw)
+        stop("step3$logits must be one Kx(K-1) matrix or one per wave")
+      for (z in logits) if (!is.matrix(z) || !is.numeric(z) ||
+          !identical(as.integer(dim(z)), c(K, K - 1L)) || any(!is.finite(z)))
+        stop("Each classification logit matrix must be finite Kx(K-1), reference class K")
+      error <- NULL
+      step3$logits <- logits
+    } else {
+      error <- if (is.matrix(step3$error)) rep(list(step3$error), nw) else step3$error
+      if (!is.list(error) || length(error) != nw) stop("step3$error must be one KxK matrix or one per wave")
+      for (e in error) {
+        if (!is.matrix(e) || !is.numeric(e) || any(dim(e) != K) || any(!is.finite(e)) || any(e <= 0) ||
+            any(abs(rowSums(e) - 1) > 1e-9))
+          stop("Each classification error matrix must be KxK, strictly positive, with rows summing to 1")
+      }
     }
     used <- step3$nominal
     cat_statement <- c("NOMINAL", used)
@@ -116,7 +131,8 @@ ch7_lta_body <- function(family, nw, K, waves, categorical, invariant, step3, er
       body <- c(body, paste0("%c", t, "#", j, "%"))
       if (!is.null(step3)) {
         # 行 = 潜在真类别 j，列 = 赋类；logit 以最后一类为参照
-        logits <- log(error[[t]][j, -K] / error[[t]][j, K])
+        logits <- if (!is.null(step3$logits)) step3$logits[[t]][j, ]
+                  else log(error[[t]][j, -K] / error[[t]][j, K])
         body <- c(body, paste0("[", step3$nominal[[t]], "#", seq_len(K - 1), "@", sprintf("%.12f", logits), "];"))
       } else for (a in seq_along(waves[[t]])) {
         variable <- waves[[t]][[a]]

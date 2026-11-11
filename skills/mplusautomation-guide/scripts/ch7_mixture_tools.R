@@ -335,13 +335,23 @@ ch7_enumeration_table <- function(paths, min_class_prop = NULL, min_entropy = NU
 # Step-1 .out 的 SAVEDATA INFORMATION：列序与存盘文件名
 ch7_savedata_info <- function(text) {
   i <- grep("^\\s*SAVEDATA INFORMATION\\s*$", text)
-  if (!length(i)) return(NULL)
+  if (length(i) != 1L) return(NULL)
   tail <- text[i[1]:length(text)]
   order_at <- grep("Order and format of variables", tail, fixed = TRUE); save_at <- grep("^\\s*Save file\\s*$", tail)
-  if (!length(order_at) || !length(save_at) || save_at[1] < order_at[1]) return(NULL)
-  rows <- trimws(tail[(order_at[1] + 1L):(save_at[1] - 1L)])
-  rows <- rows[grepl("\\s+[A-Z][0-9.]+$", rows)]
-  list(names = toupper(sub("\\s+[A-Z][0-9.]+$", "", rows)), file = trimws(tail[save_at[1] + 1L]))
+  if (length(order_at) != 1L || length(save_at) != 1L || save_at[1] == length(tail)) return(NULL)
+  # Mplus 新版把 Save file 放在变量序之前；两种布局都只读紧接的格式行。
+  rows <- character(); row_at <- order_at[1] + 1L
+  while (row_at <= length(tail) && !nzchar(trimws(tail[row_at]))) row_at <- row_at + 1L
+  while (row_at <= length(tail) && grepl("^\\s*[A-Za-z][A-Za-z0-9_]*\\s+[FEG][0-9]+\\.[0-9]+\\s*$", tail[row_at])) {
+    rows <- c(rows, trimws(tail[row_at])); row_at <- row_at + 1L
+  }
+  if (!length(rows)) return(NULL)
+  file_at <- save_at[1] + 1L
+  while (file_at <= length(tail) && !nzchar(trimws(tail[file_at]))) file_at <- file_at + 1L
+  if (file_at > length(tail)) return(NULL)
+  list(names = toupper(sub("\\s+[FEG][0-9]+\\.[0-9]+$", "", rows)),
+       formats = sub("^.*\\s+([FEG][0-9]+\\.[0-9]+)$", "\\1", rows),
+       file = sub("^([\"'])(.*)\\1$", "\\2", trimws(tail[file_at])))
 }
 
 # DATA FILE 按 INP 所在目录解析，不能用同名文件代替真正的数据源。

@@ -28,9 +28,9 @@ For changing data sources or variables, follow
 | MED | template | template_bundle | pass* | pending* | pending* | readback* |
 | MOD | configurable | r_glm_moderation | pass* | n/a* | pending* | pass* |
 | MODMED | template | template_bundle | pass* | pending* | pending* | readback* |
-| LPA_LCA | template | mplus_object_syntax, template_bundle | pass* | — | — | pass* |
-| LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | pending* |
-| MS_LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | pass* |
+| LPA_LCA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pending* | — | pass* |
+| LTA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pending* | — | pending* |
+| MS_LTA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pending* | — | pass* |
 | PP_LGCM | template | external_project, template_bundle, mplus_object_mapping | pass* | — | pending* | pending |
 | OTHER_GROWTH | template | mplus_object_mapping | pass | pending* | — | n/a |
 
@@ -165,57 +165,63 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 潜剖面/潜类别分析：单期类别枚举、类别命名与后验分类；第七章为四连续加两分类的混合指标。
 
 - Aliases: LPA, LCA
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pending; source `references/chapter7-native-acceptance-20261111.md`; 已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛
 - real_data_swap: not_started
 - historical_replay: pass; source `references/chapter7-replay-map.md`; 2026-11-10 历史输入新鲜重估：24/24 单期枚举模型按打印精度一致，保留诊断及两次旧超时；只覆盖原第七章混合指标，不证明纯分类 LCA 或当前编译器的新源原生验收
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: 类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选
+- Gap: 原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
 
 ## LTA
 
 潜转变分析：测量不变、转移概率与三步法 Step-3。
 
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_step_chain_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pending; source `references/chapter7-native-acceptance-20261111.md`; 已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛
 - real_data_swap: not_started
 - historical_replay: pending; source `references/chapter7-replay-map.md`; 2026-11-10 历史输入新鲜重估：测量/普通LTA范围4/5打印一致；MI_4W_FREE最终TIMEOUT、已结算且不重试，故未声明全家族通过。此 pending 表示完整通过未成立，不表示尚有已授权待启动模型
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表
+- Gap: 原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
 
 ## MS_LTA
 
 动静潜转变分析：G(2) mover/stayer 结构、有限 logit 与精确约束的区分。
 
 - Aliases: MS-LTA, mover-stayer LTA
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [ms-lta-workflow.md](ms-lta-workflow.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_step_chain_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pending; source `references/chapter7-native-acceptance-20261111.md`; 已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛
 - real_data_swap: not_started
 - historical_replay: pass; source `references/chapter7-replay-map.md`; 2026-11-10 两个历史Step-3输入新鲜重估打印一致；保留两期模型自动固定参数诊断，只复现归档输入，不证明新的Step-1→分类误差→Step-3完整链或真实换源验收
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明
-- Gap: 独立流量图接口已通过合成计算及 widget 载荷合同；历史 F30/F31、浏览器/PNG、新数据换源及 Step-1→Step-3 完整链仍需各自验收
+- Gap: 原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
+- Gap: stayer为有限logit近似，不能称精确不转移；总体转移与给定G条件转移分别声明
 
 ## PP_LGCM
 
