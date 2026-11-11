@@ -193,6 +193,9 @@ def validate_python_identity(record, executable=None):
         require(sha256(path) == expected, "python_executable_hash_mismatch")
     require(snapshot() == before and entries() == names and os.path.samefile(*paths),
             "python_executable_changed_during_check")
+    # 末轮路径/同文件查询也可能遇到替换；返回前再次核对已哈希的文件对象。
+    # 此复核不承诺检查返回后到启动全过程的原子安全。
+    require(snapshot() == before, "python_executable_changed_during_check")
     return {"pinned_path": str(paths[0]), "executable_path": str(paths[1]), "expanded_path": names[0],
             "sha256": expected}
 

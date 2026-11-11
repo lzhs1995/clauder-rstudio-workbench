@@ -562,6 +562,55 @@ class PythonIdentityTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.AdmissionError, "changed_during_check"):
                 self.check()
 
+    def assert_final_callback_replacement_rejected(self, callback, same_hash):
+        # 仅平台/API是替身；末轮回调内真实替换惰性文件，SHA/stat/samefile均读取磁盘。
+        replacement = self.folder / "final-replacement.exe"
+        replacement.write_bytes(self.python.read_bytes() if same_hash else b"changed inert executable fixture")
+        before = self.python.stat()
+        alternate = replacement.stat()
+        self.assertNotEqual((before.st_dev, before.st_ino), (alternate.st_dev, alternate.st_ino))
+        self.assertEqual(runner.sha256(replacement) == self.pin["sha256"], same_hash)
+        real_samefile = os.path.samefile
+        calls = {"entries": 0, "samefile": 0}
+        replaced = False
+
+        def replace_at_final(name, trigger):
+            nonlocal replaced
+            calls[name] += 1
+            if callback == name and calls[name] == trigger:
+                os.replace(replacement, self.python)
+                replaced = True
+
+        def expand(path):
+            replace_at_final("entries", 3)  # 首轮展开两条路径，第三次进入末轮。
+            return str(path)
+
+        def samefile(left, right):
+            replace_at_final("samefile", 2)
+            return real_samefile(left, right)
+
+        native = SimpleNamespace(name="nt", path=os.path)
+        with patch.object(runner, "os", native), patch.object(runner, "windows_long_path", side_effect=expand), \
+                patch.object(runner.os.path, "samefile", side_effect=samefile):
+            with self.assertRaisesRegex(runner.AdmissionError, "python_executable_changed_during_check"):
+                self.check()
+        self.assertTrue(replaced)
+        after = self.python.stat()
+        self.assertEqual((after.st_dev, after.st_ino), (alternate.st_dev, alternate.st_ino))
+        self.assertEqual(runner.sha256(self.python) == self.pin["sha256"], same_hash)
+
+    def test_final_entries_different_hash_replacement_rejected(self):
+        self.assert_final_callback_replacement_rejected("entries", False)
+
+    def test_final_entries_same_hash_replacement_rejected(self):
+        self.assert_final_callback_replacement_rejected("entries", True)
+
+    def test_final_samefile_different_hash_replacement_rejected(self):
+        self.assert_final_callback_replacement_rejected("samefile", False)
+
+    def test_final_samefile_same_hash_replacement_rejected(self):
+        self.assert_final_callback_replacement_rejected("samefile", True)
+
     @unittest.skipIf(os.name == "nt", "non-Windows exact path contract")
     def test_nonwindows_never_uses_long_path_api(self):
         with patch.object(runner, "windows_long_path", side_effect=AssertionError("not Windows")):
