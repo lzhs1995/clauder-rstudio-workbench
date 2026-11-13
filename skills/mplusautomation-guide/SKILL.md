@@ -43,6 +43,13 @@ whitelisted real-data receipts. After editing `families.json`, run
 `python scripts/family_registry.py check` and then
 `python scripts/family_registry.py render`.
 
+For CSV or Stata `.dta` sources, `prepare_mplus_source(spec, output_dir)` in
+`scripts/source_spec.R` is the common `source_spec` entry: it writes an ordered
+DAT, `NAMES` and `DATA` fragment from explicit column mappings and per-column
+missing codes, and records source, code and output hashes. See
+[source_spec](references/source-spec.md). It does not read archived DAT or
+compile models, and its preparation receipt is not a real-data swap receipt.
+
 <!-- family-registry:start -->
 | Family | Code | Synthetic | Native | Real-data swap | Historical | Start here |
 |---|---|---|---|---|---|---|
@@ -118,6 +125,12 @@ rejected. `scripts/apim_v2_io.py`, `mplus_queue.py` and
 disk, CPU and owned Mplus descendants. A second slot is enabled only after a
 native calibration receipt; high memory percentage alone does not create an
 indefinite wait when measured headroom satisfies the contract.
+
+Chapter 5 single-level mediation and moderation (MED, MOD, MODMED) follow the
+[mediation and moderation workflow](references/mediation-moderation-workflow.md).
+After changing template variables, run `ch5_check_template_lists()` on the
+filled template and `ch5_check_inp_columns()` on each generated `.inp` (see
+mediation-moderation-workflow.md §3).
 
 ## LPA/LCA, LTA and MS-LTA
 
