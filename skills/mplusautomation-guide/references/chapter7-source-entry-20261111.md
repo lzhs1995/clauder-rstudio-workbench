@@ -42,7 +42,7 @@ Use `schema_version=1`, `mode="new_source"`, and these fields:
 | `waves` | Ordered records `{wave, label, time}` with unique IDs and strictly increasing numeric times |
 | `mapping` | Records `{wave, role, source, target, type, scale}`; unique source names, Mplus target names and wave/role pairs |
 | `id_target` | Separate Mplus column name for the source ID |
-| `models` | Explicit records `{id, family, wave_ids, roles, classes, invariant, starts, estimator, processors}`; optional `seed`, `optseed`, `stayer` |
+| `models` | Explicit records `{id, family, wave_ids, roles, classes, invariant, transitions, starts, estimator, processors}`; optional `seed`, `optseed`, `stayer` |
 
 `family` is `lpa`, `lta` or `mslta`. LCA uses `family="lpa"` with only
 categorical indicators. `type` is `continuous`, `binary` or `categorical`;
@@ -59,6 +59,24 @@ discrete-time LTA does not turn those intervals into a continuous-time model.
 `classes` is the explicitly chosen K for that model, shared across its waves.
 Varying K between models is supported; different K within one longitudinal
 model is not. This entry does not select K or assign semantic class names.
+
+Every new-source and Step-3 model must explicitly declare logical `transitions`.
+For four-wave LTA measurement invariance and Step-1, use `transitions=FALSE`:
+the generated MODEL contains the class-specific measurements and no latent
+`cN ON cN-1` regressions. `invariant=TRUE` shares measurement labels across
+waves; `invariant=FALSE` gives each wave separate labels. Thus four-class
+invariant/free measurement and the ref.cat.4 Step-1 structure can be declared
+with `classes=4`, the appropriate `invariant`, and `transitions=FALSE`.
+The final category K is the chain's reference category; this does not infer a
+semantic class ordering from data or reproduce historical seeds automatically.
+
+Use `transitions=TRUE` for LTA transition estimation, Step-3 and MS-LTA.
+MS-LTA without transitions is rejected because its mover/stayer constraints
+define transitions. In a single-wave LPA/LCA record the flag is still explicit
+but adds no longitudinal regression. Omitting the flag from this configuration
+entry is rejected. Direct callers of the older `ch7_mixture_object()` R API
+retain its default `TRUE`; the new argument is appended to preserve positional
+calls. Archived replay has no new flag and continues preserving original input.
 
 `seed` writes `STSEED`, the random-start seed; `optseed` writes `OPTSEED`.
 They are distinct settings. `estimator` supports ML/MLR. The model's declared
@@ -77,8 +95,13 @@ round trip.
 The ID is retained and declared with `IDVARIABLE`. After estimation, the chain
 reader independently checks its actual savedata format, ID uniqueness and
 values; numeric input validation alone does not prove lossless CPROB export.
-The generated DAT uses MplusAutomation's `.` missing token and is read back
-against its declared NAMES order. No rows are filtered by the entry.
+The generated DAT uses `.` for missing values and is read back against its
+declared NAMES order. ID tokens and their numeric values must match exactly;
+ID checks never use a numerical tolerance. Other numeric columns use
+17-significant-digit decimal tokens, checked exactly against the source double's
+formatted representation; numerical readback is checked at machine precision
+to allow the platform's decimal-to-double parser rounding. No rows are filtered
+by the entry.
 
 To change the source, supply a new `source.path` and its independently computed
 SHA256. To rename source columns, change `mapping.source`; to rename Mplus
@@ -113,7 +136,7 @@ step1 <- list(
   latent = c("c1", "c2"), classes = 2L)
 config <- list(schema_version = 1L, mode = "step3_from_output", step1 = step1,
   models = list(list(id = "step3", family = "lta", classes = 2L,
-    invariant = TRUE, starts = "0", estimator = "MLR", processors = 1L)))
+    invariant = TRUE, transitions = TRUE, starts = "0", estimator = "MLR", processors = 1L)))
 ```
 
 `nominal_map` names the new nominal indicators and maps them to the savedata

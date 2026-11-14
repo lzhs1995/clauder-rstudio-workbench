@@ -43,6 +43,12 @@ The adapter does not derive G-specific transitions from marginal printed tables.
 The renderers are `ch7_profile_plot`, `ch7_fixed_response_plot`,
 `ch7_proportion_plot` and `ch7_matrix_plot`. The fixed-response heatmap is a
 separate display from the continuous/categorical measurement profile.
+Matrix facets use `from_variable`, `to_variable`, `condition` and `kind` as
+their identities in input order. The `label` supplied in the mapping is only
+a display title: different matrices may share it without merging panels.
+Pass the identity and class columns returned by `ch7_matrix_data()` to the
+renderer; duplicate identity/class cells, colliding display cells or conflicting
+titles within one matrix are rejected before plotting.
 
 ## Enumeration, flow and quadratic curves
 

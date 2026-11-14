@@ -56,6 +56,38 @@ test_ch7_figures_20261111 <- function(output_dir = NULL, skill_root = NULL,
   z <- m; z$class_counts$modelEstimated$proportion[1] <- 1.2; bad(ch7_proportion_data(z, map, "modelEstimated"))
   z <- map; z$matrices$condition <- "movers"; bad(ch7_matrix_data(m, z))
   z <- m; z$class_counts$transitionProbs <- z$class_counts$transitionProbs[-1, ]; bad(ch7_matrix_data(z, map))
+  # F1 回归：相同显示标题不得合并不同波次的矩阵，也不得把重复格静默叠画。
+  same <- fixture(c("C1", "C2", "C3"), 2L)
+  same$mapping$matrices$label <- "Transition"
+  same$model$class_counts$transitionProbs$probability <- c(.8, .3, .2, .7, .4, .9, .6, .1)
+  matrices <- ch7_matrix_data(same$model, same$mapping)
+  graph <- ch7_matrix_plot(matrices)
+  matrix_built <- ggplot2::ggplot_build(graph)
+  tiles <- matrix_built$data[[1L]]; text <- matrix_built$data[[2L]]
+  ok(nrow(tiles) == 8L && length(unique(tiles$PANEL)) == 2L)
+  ok(!anyDuplicated(ch7_figure_key(tiles$PANEL, tiles$x, tiles$y)))
+  ok(length(levels(graph$data$facet)) == 2L)
+  titles <- graph$facet$params$labeller(data.frame(facet = levels(graph$data$facet)))[[1L]]
+  ok(identical(unname(titles), rep("Transition | overall", 2L)))
+  # 各格按PANEL与坐标对应原概率；不以输入行数替代实际绘图正确性。
+  expected_panel <- match(as.character(graph$data$facet), as.character(matrix_built$layout$layout$facet))
+  expected_x <- as.integer(graph$data$to_label)
+  expected_y <- nlevels(graph$data$from_label) + 1L - as.integer(graph$data$from_label)
+  expected_key <- ch7_figure_key(expected_panel, expected_x, expected_y)
+  actual_key <- ch7_figure_key(text$PANEL, text$x, text$y)
+  ok(setequal(expected_key, actual_key))
+  ok(identical(as.character(text$label[match(expected_key, actual_key)]), sprintf("%.3f", matrices$probability)))
+  ok(identical(tiles$fill, matrix_built$plot$scales$get_scales("fill")$map(matrices$probability)))
+  renamed <- matrices; renamed$panel <- "Same new display title"
+  renamed_built <- ggplot2::ggplot_build(ch7_matrix_plot(renamed))
+  ok(identical(tiles[c("PANEL", "x", "y", "fill")], renamed_built$data[[1L]][c("PANEL", "x", "y", "fill")]))
+  bad(ch7_matrix_plot(rbind(matrices, matrices[1, ])))
+  conflicting <- matrices; conflicting$panel[1L] <- "Conflicting title"
+  bad(ch7_matrix_plot(conflicting))
+  missing_identity <- matrices; missing_identity$from_variable <- NULL
+  bad(ch7_matrix_plot(missing_identity))
+  colliding_labels <- matrices; colliding_labels$from_label[1:4] <- "Same class label"
+  bad(ch7_matrix_plot(colliding_labels))
   # 联合类别四条件展开；同一条件值不得被平均掩盖。
   grid <- expand.grid(a = 1:2, b = 1:2, response = 1:2)
   prob <- data.frame(param = "NBASE", category = grid$response, est = ifelse(grid$a == grid$response, .8, .2),

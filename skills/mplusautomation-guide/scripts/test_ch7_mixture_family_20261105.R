@@ -232,6 +232,7 @@ test_ch7_mixture_family <- function(output_dir, skill_root) {
           run=0L,check=FALSE,hashfilename=FALSE,writeData='always',quiet=TRUE,
           Mplus_command='FORBIDDEN_IN_SYNTHETIC_CI',killOnFail=FALSE)
       },finally=setwd(prior))
+      ch7_validate_input_width(file.path(folder, 'model.inp'))
       text <- paste(readLines(file.path(folder,'model.inp'),warn=FALSE),collapse='\n')
       data_name<-gsub('"','',statement(segment(tolower(text),'data:','variable:'),'file'),fixed=TRUE)
       stopifnot(data_name=='source.dat')

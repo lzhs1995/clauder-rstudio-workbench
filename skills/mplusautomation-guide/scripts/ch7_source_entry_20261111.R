@@ -34,24 +34,42 @@ ch7_entry_records <- function(x, label) {
 }
 
 # 严格十进制解析；不把未知字符串、日期、无限值悄悄改成缺失。
-ch7_entry_numeric <- function(x, codes, name) {
+# CSV 字符 token 先 trim 并按数值解析，再与声明的数值缺失码比较；非数值
+# 字符哨兵仍按 trim 后文本比较。audit=TRUE 供 manifest 记录摘要，默认返回
+# 数值向量以保持既有调用接口。
+ch7_entry_numeric <- function(x, codes, name, audit = FALSE) {
   ch7_entry_assert(is.character(x) || (is.numeric(x) && !is.object(x)), paste("Unsupported source type:", name))
   codes <- ch7_entry_vector(codes)
   if (is.null(codes)) codes <- numeric()
   ch7_entry_assert((is.numeric(codes) || is.character(codes)) && !anyNA(codes), "Invalid missing codes")
-  missing <- is.na(x) | x %in% codes
+  code_text <- trimws(as.character(codes))
+  code_numeric <- grepl("^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$", code_text)
+  numeric_codes <- suppressWarnings(as.numeric(code_text[code_numeric]))
+  text_codes <- code_text[!code_numeric]
+  missing_numeric <- logical(length(x)); missing_text <- logical(length(x))
   if (is.numeric(x)) {
+    missing_numeric <- is.finite(x) & x %in% numeric_codes
+    missing <- is.na(x) | missing_numeric
     ch7_entry_assert(all(missing | is.finite(x)), paste("Nonfinite source values:", name))
     # DTA 已经是 double；不得通过显示字符串的有效位数改变原数值。
     x[missing] <- NA_real_
-    return(x)
+    result <- x
+  } else {
+    token <- trimws(as.character(x))
+    decimal <- grepl("^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$", token)
+    values <- suppressWarnings(as.numeric(token))
+    missing_numeric <- decimal & is.finite(values) & values %in% numeric_codes
+    missing_text <- !is.na(token) & token %in% text_codes
+    missing <- is.na(x) | missing_numeric | missing_text
+    ch7_entry_assert(all(missing | (decimal & is.finite(values))), paste("Non-decimal or nonfinite source values:", name))
+    values[missing] <- NA_real_
+    result <- values
   }
-  token <- trimws(as.character(x))
-  decimal <- grepl("^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$", token)
-  values <- suppressWarnings(as.numeric(token))
-  ch7_entry_assert(all(missing | (decimal & is.finite(values))), paste("Non-decimal or nonfinite source values:", name))
-  values[missing] <- NA_real_
-  values
+  if (!isTRUE(audit)) return(result)
+  list(values = result, audit = list(column = name, original_type = if (is.numeric(x)) "numeric" else "character",
+    declared_numeric_codes = numeric_codes, declared_text_codes = text_codes,
+    missing_count = sum(is.na(result)), numeric_code_matches = sum(missing_numeric),
+    text_code_matches = sum(missing_text), trim_text_tokens = !is.numeric(x)))
 }
 
 ch7_entry_read_source <- function(config) {
@@ -96,8 +114,13 @@ ch7_entry_read_source <- function(config) {
   per_column <- s$column_missing_codes
   if (!is.null(per_column)) ch7_entry_assert(is.list(per_column) && !is.null(names(per_column)) &&
     !anyDuplicated(names(per_column)) && all(names(per_column) %in% c(s$id, sources)), "Unknown/duplicate per-column missing codes")
-  convert <- function(name) ch7_entry_numeric(raw[[name]], c(ch7_entry_vector(s$missing_codes),
-    ch7_entry_vector(per_column[[name]])), name)
+  missing_audit <- list()
+  convert <- function(name) {
+    converted <- ch7_entry_numeric(raw[[name]], c(ch7_entry_vector(s$missing_codes),
+      ch7_entry_vector(per_column[[name]])), name, audit = TRUE)
+    missing_audit[[name]] <<- converted$audit
+    converted$values
+  }
   if (is.character(raw[[s$id]])) {
     # CSV 身份列先核原字面量，再转 double。小数/科学计数法必须由源准备层显式规范化。
     token <- trimws(raw[[s$id]])
@@ -121,7 +144,7 @@ ch7_entry_read_source <- function(config) {
     data[[m$target]] <- value
   }
   list(data = data, mapping = map, source_sha256 = s$sha256, source_path = path,
-       source_format = s$format, id = id_target)
+       source_format = s$format, id = id_target, missing_audit = missing_audit)
 }
 
 ch7_entry_model_args <- function(model) {
@@ -129,9 +152,11 @@ ch7_entry_model_args <- function(model) {
   positive <- function(x) is.numeric(x) && length(x) == 1L && is.finite(x) && x == trunc(x) && x > 0
   ch7_entry_assert(positive(model$classes) && positive(model$processors), "Classes/processors must be positive integers")
   ch7_entry_assert(is.logical(model$invariant) && length(model$invariant) == 1L && !is.na(model$invariant), "Explicit logical invariant required")
+  ch7_entry_assert(is.logical(model$transitions) && length(model$transitions) == 1L && !is.na(model$transitions),
+    "Explicit logical transitions required")
   ch7_entry_assert(ch7_entry_scalar(model$starts) && grepl("^[0-9]+( +[0-9]+)?$", model$starts), "Invalid starts specification")
   ch7_entry_assert(ch7_entry_scalar(model$estimator) && toupper(model$estimator) %in% c("ML", "MLR"), "Estimator must be ML or MLR")
-  args <- model[c("family", "classes", "invariant", "starts", "estimator", "processors")]
+  args <- model[c("family", "classes", "invariant", "transitions", "starts", "estimator", "processors")]
   if (!is.null(model$stayer)) {
     st <- unlist(model$stayer, use.names = TRUE)
     ch7_entry_assert(is.numeric(st) && identical(sort(names(st)), c("intercept", "slope")) && all(is.finite(st)), "Invalid stayer logits")
@@ -144,6 +169,9 @@ ch7_entry_model_args <- function(model) {
 
 # 对对象而非已打印输入补充显式随机种子与 ID；不变更测量语义和协方差。
 ch7_entry_finish_object <- function(built, model, id) {
+  id_index <- match(toupper(id), toupper(names(built$data)))
+  ch7_entry_assert(length(id_index) == 1L && !is.na(id_index), "ID column missing from compiled data")
+  id <- names(built$data)[id_index]
   if (!grepl("(?i)IDVARIABLE\\s*(=|IS)", built$object$VARIABLE, perl = TRUE))
     built$object$VARIABLE <- paste(built$object$VARIABLE, paste0("IDVARIABLE = ", id, ";"), sep = "\n")
   if (!is.null(model$seed)) built$object$ANALYSIS <- paste(built$object$ANALYSIS,
@@ -152,20 +180,72 @@ ch7_entry_finish_object <- function(built, model, id) {
     paste0("OPTSEED = ", format(model$optseed, scientific = FALSE, trim = TRUE), ";"), sep = "\n")
   built$object$TITLE <- paste0("Chapter 7 configured ", model$id, ";")
   built$object$SAVEDATA <- "FILE = posterior.dat; SAVE = CPROBABILITIES;"
+  # 写DAT时需要单独定位ID列；将其加入规格元数据，不改变模型变量或数值。
+  built$spec$id <- id
   built
 }
 
-ch7_entry_write_model <- function(built, folder) {
+ch7_entry_write_model <- function(built, folder, syntax_runtime) {
   ch7_entry_assert(dir.create(folder, recursive = FALSE, showWarnings = FALSE), "Cannot create fresh model directory")
   old <- getwd(); on.exit(setwd(old)); setwd(folder)
   MplusAutomation::mplusModeler(built$object, dataout = "source.dat", modelout = "model.inp",
     run = 0L, check = FALSE, hashfilename = FALSE, writeData = "always", quiet = TRUE,
     Mplus_command = "FORBIDDEN_COMPILE_ONLY", killOnFail = FALSE)
+  # MplusAutomation 的默认 fwrite 可能以有限显示精度写大整数 ID。
+  # 这里用17位有效数字重写全部数值；ID 用整数字面文本，并在成功回执前逐值核原字节语义。
+  id <- built$spec$id
+  ch7_entry_assert(ch7_entry_scalar(id) && id %in% names(built$data), "Compiled data needs an explicit ID column")
+  format_value <- function(value, is_id = FALSE) {
+    if (is.na(value)) return(".")
+    if (is_id) {
+      ch7_entry_assert(is.finite(value) && value == trunc(value) && abs(value) <= 2^53,
+        "ID cannot be represented as an exact finite integer")
+      token <- format(value, scientific = FALSE, trim = TRUE, digits = 22)
+      ch7_entry_assert(grepl("^[+-]?[0-9]+$", token), "ID serialization did not produce an integer literal")
+      return(token)
+    }
+    token <- sprintf("%.17g", value)
+    ch7_entry_assert(grepl("^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$", token),
+      "Numeric serialization produced an invalid token")
+    token
+  }
+  id_index <- match(id, names(built$data))
+  tokens <- lapply(seq_len(nrow(built$data)), function(i)
+    vapply(seq_along(built$data), function(j) format_value(built$data[[j]][[i]], j == id_index), ""))
+  lines <- vapply(tokens, paste, "", collapse = " ")
+  writeBin(charToRaw(paste0(paste(lines, collapse = "\n"), "\n")), "source.dat")
+  # 所有列按17位文本逐 token 核验；ID另作无容差的整数与唯一性检查。
+  raw_lines <- readLines("source.dat", warn = FALSE)
+  fields <- strsplit(trimws(raw_lines), "[[:space:]]+")
+  ch7_entry_assert(length(fields) == nrow(built$data) &&
+    all(vapply(fields, length, integer(1)) == ncol(built$data)),
+    "Compiled DAT row/column shape changed")
+  ch7_entry_assert(identical(unname(unlist(fields)), unname(unlist(tokens))),
+    "Compiled DAT numeric tokens or column order changed")
+  expected_id <- vapply(built$data[[id]], format_value, "", is_id = TRUE)
+  actual_id <- vapply(fields, `[[`, "", id_index)
+  ch7_entry_assert(identical(actual_id, expected_id) && !anyDuplicated(actual_id),
+    "Compiled DAT ID tokens changed or became duplicated")
+  id_back <- suppressWarnings(as.numeric(actual_id))
+  ch7_entry_assert(length(id_back) == length(built$data[[id]]) &&
+    identical(id_back, as.numeric(built$data[[id]])) && !anyDuplicated(id_back),
+    "Compiled DAT ID numeric readback is not exact and unique")
   back <- utils::read.table("source.dat", header = FALSE, na.strings = ".", colClasses = "numeric",
     comment.char = "", quote = "", check.names = FALSE)
-  ch7_entry_assert(identical(dim(back), dim(built$data)) &&
-    isTRUE(all.equal(as.matrix(back), unname(as.matrix(built$data)), check.attributes = FALSE, tolerance = 1e-12)),
-    "Compiled DAT does not reproduce declared data and column order")
+  expected_values <- as.numeric(as.matrix(built$data)); actual_values <- as.numeric(as.matrix(back))
+  # R的十进制解析器在长小数上可能相差数个ULP；文本保真已独立检查。
+  # 此机器精度核验只适用于连续数值，绝不替代上面ID的精确检查。
+  close_values <- length(actual_values) == length(expected_values) &&
+    all((is.na(actual_values) & is.na(expected_values)) |
+      (!is.na(actual_values) & !is.na(expected_values) &
+       abs(actual_values - expected_values) <= 4 * .Machine$double.eps *
+         pmax(abs(expected_values), .Machine$double.xmin)))
+  ch7_entry_assert(identical(dim(back), dim(built$data)) && close_values,
+    "Compiled DAT numeric readback differs beyond machine precision")
+  # 对完整成品（含MplusAutomation添加的NAMES/TITLE等）安全换行并再核90列。
+  wrapped <- syntax_runtime$ch7_wrap_mplus_lines(readLines("model.inp", warn = FALSE), width = 90L)
+  writeLines(wrapped, "model.inp", useBytes = TRUE)
+  syntax_runtime$ch7_validate_input_width("model.inp")
   text <- paste(readLines("model.inp", warn = FALSE), collapse = "\n")
   ch7_entry_assert(!grepl("FORBIDDEN_COMPILE_ONLY", text, fixed = TRUE), "Unexpected engine marker in input")
   list(input_sha256 = ch7_entry_sha("model.inp"), data_sha256 = ch7_entry_sha("source.dat"),
@@ -291,7 +371,7 @@ ch7_source_entry <- function(config, output_dir, skill_root = NULL) {
   ids <- vapply(models, function(m) if (ch7_entry_scalar(m$id)) m$id else "", "")
   ch7_entry_assert(all(grepl("^[A-Za-z][A-Za-z0-9_-]{0,79}$", ids)) && !anyDuplicated(tolower(ids)), "Unique safe model IDs required")
   data_source <- NULL; built <- list(); chains <- list()
-  model_required <- c("id", "family", "classes", "invariant", "starts", "estimator", "processors")
+  model_required <- c("id", "family", "classes", "invariant", "transitions", "starts", "estimator", "processors")
   if (config$mode == "new_source") {
     ch7_entry_assert(is.null(config$step1), "new_source cannot carry prior Step-1 outputs")
     data_source <- ch7_entry_read_source(config)
@@ -356,7 +436,7 @@ ch7_source_entry <- function(config, output_dir, skill_root = NULL) {
   for (model in models) {
     folder <- file.path(output_dir, model$id)
     info <- if (config$mode == "historical_replay") ch7_entry_replay(model, folder) else
-      ch7_entry_write_model(built[[model$id]], folder)
+      ch7_entry_write_model(built[[model$id]], folder, runtime)
     model_paths[[model$id]] <- list(input = file.path(folder, "model.inp"), data = file.path(folder, "source.dat"))
     if (config$mode == "step3_from_output") {
       info$lineage <- runtime$ch7_step3_chain_receipt(chains[[model$id]], model_paths[[model$id]]$input,
@@ -376,6 +456,7 @@ ch7_source_entry <- function(config, output_dir, skill_root = NULL) {
     source_contract = if (!is.null(data_source)) config$source[setdiff(names(config$source), "path")] else NULL,
     sample = if (!is.null(data_source)) config$sample else NULL,
     mapping = if (!is.null(data_source)) config$mapping else NULL,
+    missing_audit = if (!is.null(data_source)) data_source$missing_audit else NULL,
     waves = if (!is.null(data_source)) config$waves else NULL,
     transformations = if (!is.null(data_source)) config$transformations else NULL,
     rows_removed = 0L, row_order = "source", model_count = length(artifacts), artifacts = artifacts,

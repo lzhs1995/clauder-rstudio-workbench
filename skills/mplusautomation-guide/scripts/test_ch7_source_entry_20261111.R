@@ -39,7 +39,7 @@ test_ch7_source_entry_20261111 <- function(output_dir, skill_root) {
   }
   model <- function(id, family = "lta", waves = paste0("w", 1:4), roles = c("signal", "binary"), k = 2L)
     list(id = id, family = family, wave_ids = waves, roles = roles, classes = k,
-      invariant = TRUE, starts = "20 5", estimator = "MLR", processors = 1L, seed = 71111L)
+      invariant = TRUE, transitions = TRUE, starts = "20 5", estimator = "MLR", processors = 1L, seed = 71111L)
   cfg <- list(schema_version = 1L, mode = "new_source", source = write_source(d, "source"),
     sample = list(rule = "all_rows", row_order = "source"),
     transformations = list(status = "none", description = "Synthetic scale fixed before entry"),
@@ -55,6 +55,31 @@ test_ch7_source_entry_20261111 <- function(output_dir, skill_root) {
   check("seed_preserved", grepl("STSEED = 71111;", inp(base), fixed = TRUE))
   check("four_wave_syntax", grepl("CLASSES = c1(2) c2(2) c3(2) c4(2);", inp(base), fixed = TRUE))
   check("no_absolute_manifest_path", !grepl(output_dir, paste(readLines(file.path(base$output_dir, "manifest.json")), collapse = ""), fixed = TRUE))
+  check("default_explicit_transition_present", grepl("c2 ON c1;", inp(base), fixed = TRUE))
+  c <- cfg; c$models[[1L]]$transitions <- FALSE
+  measure <- prepare(c, "measurement_only")
+  check("measurement_only_has_no_transitions", !grepl("(?i)\\bc[0-9]+\\s+ON\\s+c[0-9]+", inp(measure), perl = TRUE))
+  check("measurement_structure_recorded", identical(measure$manifest$artifacts$base$spec$transitions, FALSE))
+  c <- cfg; c$models[[1L]]$transitions <- NULL
+  reject("implicit_transition_structure_rejected", prepare(c, "missing_transitions"))
+
+  # M1 回归：允许上界附近的多个唯一 ID 必须逐字面量写入 DAT 并逐值回读。
+  large <- d[seq_len(8L), , drop = FALSE]
+  large$person_key <- as.character(9007199254740985:9007199254740992)
+  c_large <- cfg
+  c_large$source <- write_source(large, "large_exact_ids")
+  large_result <- prepare(c_large, "large_exact_ids")
+  large_dat_lines <- readLines(large_result$models$base$data, warn = FALSE)
+  large_tokens <- vapply(strsplit(trimws(large_dat_lines), "[[:space:]]+"), `[[`, "", 1L)
+  expected_large <- as.character(9007199254740985:9007199254740992)
+  check("large_id_literal_exact", identical(large_tokens, expected_large))
+  check("large_id_literal_unique", !anyDuplicated(large_tokens))
+  check("large_id_numeric_exact", identical(as.numeric(large_tokens), as.numeric(expected_large)))
+  check("large_id_manifest_prepared", large_result$manifest$status == "PREPARED_NO_ENGINE")
+  duplicate_large <- large
+  duplicate_large$person_key[8L] <- duplicate_large$person_key[7L]
+  c_large_bad <- cfg; c_large_bad$source <- write_source(duplicate_large, "large_duplicate_ids")
+  reject("large_id_duplicate_rejected_at_source", prepare(c_large_bad, "large_duplicate_ids_rejected"))
 
   c <- cfg; c$source <- write_source(d, "same_values_new_source"); same <- prepare(c, "same_values")
   check("same_values_source_swap", identical(sha(base$models$base$data), sha(same$models$base$data)))
@@ -90,6 +115,21 @@ test_ch7_source_entry_20261111 <- function(output_dir, skill_root) {
   c <- cfg; dm <- d; dm$wave_1_signal[2L] <- -999
   c$source <- write_source(dm, "missing_code"); c$source$missing_codes <- -999
   missing <- prepare(c, "missing"); check("missing_code_recode", is.na(dat(missing)[2L, 2L]) && nrow(dat(missing)) == nrow(d))
+  # N1：等价数值码按数值处理，文本哨兵先trim；身份列命中哨兵必须拒绝。
+  dm <- d; dm$wave_1_signal <- as.character(dm$wave_1_signal)
+  dm$wave_1_signal[1:3] <- c("-999.0", " -999 ", " NA_TOKEN ")
+  c <- cfg; c$source <- write_source(dm, "missing_variants")
+  c$source$missing_codes <- c("-999", "NA_TOKEN")
+  variants <- prepare(c, "missing_variants")
+  check("numeric_missing_spelling_variants", all(is.na(dat(variants)[1:2, 2L])))
+  check("trimmed_text_missing_token", is.na(dat(variants)[3L, 2L]))
+  check("missing_variants_keep_rows", nrow(dat(variants)) == nrow(d))
+  for (sentinel in c("-999", "-999.0", " -999 ")) {
+    dm <- d; dm$person_key <- as.character(dm$person_key); dm$person_key[1L] <- sentinel
+    key <- paste0("id_sentinel_", match(sentinel, c("-999", "-999.0", " -999 ")))
+    c <- cfg; c$source <- write_source(dm, key); c$source$missing_codes <- -999
+    reject(key, prepare(c, key))
+  }
   json <- file.path(output_dir, "config.json"); jsonlite::write_json(cfg, json, auto_unbox = TRUE, pretty = TRUE)
   from_json <- prepare(json, "json_config")
   check("json_api_equal", identical(inp(base), inp(from_json)) && identical(dat(base), dat(from_json)))
@@ -175,11 +215,15 @@ test_ch7_source_entry_20261111 <- function(output_dir, skill_root) {
   step_cfg <- list(schema_version = 1L, mode = "step3_from_output", step1 = list(out = step_out, savedata = step_dat,
     out_sha256 = sha(step_out), savedata_sha256 = sha(step_dat), id = "SID", nominal_map = c(n1 = "MLCC1", n2 = "MLCC2"),
     latent = c("c1", "c2"), classes = 2L), models = list(list(id = "step3", family = "lta", classes = 2L,
-    invariant = TRUE, starts = "0", estimator = "MLR", processors = 1L)))
+    invariant = TRUE, transitions = TRUE, starts = "0", estimator = "MLR", processors = 1L)))
   step <- prepare(step_cfg, "step3")
   check("step3_bound_lineage", step$manifest$artifacts$step3$lineage$status == "PASS_COMPILED_LINEAGE")
   check("step3_direct_logit", grepl("n1#1@1.386", inp(step), fixed = TRUE))
+  check("step3_still_estimates_transitions", grepl("c2 ON c1;", inp(step), fixed = TRUE))
   check("step3_id_preserved", identical(as.numeric(dat(step)[, 1L]), as.numeric(1:8)))
+  c <- step_cfg; c$step1$id <- "sid"
+  lower_id <- prepare(c, "step3_case_insensitive_id")
+  check("step3_id_case_insensitive_binding", identical(dat(lower_id), dat(step)))
   c <- step_cfg; c$step1$savedata_sha256 <- paste(rep("0", 64L), collapse = "")
   reject("step3_savedata_sha_mismatch", prepare(c, "step3_bad_sha"))
   c <- step_cfg; c$models[[1L]]$classes <- 3L

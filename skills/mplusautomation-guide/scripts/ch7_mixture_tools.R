@@ -332,7 +332,7 @@ ch7_enumeration_table <- function(paths, min_class_prop = NULL, min_entropy = NU
 }
 
 # ---- Step-1 存盘 → Step-3 输入绑定（lta-workflow.md：每个 Step-3 输入与 Step-1 savedata 有明确 hash 关系） ----
-# Step-1 .out 的 SAVEDATA INFORMATION：列序与存盘文件名
+# Step-1 .out 的 SAVEDATA INFORMATION：列序、存盘文件名与实际缺失符号。
 ch7_savedata_info <- function(text) {
   i <- grep("^\\s*SAVEDATA INFORMATION\\s*$", text)
   if (length(i) != 1L) return(NULL)
@@ -349,9 +349,43 @@ ch7_savedata_info <- function(text) {
   file_at <- save_at[1] + 1L
   while (file_at <= length(tail) && !nzchar(trimws(tail[file_at]))) file_at <- file_at + 1L
   if (file_at > length(tail)) return(NULL)
+  marker_lines <- grep("^\\s*Save missing symbol\\s+[^[:space:]]+\\s*$", tail,
+    ignore.case = TRUE, value = TRUE, perl = TRUE)
+  if (length(marker_lines) != 1L) return(NULL)
+  marker <- sub("^\\s*Save missing symbol\\s+([^[:space:]]+)\\s*$", "\\1",
+    marker_lines[[1L]], ignore.case = TRUE, perl = TRUE)
+  marker <- sub("^([\"'])(.*)\\1$", "\\2", marker)
+  if (!nzchar(marker) || grepl("[[:space:]]", marker)) return(NULL)
   list(names = toupper(sub("\\s+[FEG][0-9]+\\.[0-9]+$", "", rows)),
        formats = sub("^.*\\s+([FEG][0-9]+\\.[0-9]+)$", "\\1", rows),
-       file = sub("^([\"'])(.*)\\1$", "\\2", trimws(tail[file_at])))
+       file = sub("^([\"'])(.*)\\1$", "\\2", trimws(tail[file_at])), missing_symbol = marker)
+}
+
+# 数值 MISSFLAG 可由 F/E/D 输出格式重写；按精确十进制值识别，避免
+# double 舍入把邻近真实值或超界 ID 误当缺失。非数值符号只作字面量比较。
+ch7_savedata_missing <- function(tokens, symbol) {
+  if (!is.character(symbol) || length(symbol) != 1L || is.na(symbol) || !nzchar(symbol))
+    stop("Savedata missing symbol declaration is required")
+  number <- "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[EeDd][+-]?[0-9]+)?$"
+  missing <- !is.na(tokens) & tokens == symbol
+  if (!grepl(number, symbol, perl = TRUE)) return(missing)
+  if (!is.finite(suppressWarnings(as.numeric(gsub("[dD]", "E", symbol)))))
+    stop("Numeric savedata missing symbol must be finite")
+  decimal_key <- function(token) {
+    parts <- strsplit(sub("^[+-]", "", token), "[EeDd]")[[1L]]
+    places <- if (grepl(".", parts[1L], fixed = TRUE)) nchar(sub("^[^.]*\\.", "", parts[1L])) else 0L
+    digits <- sub("^0+", "", gsub(".", "", parts[1L], fixed = TRUE))
+    if (!nzchar(digits)) return("0")
+    exponent <- if (length(parts) == 2L) suppressWarnings(as.numeric(parts[2L])) else 0
+    if (!is.finite(exponent)) return(NA_character_)
+    reduced <- sub("0+$", "", digits)
+    paste0(if (startsWith(token, "-")) "-" else "", reduced, "e",
+      sprintf("%.0f", exponent - places + nchar(digits) - nchar(reduced)))
+  }
+  valid <- !is.na(tokens) & grepl(number, tokens, perl = TRUE)
+  keys <- vapply(tokens[valid], decimal_key, "", USE.NAMES = FALSE)
+  missing[valid] <- !is.na(keys) & keys == decimal_key(symbol)
+  missing
 }
 
 # DATA FILE 按 INP 所在目录解析，不能用同名文件代替真正的数据源。
@@ -429,7 +463,13 @@ ch7_step3_binding <- function(step1_out, step1_savedata, step3_inp, step3_dat = 
   variable <- ch7_statements(sec[["VARIABLE"]])
   names3 <- ch7_varlist(ch7_option(variable, "NAMES")); nominal3 <- ch7_varlist(ch7_option(variable, "NOMINAL"), names3)
   read_dat <- function(p) as.matrix(utils::read.table(p, header = FALSE, na.strings = c("*", "."), colClasses = "numeric"))
-  d1 <- read_dat(step1_savedata); d3 <- read_dat(step3_dat)
+  if (is.null(info)) return(finish())
+  raw1 <- as.matrix(utils::read.table(step1_savedata, header = FALSE, na.strings = character(),
+    colClasses = "character", comment.char = "", quote = ""))
+  raw1[ch7_savedata_missing(raw1, info$missing_symbol)] <- NA_character_
+  d1 <- matrix(suppressWarnings(as.numeric(gsub("[dD]", "E", raw1))), nrow(raw1), ncol(raw1))
+  if (any(!is.na(raw1) & !is.finite(d1))) stop("Step-1 savedata contains undeclared missing or invalid numeric values")
+  d3 <- read_dat(step3_dat)
   names1 <- if (is.null(info)) character() else info$names
   check("step1_columns_match_declared_order", length(names1) == ncol(d1), "Step-1 savedata column count differs from its declared order")
   check("step3_columns_match_names", length(names3) == ncol(d3), "Step-3 DAT column count differs from NAMES")

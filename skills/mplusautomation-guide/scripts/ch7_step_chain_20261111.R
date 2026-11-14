@@ -118,12 +118,50 @@ ch7_classification_error <- function(step1_out, latent, classes) {
 # 兼容 Save file 在变量序之前/之后；格式读取交给同一既有解析器。
 ch7_step1_savedata_info <- function(text) {
   info <- ch7_savedata_info(text)
-  if (is.null(info)) stop("Missing or malformed SAVEDATA INFORMATION")
+  if (is.null(info)) stop("Missing or malformed SAVEDATA INFORMATION, including Save missing symbol")
   if (anyDuplicated(info$names)) stop("Duplicate savedata column names")
   info
 }
 
-ch7_read_step1_savedata <- function(path, info) {
+# ID 必须先按十进制字面量判定，再转换 double；禁止靠舍入后的数值“证明”精确。
+# F 格式的零小数位以及 E/D 指数均可归一化，但原 token 的数学值必须恰好为整数。
+ch7_chain_integer_ids <- function(tokens) {
+  if (!is.character(tokens) || !length(tokens) || anyNA(tokens))
+    stop("IDs need nonmissing numeric tokens")
+  canonical <- vapply(trimws(tokens), function(token) {
+    number <- "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[EeDd][+-]?[0-9]+)?$"
+    if (!grepl(number, token, perl = TRUE)) stop("ID token is not a finite decimal integer")
+    negative <- startsWith(token, "-")
+    parts <- strsplit(sub("^[+-]", "", token), "[EeDd]")[[1L]]
+    mantissa <- parts[1L]
+    decimal_places <- if (grepl(".", mantissa, fixed = TRUE)) nchar(sub("^[^.]*\\.", "", mantissa)) else 0L
+    digits <- sub("^0+", "", gsub(".", "", mantissa, fixed = TRUE))
+    if (!nzchar(digits)) return("0")
+    exponent <- if (length(parts) == 2L) suppressWarnings(as.numeric(parts[2L])) else 0
+    if (!is.finite(exponent) || abs(exponent) > nchar(mantissa) + 16L)
+      stop("ID token is outside the exact integer range or is fractional")
+    shift <- exponent - decimal_places
+    if (shift < 0) {
+      count <- -shift
+      if (count >= nchar(digits) || !grepl("^0+$", substr(digits, nchar(digits) - count + 1L, nchar(digits))))
+        stop("ID token has a nonzero fractional part")
+      digits <- substr(digits, 1L, nchar(digits) - count)
+    } else {
+      if (nchar(digits) + shift > 16L) stop("ID token exceeds the exact integer range")
+      digits <- paste0(digits, strrep("0", shift))
+    }
+    if (nchar(digits) > 16L || (nchar(digits) == 16L && digits > "9007199254740992"))
+      stop("ID token exceeds the exact integer range")
+    paste0(if (negative) "-" else "", digits)
+  }, "", USE.NAMES = FALSE)
+  values <- suppressWarnings(as.numeric(canonical))
+  if (any(!is.finite(values)) || !identical(sprintf("%.0f", values), canonical))
+    stop("ID token does not survive an exact numeric round trip")
+  if (anyDuplicated(canonical) || anyDuplicated(values)) stop("IDs must be unique after exact normalization")
+  values
+}
+
+ch7_read_step1_savedata <- function(path, info, id = NULL) {
   lines <- readLines(path, warn = FALSE)
   if (!length(lines) || any(!nzchar(trimws(lines)))) stop("Savedata contains empty records")
   widths <- as.integer(sub("^[FEG]([0-9]+)\\..*$", "\\1", info$formats))
@@ -137,11 +175,20 @@ ch7_read_step1_savedata <- function(path, info) {
   if (any(lengths(tokens) != length(info$names))) stop("Savedata width differs from its declared variable order")
   number <- "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[EeDd][+-]?[0-9]+)?$"
   raw <- matrix(unlist(tokens), ncol = length(info$names), byrow = TRUE)
-  missing <- raw %in% c("*", ".")
+  missing <- ch7_savedata_missing(raw, info$missing_symbol)
+  id_values <- NULL
+  if (!is.null(id)) {
+    if (!is.character(id) || length(id) != 1L || is.na(id) || !toupper(id) %in% info$names)
+      stop("id must name one savedata column")
+    if (any(missing[, match(toupper(id), info$names)]))
+      stop("Savedata ID contains the declared missing symbol")
+    id_values <- ch7_chain_integer_ids(raw[, match(toupper(id), info$names)])
+  }
   if (any(!missing & !grepl(number, raw, perl = TRUE))) stop("Savedata has nonnumeric or overflow values")
   raw[missing] <- NA_character_
   data <- matrix(as.numeric(gsub("[dD]", "E", raw)), nrow(raw), ncol(raw), dimnames = list(NULL, info$names))
   if (any(!is.na(data) & !is.finite(data))) stop("Savedata contains nonfinite values")
+  if (!is.null(id_values)) data[, match(toupper(id), info$names)] <- id_values
   as.data.frame(data, check.names = FALSE)
 }
 
@@ -154,9 +201,9 @@ ch7_step3_from_step1 <- function(step1_out, step1_savedata = NULL, id, nominal_m
   if (is.null(step1_savedata)) step1_savedata <- declared
   if (!identical(normalizePath(step1_savedata, winslash = "/", mustWork = TRUE), declared))
     stop("Step-1 SAVEDATA declaration does not identify the supplied file")
-  d <- ch7_read_step1_savedata(step1_savedata, info)
   if (!is.character(id) || length(id) != 1L || is.na(id)) stop("id must be one savedata column")
   id <- toupper(id)
+  d <- ch7_read_step1_savedata(step1_savedata, info, id = id)
   if (!id %in% names(d) || anyNA(d[[id]]) || anyDuplicated(d[[id]]) ||
       any(d[[id]] != round(d[[id]]) | abs(d[[id]]) > 2^53)) stop("Savedata needs unique exact nonmissing integer IDs")
   if (!is.character(nominal_map) || is.null(names(nominal_map)) || length(nominal_map) != length(latent) ||
@@ -185,7 +232,7 @@ ch7_step3_from_step1 <- function(step1_out, step1_savedata = NULL, id, nominal_m
   built$step3 <- step3
   built$lineage <- list(status = "COMPILED_FROM_STEP1_PRINTED_LOGITS_NOT_ESTIMATED", source = extracted$source,
     savedata = list(file = basename(step1_savedata), sha256 = ch7_chain_sha(step1_savedata),
-      columns = info$names, formats = info$formats), id_column = id,
+      columns = info$names, formats = info$formats, missing_symbol = info$missing_symbol), id_column = id,
     rows = nrow(data), output_columns = names(data),
     mapping = data.frame(latent = toupper(latent), nominal = nominal, savedata = source),
     diagnostics = extracted$diagnostics,
@@ -203,20 +250,34 @@ ch7_step3_chain_receipt <- function(chain, step3_inp, step3_dat = NULL, value_to
     stop("value_tolerance must be finite and nonnegative")
   if (ch7_chain_sha(chain$private_paths$step1_out) != chain$lineage$source$sha256 ||
       ch7_chain_sha(chain$private_paths$step1_savedata) != chain$lineage$savedata$sha256) stop("Step-1 source changed after extraction")
-  sec <- ch7_inp_sections(readLines(step3_inp, warn = FALSE)); variable <- ch7_statements(sec$VARIABLE)
+  input <- readLines(step3_inp, warn = FALSE)
+  # 此链只接受原始投影列；DEFINE 会改变 Mplus 实际读取的分类输入，不能仅核 DAT 后放行。
+  # 同时拦截四字母命令缩写和紧随其他语句的 inline 写法；注释/引号内文本不作命令。
+  commands <- sub("!.*$", "", input)
+  commands <- gsub("\"[^\"]*\"|'[^']*'", "", paste(commands, collapse = "\n"), perl = TRUE)
+  if (grepl("(?i)(^|[;:\n])\\s*DEFI(?:N(?:E)?)?\\s*:", commands, perl = TRUE))
+    stop("Step-3 DEFINE transformations are not part of the declared projection")
+  sec <- ch7_inp_sections(input); variable <- ch7_statements(sec$VARIABLE)
   path <- ch7_option(ch7_statements(sec$DATA), "FILE")
   path <- sub("^([\"'])(.*)\\1$", "\\2", path)
   declared <- ch7_data_path(path, dirname(step3_inp))
   if (is.null(step3_dat)) step3_dat <- declared
   if (!identical(normalizePath(step3_dat, winslash = "/", mustWork = TRUE), declared)) stop("Step-3 reads a different DAT")
   names3 <- ch7_varlist(ch7_option(variable, "NAMES"))
-  d <- utils::read.table(step3_dat, header = FALSE, na.strings = c("*", "."), colClasses = "numeric")
+  raw <- utils::read.table(step3_dat, header = FALSE, na.strings = c("*", "."), colClasses = "character",
+    comment.char = "", quote = "", check.names = FALSE)
+  id <- chain$lineage$id_column
+  if (ncol(raw) != length(names3) || anyDuplicated(names3) || !id %in% names3)
+    stop("Step-3 DAT width, NAMES or ID invalid")
+  id_values <- ch7_chain_integer_ids(raw[[match(id, names3)]])
+  d <- as.data.frame(lapply(raw, function(x) suppressWarnings(as.numeric(x))), check.names = FALSE)
+  if (any(!is.na(as.matrix(raw)) & !is.finite(as.matrix(d)))) stop("Step-3 DAT contains invalid numeric tokens")
+  d[[match(id, names3)]] <- id_values
   if (ncol(d) != length(names3) || anyDuplicated(names3)) stop("Step-3 DAT width or NAMES invalid")
   names(d) <- names3; expected <- chain$data; names(expected) <- toupper(names(expected))
   if (!setequal(names3, names(expected))) stop("Step-3 columns differ from compiled projection")
   missing <- ch7_missing_codes(ch7_option(variable, "MISSING"), names3)
   for (n in names3) d[[n]][d[[n]] %in% missing[[n]]] <- NA_real_
-  id <- chain$lineage$id_column
   if (anyNA(d[[id]]) || anyDuplicated(d[[id]]) || !setequal(d[[id]], expected[[id]])) stop("Step-3 ID set changed")
   rows <- match(d[[id]], expected[[id]])
   for (n in names3) {

@@ -22,6 +22,16 @@ logit approximation. `keep` optionally names additional savedata columns to
 project. `...` passes declared estimation options to the generator. The source
 Step-1 must declare an `IDVARIABLE`; integer IDs must be unique, nonmissing and
 exactly representable. The Step-3 object also preserves `IDVARIABLE`.
+The savedata reader requires and records exactly one `Save missing symbol`
+declaration from the Step-1 `SAVEDATA INFORMATION` block through the shared
+`ch7_savedata_info()` parser. Numeric markers match their exact decimal value
+across F/E/D output formats; nonnumeric symbols match their literal text.
+A missing declaration or undeclared nonnumeric marker is rejected. The original
+ID tokens are then validated before numeric conversion:
+decimal zero tails and E/D notation are allowed only when the exact decimal
+value is an integer within ±2^53. Nonzero fractional tails, out-of-range tokens
+and duplicate normalized values are rejected even when double rounding would
+make them look valid. Compiled Step-3 DAT identifiers use the same check.
 
 The ordered `latent` vector defines waves. `nominal_map` names the new nominal
 variables and maps them to the corresponding `MLCCn` column by the Step-1
@@ -47,7 +57,9 @@ paths are kept separately in `chain$private_paths`. `chain$data`,
 
 The compiled receipt independently checks the source hashes, Step-3 DATA path,
 column projection by ID, nominal/ID/class declarations and fixed logits in their
-correct latent namespaces. Its status is `PASS_COMPILED_LINEAGE`, with
+correct latent namespaces. `DEFINE` transformations are not supported by this
+projection contract and are rejected, including abbreviated and inline command
+forms; matching text in a comment is ignored. Its status is `PASS_COMPILED_LINEAGE`, with
 `engine_estimated=FALSE`. A new native Step-1→Step-3 claim additionally requires
 the authorized RStudio/ClaudeR→MplusAutomation→Mplus execution receipts for both
 stages, their output hashes, convergence and warnings. An archived output used
@@ -57,5 +69,8 @@ The synthetic contract is
 `test_ch7_step_chain_20261111(output_dir, skill_root)`. It covers two/four waves,
 K=2/3/4, variable names, column-split tables, both SAVEDATA layouts, fixed-width
 negative values, explicit native-call interception and mutation failures. It
+also covers exact ID limits, decimal/exponent representations, rounded-ID
+rejection and undeclared `DEFINE` mutation.
+It
 uses synthetic text/data only and separately records native execution as
 `NOT_RUN`.

@@ -265,15 +265,32 @@ ch7_proportion_plot <- function(data, title = NULL, caption = NULL) {
     ggplot2::labs(title = title, caption = caption, x = "Latent variable", y = paste(unique(data$method), "proportion"), fill = NULL) + ch7_figure_theme()
 }
 ch7_matrix_plot <- function(data, title = NULL, caption = NULL, ncol = NULL) {
-  ch7_figure_frame(data, c("from_label", "to_label", "probability", "panel", "condition", "kind"), "matrix data")
-  d <- data; d$facet <- paste(d$panel, d$condition, sep = " | ")
+  ch7_figure_frame(data, c("from_variable", "to_variable", "from_class", "to_class",
+    "from_label", "to_label", "probability", "panel", "condition", "kind"), "matrix data")
+  d <- data
+  for (name in c("from_variable", "to_variable", "from_class", "to_class", "from_label", "to_label", "panel", "condition", "kind"))
+    if (anyNA(d[[name]]) || any(!nzchar(as.character(d[[name]]))))
+      stop("matrix identities and labels must be non-empty", call. = FALSE)
+  # 分面键只使用实际矩阵身份；重复显示标题经labeller输出，不作为factor标签合并面板。
+  facet_key <- ch7_figure_key(d$from_variable, d$to_variable, d$condition, d$kind)
+  facet_levels <- unique(facet_key)
+  facet_labels <- vapply(facet_levels, function(key) {
+    labels <- unique(paste(d$panel[facet_key == key], d$condition[facet_key == key], sep = " | "))
+    if (length(labels) != 1L) stop("one matrix identity must have one display title", call. = FALSE)
+    labels
+  }, character(1))
+  if (anyDuplicated(ch7_figure_key(facet_key, d$from_class, d$to_class)) ||
+      anyDuplicated(ch7_figure_key(facet_key, d$from_label, d$to_label)))
+    stop("duplicate matrix identity/class or rendered cells", call. = FALSE)
+  d$facet <- factor(facet_key, levels = facet_levels)
   map <- attr(data, "mapping")
   from_levels <- if (is.list(map)) unique(map$classes$label[map$classes$variable %in% d$from_variable]) else unique(d$from_label)
   to_levels <- if (is.list(map)) unique(map$classes$label[map$classes$variable %in% d$to_variable]) else unique(d$to_label)
   d$from_label <- factor(d$from_label, levels = from_levels); d$to_label <- factor(d$to_label, levels = to_levels)
   ggplot2::ggplot(d, ggplot2::aes(to_label, from_label, fill = probability)) + ggplot2::geom_tile(colour = "white") +
     ggplot2::geom_text(ggplot2::aes(label = sprintf("%.3f", probability)), size = 3) +
-    ggplot2::facet_wrap(~facet, ncol = ncol, scales = "free") +
+    ggplot2::facet_wrap(~facet, ncol = ncol, scales = "free",
+      labeller = ggplot2::as_labeller(stats::setNames(facet_labels, facet_levels))) +
     ggplot2::scale_fill_gradient(low = "#f7fbff", high = "#08519c", limits = c(0, 1)) + ggplot2::scale_y_discrete(limits = rev) +
     ggplot2::labs(title = title, caption = caption, x = "Destination class", y = "Origin class", fill = "Probability") + ch7_figure_theme()
 }

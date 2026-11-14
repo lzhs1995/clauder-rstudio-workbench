@@ -113,6 +113,53 @@ test_ch7_step_chain_20261111 <- function(output_dir, skill_root) {
   mutate("reject_wrong_savedata_declaration", function(x) sub("posterior.dat", "missing.dat", x, fixed = TRUE), function() build(f))
   mutate("reject_duplicate_savedata_section", function(x) c(x, "SAVEDATA INFORMATION"), function() build(f))
   mutate("reject_wrong_id_declaration", function(x) sub("IDVARIABLE = SID", "IDVARIABLE = VALUE", x, fixed = TRUE), function() build(f))
+  # N4：缺失符号来自 Step-1 SAVEDATA INFORMATION，不能固定假设 * 或 .。
+  missing_fixture <- fixture("declared_missing_symbol", 2L, 2L)
+  missing_text <- sub("Save missing symbol        *", "Save missing symbol        -999", missing_fixture$text, fixed = TRUE)
+  writeLines(missing_text, missing_fixture$out)
+  missing_rows <- readLines(missing_fixture$saved)
+  missing_rows[1L] <- paste0(substr(missing_rows[1L], 1L, 12L), sprintf("%10s", "-999"), substr(missing_rows[1L], 23L, nchar(missing_rows[1L])))
+  writeLines(missing_rows, missing_fixture$saved)
+  missing_chain <- build(missing_fixture)
+  check("declared_numeric_missing_symbol_bound", is.na(missing_chain$data$VALUE[1L]) &&
+    identical(missing_chain$lineage$savedata$missing_symbol, "-999"))
+  # 不接受未声明的另一种字符缺失符号；数值 marker 则允许合法 F/E/D 格式。
+  mismatch_rows <- missing_rows; mismatch_rows[1L] <- sub("-999", "*", mismatch_rows[1L], fixed = TRUE)
+  writeLines(mismatch_rows, missing_fixture$saved)
+  reject("reject_savedata_missing_symbol_mismatch", build(missing_fixture))
+  numeric_rows <- missing_rows
+  numeric_rows[1L] <- paste0(substr(missing_rows[1L], 1L, 12L), sprintf("%10.3f", -999),
+    substr(missing_rows[1L], 23L, nchar(missing_rows[1L])))
+  writeLines(numeric_rows, missing_fixture$saved)
+  numeric_chain <- build(missing_fixture)
+  check("numeric_missing_marker_fixed_format", is.na(numeric_chain$data$VALUE[1L]))
+  numeric_compiled <- compile(numeric_chain, file.path(missing_fixture$root, "compiled_numeric_missing"))
+  check("numeric_missing_marker_compiled_roundtrip",
+    identical(ch7_step3_chain_receipt(numeric_chain, numeric_compiled)$status, "PASS_COMPILED_LINEAGE"))
+  check("numeric_missing_marker_exact_decimal_equivalence",
+    identical(ch7_savedata_missing(c("-999", "-999.000", "-9.99E2", "-9.99D2", "-999.00000000000000001"), "-999"),
+      c(TRUE, TRUE, TRUE, TRUE, FALSE)))
+  check("shared_savedata_parser_exposes_missing_symbol",
+    identical(ch7_savedata_info(missing_text)$missing_symbol, "-999"))
+  reject("reject_duplicate_missing_symbol_declaration", {
+    writeLines(c(missing_text, " Save missing symbol -999"), missing_fixture$out)
+    build(missing_fixture)
+  })
+  writeLines(missing_text, missing_fixture$out)
+  writeLines(missing_rows, missing_fixture$saved)
+  reject("reject_missing_symbol_declaration_absent", {
+    writeLines(missing_text[!grepl("Save missing symbol", missing_text, fixed = TRUE)], missing_fixture$out)
+    build(missing_fixture)
+  })
+  writeLines(missing_text, missing_fixture$out)
+  dot_text <- sub("Save missing symbol        -999", "Save missing symbol        .", missing_text, fixed = TRUE)
+  writeLines(dot_text, missing_fixture$out)
+  dot_rows <- missing_rows; dot_rows[1L] <- sub("-999", ".", dot_rows[1L], fixed = TRUE)
+  writeLines(dot_rows, missing_fixture$saved)
+  dot_chain <- build(missing_fixture)
+  check("declared_dot_missing_symbol_bound", is.na(dot_chain$data$VALUE[1L]) &&
+    identical(dot_chain$lineage$savedata$missing_symbol, "."))
+  writeLines(missing_text, missing_fixture$out); writeLines(missing_rows, missing_fixture$saved)
   writeLines(sub("INPUT READING TERMINATED NORMALLY", "SUMMARY OF ANALYSIS", baseline), f$out)
   check("supports_summary_input_boundary", length(build(f)$step3$logits) == 2L)
   writeLines(baseline, f$out)
@@ -123,12 +170,48 @@ test_ch7_step_chain_20261111 <- function(output_dir, skill_root) {
   reject("reject_duplicate_ids", build(f)); writeLines(saved_base, f$saved)
   writeLines(sub("^.{12}", "           *", saved_base), f$saved)
   reject("reject_missing_ids", build(f)); writeLines(saved_base, f$saved)
+  # R2：在原始固定宽度 ID 上复现边界与舍入负例，不能让 as.numeric 先抹掉小数或越界。
+  wide <- fixture("exact_savedata_ids", 2L, 2L)
+  writeLines(sub("F12.0", "F24.0", wide$text, fixed = TRUE), wide$out)
+  narrow_rows <- readLines(wide$saved)
+  wide_rows <- paste0(sprintf("%24s", trimws(substr(narrow_rows, 1L, 12L))),
+    substr(narrow_rows, 13L, nchar(narrow_rows)))
+  id_case <- function(token) {
+    rows <- wide_rows
+    rows[1L] <- paste0(sprintf("%24s", token), substr(narrow_rows[1L], 13L, nchar(narrow_rows[1L])))
+    writeLines(rows, wide$saved)
+    build(wide)
+  }
+  valid_ids <- c(upper = "9007199254740992", upper_minus_one = "9007199254740991",
+    lower = "-9007199254740992", decimal_zero_tail = "9007199254740992.000",
+    exponent = "9.007199254740992D15", integer_exponent = "+00100E-1", negative_zero = "-0.000")
+  expected_ids <- c(2^53, 2^53 - 1, -2^53, 2^53, 2^53, 10, 0)
+  for (i in seq_along(valid_ids)) check(paste0("savedata_exact_id_", names(valid_ids)[i]),
+    identical(id_case(valid_ids[i])$data$SID[1L], expected_ids[i]))
+  invalid_ids <- c(above_range = "9007199254740993", below_range = "-9007199254740993",
+    rounded_fraction = "1.00000000000000001", fractional_exponent = "100000000000000001E-17",
+    tiny_fraction = "1E-9999", huge_exponent = "1E9999", nondecimal = "0x10")
+  for (i in seq_along(invalid_ids)) reject(paste0("reject_savedata_id_", names(invalid_ids)[i]), id_case(invalid_ids[i]))
+  reject("reject_savedata_normalized_duplicate", id_case("2.000D0"))
+  # 同样的严格整数合同适用于自由格式存盘。
+  writeLines(c("9007199254740993 -1.125 1 1", "2 -2.125 2 2"), wide$saved)
+  reject("reject_free_format_rounded_id", build(wide))
   other <- file.path(f$root, "other"); dir.create(other); file.copy(f$saved, other)
   reject("reject_same_name_other_path", ch7_step3_from_step1(f$out, file.path(other, "posterior.dat"), id = "SID",
     nominal_map = f$nominal_map, latent = f$latent, classes = f$K))
   ms <- build(f, family = "mslta"); inp <- compile(ms, file.path(f$root, "ms_compiled"))
   check("ms_lta_compiled_chain", ch7_step3_chain_receipt(ms, inp)$status == "PASS_COMPILED_LINEAGE")
   inp_base <- readLines(inp)
+  # R1：数据和固定logit不变时，额外输入变换仍必须被拒；保留注释说明的正例。
+  insert_at <- grep("^ANALYSIS:", inp_base)[1L] - 1L
+  for (variant in c("DEFINE:\n n1 = 1;", "defi: n1 = 1;", "OUTPUT: TECH1; DEFINE: n1 = 1;")) {
+    writeLines(append(inp_base, variant, after = insert_at), inp)
+    reject(paste0("reject_step3_define_variant_", match(variant, c("DEFINE:\n n1 = 1;", "defi: n1 = 1;", "OUTPUT: TECH1; DEFINE: n1 = 1;"))),
+      ch7_step3_chain_receipt(ms, inp))
+  }
+  writeLines(append(inp_base, "! DEFINE: n1 = 1; is not an active statement", after = insert_at), inp)
+  check("define_in_comment_is_not_a_transform", ch7_step3_chain_receipt(ms, inp)$status == "PASS_COMPILED_LINEAGE")
+  writeLines(inp_base, inp)
   writeLines(sub("c1(3)", "c1(4)", inp_base, fixed = TRUE), inp)
   reject("reject_step3_wrong_classes", ch7_step3_chain_receipt(ms, inp)); writeLines(inp_base, inp)
   writeLines(sub("n1#1@14.000000000000", "n1#1@13.000000000000", inp_base, fixed = TRUE), inp)
@@ -138,6 +221,10 @@ test_ch7_step_chain_20261111 <- function(output_dir, skill_root) {
   writeLines(c(baseline, "changed source"), f$out)
   reject("reject_step1_changed_after_build", ch7_step3_chain_receipt(ms, inp)); writeLines(baseline, f$out)
   dat <- file.path(dirname(inp), "data.dat"); d <- utils::read.table(dat, header = FALSE)
+  dat_base <- readLines(dat)
+  writeLines(sub("^[^[:space:]]+", "1.00000000000000001", dat_base), dat)
+  reject("reject_step3_dat_rounded_id", ch7_step3_chain_receipt(ms, inp))
+  writeLines(dat_base, dat)
   utils::write.table(d[rev(seq_len(nrow(d))), ], dat, row.names = FALSE, col.names = FALSE)
   check("rows_compared_by_id", !ch7_step3_chain_receipt(ms, inp)$row_order_identical)
   d[1, 2] <- d[1, 2] + 1

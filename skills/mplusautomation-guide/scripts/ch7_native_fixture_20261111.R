@@ -40,9 +40,9 @@ ch7_native_fixture <- function(output_dir, n = 400L, seed = 71111L) {
   }
   csv <- file.path(output_dir, "synthetic_source.csv")
   utils::write.csv(data, csv, row.names = FALSE, na = "")
-  spec <- function(id, family, wave_ids, roles) list(id = id, family = family,
+  spec <- function(id, family, wave_ids, roles, transitions = TRUE) list(id = id, family = family,
     wave_ids = wave_ids, roles = roles, classes = 2L, invariant = TRUE,
-    starts = "40 10", estimator = "MLR", processors = 1L, seed = seed)
+    starts = "40 10", estimator = "MLR", processors = 1L, transitions = transitions, seed = seed)
   continuous <- paste0("x", 1:3); binary <- paste0("b", 1:3)
   config <- list(schema_version = 1L, mode = "new_source",
     source = list(path = csv, sha256 = digest::digest(csv, algo = "sha256", file = TRUE),
@@ -55,7 +55,7 @@ ch7_native_fixture <- function(output_dir, n = 400L, seed = 71111L) {
       spec("SYN_LPA", "lpa", "w1", continuous),
       spec("SYN_LCA", "lpa", "w1", binary),
       spec("SYN_MIXED", "lpa", "w1", c(continuous, binary)),
-      spec("SYN_LTA4_MI_STEP1", "lta", paste0("w", 1:4), c(continuous, binary)),
+      spec("SYN_LTA4_MI_STEP1", "lta", paste0("w", 1:4), c(continuous, binary), transitions = FALSE),
       spec("SYN_MSLTA4_MI", "mslta", paste0("w", 1:4), c(continuous, binary))))
   config_file <- file.path(output_dir, "synthetic_config.json")
   jsonlite::write_json(config, config_file, auto_unbox = TRUE, pretty = TRUE, digits = NA)
@@ -64,6 +64,7 @@ ch7_native_fixture <- function(output_dir, n = 400L, seed = 71111L) {
     config_sha256 = digest::digest(config_file, algo = "sha256", file = TRUE),
     synthetic_only = TRUE, mplus_calls = 0L, acceptance = "GENERATED_NOT_ENGINE_VALIDATED",
     measurement = "3 continuous normal + 3 binary indicators; within-class independent; invariant population parameters",
+    step1_structure = "Four-wave invariant measurement; transitions = FALSE; no latent ON regressions",
     stayer = "data generation exact no-change; model uses declared finite logit approximation",
     downstream = c("SYN_LTA4_STEP3", "SYN_MSLTA4_STEP3"),
     downstream_dependency = "SYN_LTA4_MI_STEP1 fresh OUT and its own savedata; never reuse prior CPROB")
