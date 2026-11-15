@@ -164,7 +164,7 @@ ch7_chain_integer_ids <- function(tokens) {
 ch7_read_step1_savedata <- function(path, info, id = NULL) {
   lines <- readLines(path, warn = FALSE)
   if (!length(lines) || any(!nzchar(trimws(lines)))) stop("Savedata contains empty records")
-  widths <- as.integer(sub("^[FEG]([0-9]+)\\..*$", "\\1", info$formats))
+  widths <- ch7_savedata_widths(info$formats)
   if (length(widths) != length(info$names) || anyNA(widths) || any(widths <= 0L)) stop("Unsupported savedata format")
   # 优先严格固定宽度，能正确读相邻的负值。外部自由格式必须每行恰好同样列数。
   fixed <- all(nchar(lines, type = "chars") == sum(widths))

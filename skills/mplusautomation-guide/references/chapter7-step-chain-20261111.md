@@ -24,7 +24,12 @@ Step-1 must declare an `IDVARIABLE`; integer IDs must be unique, nonmissing and
 exactly representable. The Step-3 object also preserves `IDVARIABLE`.
 The savedata reader requires and records exactly one `Save missing symbol`
 declaration from the Step-1 `SAVEDATA INFORMATION` block through the shared
-`ch7_savedata_info()` parser. Numeric markers match their exact decimal value
+`ch7_savedata_info()` parser. Variable format rows accept both floating-point
+Fortran descriptors (`F`, `E`, `G`, `D` `<w>.<d>`) and integer `I<w>` descriptors
+emitted by Mplus 9 for integer `IDVARIABLE` columns (such as `SID I4` in
+`45F10.3 I4`), using `ch7_savedata_widths()` to slice fixed-width records even
+when a full-width integer ID touches the preceding `F10.3` field without
+intervening spaces. Numeric markers match their exact decimal value
 across F/E/D output formats; nonnumeric symbols match their literal text.
 A missing declaration or undeclared nonnumeric marker is rejected. The original
 ID tokens are then validated before numeric conversion:

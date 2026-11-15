@@ -112,7 +112,8 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   ms4 <- ch7_mixture_object(syn, "mslta", waves = lapply(1:3, wave), categorical = binary, classes = 4L)
   check("mslta_k4_stayer_rows", grepl("c3#3 ON c2#1@0 c2#2@0 c2#3@20;", model_text(ms4), fixed = TRUE) &&
     grepl("[c3#1@-10 c3#2@-10 c3#3@-10];", model_text(ms4), fixed = TRUE) &&
-    grepl("%g#1%\n[c2#1 c2#2 c2#3];", model_text(ms4), fixed = TRUE))
+    grepl("c2 ON g;\nc3 ON g;", model_text(ms4), fixed = TRUE) &&
+    !grepl("[", sub("MODEL c1:.*$", "", sub("^.*MODEL g:", "", model_text(ms4))), fixed = TRUE))
   e1 <- matrix(c(.7, .1, .1, .1, .1, .7, .1, .1, .1, .1, .7, .1, .1, .1, .1, .7), 4, byrow = TRUE)
   e2 <- matrix(c(.85, .05, .05, .05, .05, .85, .05, .05, .05, .05, .85, .05, .05, .05, .05, .85), 4, byrow = TRUE)
   asym4 <- rbind(c(.70, .15, .10, .05), c(.10, .70, .15, .05), c(.05, .10, .75, .10), c(.05, .05, .10, .80))
@@ -195,9 +196,17 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   check("classify_cyclic_paths_not_lta",
     ch7_classify_inp(text = paste(classifier_lta, "c1 ON c2;", sep = "\n"))$family == "OTHER_MIXTURE")
   classifier_ms <- paste("VARIABLE: NAMES = y1 y2; USEVARIABLES = y1 y2; CLASSES = g(2) c1(2) c2(2);",
+    "ANALYSIS: TYPE = MIXTURE;", "MODEL:", "%OVERALL%", "c2 ON c1;", "c1 ON g;", "c2 ON g;", "[c2#1@-10];",
+    "MODEL g:", "%g#1%", "c2 ON c1;", "%g#2%", "c2#1 ON c1#1@20;", sep = "\n")
+  check("classify_explicit_stayer_diagonal", ch7_classify_inp(text = classifier_ms)$family == "MS_LTA")
+  classifier_illegal_group_bracket <- paste("VARIABLE: NAMES = y1 y2; USEVARIABLES = y1 y2; CLASSES = g(2) c1(2) c2(2);",
     "ANALYSIS: TYPE = MIXTURE;", "MODEL:", "%OVERALL%", "c2 ON c1;", "c1 ON g;", "MODEL g:",
     "%g#1%", "[c2#1];", "c2 ON c1;", "%g#2%", "[c2#1@-10];", "c2#1 ON c1#1@20;", sep = "\n")
-  check("classify_explicit_stayer_diagonal", ch7_classify_inp(text = classifier_ms)$family == "MS_LTA")
+  check("classify_illegal_model_g_bracket_not_stayer",
+    ch7_classify_inp(text = classifier_illegal_group_bracket)$family == "OTHER_MIXTURE")
+  classifier_no_mover_shift <- sub("c2 ON g;\n", "", classifier_ms, fixed = TRUE)
+  check("classify_missing_mover_shift_not_stayer",
+    ch7_classify_inp(text = classifier_no_mover_shift)$family == "OTHER_MIXTURE")
   classifier_random <- sub("[c2#1@-10]", "[c2#1@0]", classifier_ms, fixed = TRUE)
   classifier_random <- sub("c1#1@20", "c1#1@0", classifier_random, fixed = TRUE)
   check("classify_fixed_random_transition_not_stayer", ch7_classify_inp(text = classifier_random)$family == "OTHER_MIXTURE")
@@ -322,6 +331,24 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
     is.null(ch7_savedata_info(step1_text[!grepl("Save missing symbol", step1_text, fixed = TRUE)])))
   check("savedata_info_uses_its_own_block", identical(
     ch7_savedata_info(c(" Save missing symbol -9999", step1_text))$missing_symbol, "*"))
+  # Mplus 9 整数 IDVARIABLE 可输出为 Fortran I<w>（如末尾 PID I4 紧贴前列 F10.3 无空格）
+  mplus9_i4 <- variant("mplus9_integer_id_format", function(folder) {
+    out <- file.path(folder, "step1.out")
+    reordered <- save1[, c("Y", "CPROB1", "CPROB2", "CPROB3", "C1", "C2", "PID")]
+    lines_i4 <- vapply(seq_len(nrow(reordered)), function(i) {
+      paste0(paste(formatC(as.numeric(reordered[i, 1:6]), width = 10, format = "f", digits = 3), collapse = ""),
+             sprintf("%4d", as.integer(reordered$PID[i])))
+    }, "")
+    writeLines(lines_i4, file.path(folder, "step1_cprob.dat"))
+    out_i4 <- c("Mplus VERSION 9", "", "THE MODEL ESTIMATION TERMINATED NORMALLY", "", "SAVEDATA INFORMATION", "",
+      "  Order and format of variables", "",
+      paste0("    ", c("Y", "CPROB1", "CPROB2", "CPROB3", "C1", "C2"), "           F10.3"),
+      "    PID            I4", "",
+      "  Save file", "    step1_cprob.dat", "", "  Save file format", "    6F10.3 I4", "",
+      "  Save missing symbol        *", "  Save file record length    10000", "")
+    writeLines(out_i4, out)
+  })
+  check("binding_mplus9_trailing_i4_touching_fixed_width", identical(mplus9_i4$status, "PASS") && mplus9_i4$rows == m)
   numeric_step1 <- variant("numeric_step1_missflag", function(folder) {
     out <- file.path(folder, "step1.out")
     writeLines(sub("Save missing symbol        *", "Save missing symbol        -9999",

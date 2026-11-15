@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "family": "APIMeM",
+  "dataset": "CHARLS",
+  "route": "apim_v2_config",
+  "generated_taipei": "2026-11-12T16:41:06+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "b7a988c4302387c3dcb952f51de3a1872a58b354291aa312756804b04a312eee",
+  "code_sha256": {
+    "scripts/workflow.R": "cb43b9cf003bdacf4f12e854a8970fd1caa425883f8662ad5ddaeb2c770ed569",
+    "scripts/apim_v2_config.R": "23fef5a63cc04d85e1c47541c09f04916266a05f422b7cad09761613e82017ac",
+    "scripts/apim_v2_data_adapter.R": "85e2c1bfcebfff079376fd2e36f03099ef86d715032051fce27838beb983c472",
+    "scripts/apim_v2_models.R": "0bb86a06a35f5ee843f740fd41f283f0113e3216783efb132f4bcd78f13dd5f3",
+    "scripts/apim_v2_runtime.R": "f276c9e76313c7118cb01365aba6d0bb7284be5f68a2c468b6e6637a6ed8b04a",
+    "scripts/results.R": "40d9d8f5375ebc5db2838078a4402c309498a923b5dd4739ef0c032940d4e63d"
+  },
+  "output_sha256": {
+    "apimem_model.inp": "616adff0a678b3c2b03fe60190117ed4085a27422f375c17147c09d6ee2da2cc",
+    "apimem_model.out": "655272a0b6fc9885d9c7d3ca6248fa289bc15e51eeab7baef7c84ee29b23a91f",
+    "apimem_results.dat": "cf2d8e93ee6598651cef7bf08da893c57d5d6fd05b506491f038dc7a13201abe",
+    "apimem_precision_parameters.csv": "1102237e2a842e9134ce0c6b67217376d6d8841ce8b617549ac67333f703691c",
+    "apimem_effects.csv": "c3e4d48056f372b86453936be017a55432fcbb30df203aa126aeaa53b240fae3",
+    "apimem_parse_validation.json": "4fbff306dc6d94f1414ac0d68a991c2ac1cdae74922cbd4ec6b970c0e1811a86",
+    "apimem_output_binding.json": "a80be09610f73ace8f28d84003547969a89f10b7b0fc9b416e1d9fe4a259c3b4",
+    "apimem_plot_data.csv": "c868e0a5a2ed5284d39d7dc385e0015ce95a25793af670b87b468503118d3a5f",
+    "apimem_figure.svg": "fdc29f56daec2bd49ad914e37264add8528ea298ddfa72165c7601cc3bdb7efd",
+    "manifest.csv": "a185c785bd5eca41173a8b0ccbaee1a2d234dbd12ed1be3d83428471a8209597",
+    "independent_native_validation.json": "0729aaeeca9dca00523b3f09dd59d350c7ed9f4ad35a76f6e9092e3f3aa6cf28",
+    "report_effects.csv": "340c728c1fdc6cf13f26a66946c0000b3056e6068fa060cdc75dc1299114250c",
+    "effects.html": "f4b0dcf85802d7982c29f6811ac22abe9d851a7371754b2e33cd98f909d4c72c",
+    "tables.docx": "d3184bd7348c4599af236db16efd6baf8693a3c68bbf2085423ed061a4672ade"
+  },
+  "rows": 7371,
+  "columns": 10,
+  "column_names": [
+    "couple_wave_id",
+    "community_id",
+    "member1_id",
+    "member2_id",
+    "member1_age",
+    "member2_age",
+    "member1_adl",
+    "member2_adl",
+    "member1_cesd10",
+    "member2_cesd10"
+  ],
+  "missing_by_column": {},
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 320,
+    "max_abs_diff": 7.389330133888983e-09
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "w1-charls-apimem-swap-attempt3-20261112"
+}

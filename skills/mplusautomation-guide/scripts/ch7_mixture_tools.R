@@ -102,24 +102,46 @@ ch7_transition_chain <- function(nodes, pairs) {
   ordered
 }
 
-# 保守核 stayer：只接受块内逐项写出的完整固定截距/斜率，不推断继承或简写约束。
-# 最后一类为 logit 参照；每个相邻转移都必须在 tolerance 内接近单位矩阵。
-ch7_stayer_block <- function(statements, chain, classes, tolerance, overall = character()) {
+# 保守核 stayer：Mplus 9 禁止在 MODEL g: 内写潜类别截距 [c_t#k]，须在 %OVERALL% 写固定截距
+# [c_t#k@-10] 并配自由的 c_t ON g（使参照类 %g#M% 继承固定截距、非参照 mover 类偏移自由），
+# 在 %g#M% 内逐项写出完整固定斜率。最后一类为 logit 参照；相邻转移须在 tolerance 内逼近单位矩阵。
+ch7_stayer_block <- function(statements, chain, classes, tolerance, overall = character(),
+                             higher = NA_character_, block = NA_character_, group_statements = statements) {
+  is_higher_ref <- !is.na(higher) && !is.na(block) &&
+                   identical(toupper(block), paste0(toupper(higher), "#", classes[higher]))
+  if (!is_higher_ref) return(NULL)
+  for (statement in group_statements) {
+    m <- regmatches(statement, regexec("^\\s*\\[([^]]+)\\]\\s*(?:\\([^)]*\\))?\\s*$",
+                                       statement, perl = TRUE))[[1]]
+    if (length(m)) {
+      tokens <- strsplit(toupper(trimws(m[2])), "\\s+")[[1]]
+      if (any(sub("#.*$", "", tokens) %in% chain)) return(NULL)
+    }
+  }
   worst <- 0
   for (t in 2:length(chain)) {
     from <- chain[t - 1L]; to <- chain[t]; K <- unname(classes[to])
     if (K < 2L || classes[from] != K) return(NULL)
-    # OVERALL 中的额外预测变量仍会影响该块，不能忽略后宣称无条件的 stayer。
+    # OVERALL 中的额外预测变量仍会影响该块；仅允许 from 与自由的 higher（在参照类 %g#M% 哑变量为 0，同时保证 mover 类截距自由）。
+    has_free_mover_shift <- FALSE
     for (statement in overall) {
       r <- ch7_on(statement)
-      if (!is.null(r) && any(sub("#.*$", "", r$lhs) == to) &&
-          any(sub("#.*$", "", r$rhs) != from)) return(NULL)
+      if (!is.null(r) && any(sub("#.*$", "", r$lhs) == to)) {
+        rhs_base <- sub("#.*$", "", r$rhs)
+        if (any(!rhs_base %in% c(from, higher))) return(NULL)
+        if (any(toupper(r$rhs) == paste0(toupper(higher), "#", classes[higher]))) return(NULL)
+        if (any(rhs_base == higher)) {
+          if (any(r$fixed[rhs_base == higher])) return(NULL)
+          has_free_mover_shift <- TRUE
+        }
+      }
     }
+    if (!has_free_mover_shift) return(NULL)
     targets <- paste0(to, "#", seq_len(K - 1L)); sources <- paste0(from, "#", seq_len(K - 1L))
     intercept <- rep(NA_real_, K - 1L); slope <- matrix(NA_real_, K - 1L, K - 1L)
-    for (statement in statements) {
+    for (statement in overall) {
       m <- regmatches(statement, regexec("^\\s*\\[([^]]+)\\]\\s*(?:\\([^)]*\\))?\\s*$",
-                                        statement, perl = TRUE))[[1]]
+                                         statement, perl = TRUE))[[1]]
       if (length(m)) {
         tokens <- strsplit(toupper(trimws(m[2])), "\\s+")[[1]]
         tokens <- tokens[sub("#.*$", "", tokens) == to]
@@ -131,6 +153,8 @@ ch7_stayer_block <- function(statements, chain, classes, tolerance, overall = ch
           intercept[idx] <- values
         }
       }
+    }
+    for (statement in statements) {
       r <- ch7_on(statement)
       if (!is.null(r) && any(sub("#.*$", "", r$lhs) == to)) {
         rows <- match(r$lhs, targets); cols <- match(r$rhs, sources)
@@ -258,7 +282,9 @@ ch7_classify_inp <- function(path = NULL, text = NULL, stayer_tolerance = 1e-3) 
       verified <- lapply(groups[state == "fixed"], function(b)
         ch7_stayer_block(blocks$statement[blocks$namespace == h & blocks$block == b],
                          chain, classes, stayer_tolerance,
-                         blocks$statement[blocks$namespace == "OVERALL" & blocks$block == "OVERALL"]))
+                         blocks$statement[blocks$namespace == "OVERALL" & blocks$block == "OVERALL"],
+                         higher = h, block = b,
+                         group_statements = blocks$statement[blocks$namespace == h]))
       verified <- Filter(Negate(is.null), verified)
       if (length(verified)) {
         difference <- max(vapply(verified, `[[`, 0, "max_identity_difference"))
@@ -332,6 +358,14 @@ ch7_enumeration_table <- function(paths, min_class_prop = NULL, min_entropy = NU
 }
 
 # ---- Step-1 存盘 → Step-3 输入绑定（lta-workflow.md：每个 Step-3 输入与 Step-1 savedata 有明确 hash 关系） ----
+# Mplus SAVEDATA 列宽：实数列为 F/E/G/D<w>.<d>，Mplus 9 整数 IDVARIABLE 可输出为 Fortran I<w>（如 SID I4）。
+ch7_savedata_widths <- function(formats) {
+  ok <- !is.na(formats) & grepl("^(?:[FEGD][0-9]+\\.[0-9]+|I[0-9]+)$", formats, ignore.case = TRUE, perl = TRUE)
+  out <- rep(NA_integer_, length(formats))
+  out[ok] <- as.integer(sub("^[FEGDI]([0-9]+)(?:\\..*|$)", "\\1", formats[ok], ignore.case = TRUE, perl = TRUE))
+  out
+}
+
 # Step-1 .out 的 SAVEDATA INFORMATION：列序、存盘文件名与实际缺失符号。
 ch7_savedata_info <- function(text) {
   i <- grep("^\\s*SAVEDATA INFORMATION\\s*$", text)
@@ -339,10 +373,12 @@ ch7_savedata_info <- function(text) {
   tail <- text[i[1]:length(text)]
   order_at <- grep("Order and format of variables", tail, fixed = TRUE); save_at <- grep("^\\s*Save file\\s*$", tail)
   if (length(order_at) != 1L || length(save_at) != 1L || save_at[1] == length(tail)) return(NULL)
-  # Mplus 新版把 Save file 放在变量序之前；两种布局都只读紧接的格式行。
+  # Mplus 新版把 Save file 放在变量序之前，且整数 IDVARIABLE 可输出为 I<w>；两种布局都只读紧接的格式行。
+  fmt_rx <- "(?:[FEGD][0-9]+\\.[0-9]+|I[0-9]+)"
+  row_rx <- paste0("^\\s*[A-Za-z][A-Za-z0-9_]*\\s+", fmt_rx, "\\s*$")
   rows <- character(); row_at <- order_at[1] + 1L
   while (row_at <= length(tail) && !nzchar(trimws(tail[row_at]))) row_at <- row_at + 1L
-  while (row_at <= length(tail) && grepl("^\\s*[A-Za-z][A-Za-z0-9_]*\\s+[FEG][0-9]+\\.[0-9]+\\s*$", tail[row_at])) {
+  while (row_at <= length(tail) && grepl(row_rx, tail[row_at], ignore.case = TRUE, perl = TRUE)) {
     rows <- c(rows, trimws(tail[row_at])); row_at <- row_at + 1L
   }
   if (!length(rows)) return(NULL)
@@ -356,8 +392,8 @@ ch7_savedata_info <- function(text) {
     marker_lines[[1L]], ignore.case = TRUE, perl = TRUE)
   marker <- sub("^([\"'])(.*)\\1$", "\\2", marker)
   if (!nzchar(marker) || grepl("[[:space:]]", marker)) return(NULL)
-  list(names = toupper(sub("\\s+[FEG][0-9]+\\.[0-9]+$", "", rows)),
-       formats = sub("^.*\\s+([FEG][0-9]+\\.[0-9]+)$", "\\1", rows),
+  list(names = toupper(sub(paste0("\\s+", fmt_rx, "$"), "", rows, ignore.case = TRUE, perl = TRUE)),
+       formats = toupper(sub(paste0("^.*\\s+(", fmt_rx, ")$"), "\\1", rows, ignore.case = TRUE, perl = TRUE)),
        file = sub("^([\"'])(.*)\\1$", "\\2", trimws(tail[file_at])), missing_symbol = marker)
 }
 
@@ -464,8 +500,16 @@ ch7_step3_binding <- function(step1_out, step1_savedata, step3_inp, step3_dat = 
   names3 <- ch7_varlist(ch7_option(variable, "NAMES")); nominal3 <- ch7_varlist(ch7_option(variable, "NOMINAL"), names3)
   read_dat <- function(p) as.matrix(utils::read.table(p, header = FALSE, na.strings = c("*", "."), colClasses = "numeric"))
   if (is.null(info)) return(finish())
-  raw1 <- as.matrix(utils::read.table(step1_savedata, header = FALSE, na.strings = character(),
-    colClasses = "character", comment.char = "", quote = ""))
+  lines1 <- readLines(step1_savedata, warn = FALSE)
+  widths1 <- ch7_savedata_widths(info$formats)
+  if (length(lines1) && !anyNA(widths1) && all(widths1 > 0L) && all(nchar(lines1, type = "chars") == sum(widths1))) {
+    ends1 <- cumsum(widths1); starts1 <- c(1L, utils::head(ends1, -1L) + 1L)
+    tokens1 <- lapply(lines1, function(line) trimws(substring(line, starts1, ends1)))
+    raw1 <- matrix(unlist(tokens1, use.names = FALSE), nrow = length(lines1), ncol = length(widths1), byrow = TRUE)
+  } else {
+    raw1 <- as.matrix(utils::read.table(step1_savedata, header = FALSE, na.strings = character(),
+      colClasses = "character", comment.char = "", quote = ""))
+  }
   raw1[ch7_savedata_missing(raw1, info$missing_symbol)] <- NA_character_
   d1 <- matrix(suppressWarnings(as.numeric(gsub("[dD]", "E", raw1))), nrow(raw1), ncol(raw1))
   if (any(!is.na(raw1) & !is.finite(d1))) stop("Step-1 savedata contains undeclared missing or invalid numeric values")

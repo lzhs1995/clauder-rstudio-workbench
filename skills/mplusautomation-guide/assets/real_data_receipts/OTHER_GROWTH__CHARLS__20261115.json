@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "family": "OTHER_GROWTH",
+  "dataset": "CHARLS",
+  "route": "mplus_object_mapping",
+  "generated_taipei": "2026-11-15T23:02:54+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "b88c6e495dfcd909a3f76d1ffd690ca30ae0412f79ccb7344996d5784326adfa",
+  "code_sha256": {
+    "scripts/model_mapping.R": "d8ad946e8f43b4fb2ee85268466c5ccb4e7e86e593576efb9dce79857da3d569",
+    "scripts/growth_time_basis.R": "c3a33106b8e36f7502a4083525e77a12e01cd8195fe6a860e3b7dc6d5b4351a5",
+    "scripts/mplus_workflow.R": "4ba7e0d846f37da1fded5f115fc57300ae371aa4bd719c1dd5b9f5d25b806f9e"
+  },
+  "output_sha256": {
+    "other_growth_model.inp": "30961443ae9346aec735bc6dd2d73bd9be5bfae978ebeef94e2725a1033f4568",
+    "other_growth_model.out": "d4166a7ce0eea7d15881fbce5d8ea6bdbf14bf87404f283d4112a1365cfbf7bb",
+    "other_growth_parameters.csv": "1d33234b8e087c5b9d0fa1befc9330c499d1bb1f972cdfc8fb2e89adbf4a947c",
+    "other_growth_validation.json": "6e9d27c2df1e1d27f5e64e41b0daadbb1e7b626e45656a61b0b96ea2ab85d47d",
+    "other_growth_renamed_model.out": "757c4ccf1d2ad888dedd20d667456a5f536935c8270cd4759f069e6e0db370d9"
+  },
+  "rows": 17028,
+  "columns": 11,
+  "column_names": [
+    "r1cesd10",
+    "r2cesd10",
+    "r3cesd10",
+    "r4cesd10",
+    "r1shlta",
+    "r2shlta",
+    "r3shlta",
+    "r4shlta",
+    "age_dec",
+    "female",
+    "rural11"
+  ],
+  "missing_by_column": {
+    "r1cesd10": 1112,
+    "r2cesd10": 3354,
+    "r3cesd10": 3370,
+    "r4cesd10": 4669,
+    "r1shlta": 89,
+    "r2shlta": 2726,
+    "r3shlta": 3322,
+    "r4shlta": 4472,
+    "age_dec": 0,
+    "female": 0,
+    "rural11": 0
+  },
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 54,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-other-growth-swap-8796-20261115"
+}

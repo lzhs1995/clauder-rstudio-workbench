@@ -208,3 +208,24 @@ For an accepted MI prefix left by a failed progress write, follow
 the old R producer and all attempts before giving genuinely unstarted nodes a
 new recovery contract. Preserve calls, seconds and the original absolute
 deadline; copying outputs does not change their original execution route.
+
+## Verified Windows RStudio, ClaudeR, and Mplus 9 runtime guardrails
+
+- **`MplusAutomation::detectMplus()` return value**: When `Mplus.exe` is on
+  `PATH`, `detectMplus()` can return bare `"Mplus"` rather than an absolute
+  file path. Resolve non-path tokens with `Sys.which()` before checking
+  `file.exists()`, while passing the explicit executable path to `MPLUS_COMMAND`
+  and `runModels(..., Mplus_command = ...)`.
+- **ClaudeR static security filter**: Async and sync R payloads submitted to
+  ClaudeR are scanned before execution; calls to `system()`, `system2()`,
+  `shell()`, or `unlink(..., recursive = TRUE)` are refused at submission time.
+  Keep R model drivers pure R plus `MplusAutomation`, and run standalone Python
+  validators as a separate post-step on the saved outputs rather than shelling
+  out from inside the ClaudeR script.
+- **Multi-session Windows RStudio isolation**: Launch additional interactive
+  RStudio instances in the logged-on desktop session (`Schedule.Service`
+  `LogonType = 3`) on a dedicated ClaudeR loopback port,prepend any task-local
+  `R_LIBS_USER` without mutating the shared user library, verify clock-skew
+  grace using monotonic elapsed bounds when signing cross-host windows, and
+  retire temporary sessions politely via `CloseMainWindow()` with zero forced
+  process kills so co-resident sessions remain undisturbed.
