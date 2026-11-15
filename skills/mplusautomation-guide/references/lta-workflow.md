@@ -43,7 +43,7 @@ Vermunt 三步法、BCH 和一步法必须区分用途。三步法用于固定�
 
 ## 3. 第七章对应的 LTA 证据
 
-- q1604：归档 q 输入上的两期（16a20）LTA Step-3 新鲜复现；语法声明 `c1(4) c3(4)`；这不是本次 replay 的四波 LTA，N=7008，Entropy=0.975；
+- q1604：归档 q 输入上的两期（16a20）LTA Step-3 新鲜复现；语法声明 `c1(4) c3(4)`；这不是本次 replay 的四波 LTA，N=7008；分类质量数值见私有 q1604 验收证据；
 - q1522：16–22 四波测量基线，正确配对 16–22 输入后拟合指标和 savedata 通过；
 - q1629：同一两期（16a20）输入上的 MS-LTA Step-3 分支；其 `G(2)` 扩展应在 MS-LTA workflow 中单独记录，不能写成本次 replay 的全四波模型；
 - q1604/q1629 的 panel→Step-1→Step-3 数据血缘仍需单独审计，不能将归档输入重放写成当前 panel 的端到端证明。
@@ -53,7 +53,7 @@ Vermunt 三步法、BCH 和一步法必须区分用途。三步法用于固定�
 - [ ] 1 至 K 类别选择有完整证据；
 - [ ] 测量不变性约束和图形支持一致；
 - [ ] 转移矩阵行和为 1，类别标签已语义对齐；
-- [ ] 每个 Step-3 输入与 Step-1 savedata 具有明确 hash 关系（`scripts/ch7_mixture_tools.R` 的 `ch7_step3_binding()`：核 Step-1 正常结束与存盘名、Step-3 INP 读的 DAT、按 ID 投影的值和固定 logit；分类误差矩阵由调用方提供并记录来源）；
+- [ ] 每个 Step-3 输入与 Step-1 savedata 具有明确 hash 关系；[自动链](chapter7-step-chain-20261111.md) 从 Step-1 提取逐波打印 logit、核误差方向、按ID投影并记录来源。既有 `ch7_step3_binding()` 仍可核调用方显式提供的矩阵，二者均不替代新鲜引擎回执；
 - [ ] 辅助变量方法、硬分类限制和未采用 VAM 的理由写入方法；
 - [ ] 图表、表格和正文使用同一套 transition state 定义。
 

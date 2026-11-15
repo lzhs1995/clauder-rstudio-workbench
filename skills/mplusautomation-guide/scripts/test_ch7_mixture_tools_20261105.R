@@ -291,7 +291,8 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   write_save(save1, file.path(base, "step1_cprob.dat"))
   step1_text <- c("Mplus VERSION 8.10", "", "THE MODEL ESTIMATION TERMINATED NORMALLY", "", "SAVEDATA INFORMATION", "",
     "  Order and format of variables", "", paste0("    ", names(save1), "           F10.3"), "",
-    "  Save file", "    step1_cprob.dat", "", "  Save file format", "    7F10.3", "", "  Save file record length    10000", "")
+    "  Save file", "    step1_cprob.dat", "", "  Save file format", "    7F10.3", "", "  Save missing symbol        *",
+    "  Save file record length    10000", "")
   writeLines(step1_text, file.path(base, "step1.out"))
   # 第 1 波：行列和都为 1 但不对称，转置后仍是合法矩阵，只能靠行列约定区分
   err <- list(rbind(c(.7, .2, .1), c(.1, .7, .2), c(.2, .1, .7)), diag(.4, 3) + .2)
@@ -316,6 +317,22 @@ test_ch7_mixture_tools <- function(output_dir, skill_root) {
   check("binding_good_passes", identical(good$status, "PASS") && isTRUE(good$row_order_identical) &&
     all(vapply(good$max_abs_logit_diff, function(x) x < 1e-9, logical(1))) && good$rows == m)
   check("binding_records_four_sha256", length(good$files) == 4L && all(vapply(good$files, function(f) nchar(f$sha256) == 64L, logical(1))))
+  check("savedata_info_declares_missing_symbol", identical(ch7_savedata_info(step1_text)$missing_symbol, "*"))
+  check("savedata_info_rejects_absent_missing_symbol",
+    is.null(ch7_savedata_info(step1_text[!grepl("Save missing symbol", step1_text, fixed = TRUE)])))
+  check("savedata_info_uses_its_own_block", identical(
+    ch7_savedata_info(c(" Save missing symbol -9999", step1_text))$missing_symbol, "*"))
+  numeric_step1 <- variant("numeric_step1_missflag", function(folder) {
+    out <- file.path(folder, "step1.out")
+    writeLines(sub("Save missing symbol        *", "Save missing symbol        -9999",
+      readLines(out), fixed = TRUE), out)
+    original <- save1; original$Y[2L] <- -9999
+    write_save(original, file.path(folder, "step1_cprob.dat"))
+    path <- file.path(folder, "data.dat"); projected <- utils::read.table(path, header = FALSE)
+    projected[2L, 4L] <- NA_real_
+    utils::write.table(projected, path, row.names = FALSE, col.names = FALSE, na = ".")
+  })
+  check("binding_numeric_step1_missflag_preserved", identical(numeric_step1$status, "PASS"))
   check("binding_receipt_has_no_data_values", !any(c("data", "values", "logits", "error") %in% names(good)))
   shuffled <- variant("shuffled", function(folder) edit_dat(folder, function(d) d[rev(seq_len(nrow(d))), ]))
   check("binding_rows_matched_by_id", identical(shuffled$status, "PASS") && identical(shuffled$row_order_identical, FALSE))

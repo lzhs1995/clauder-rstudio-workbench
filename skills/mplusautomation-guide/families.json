@@ -102,6 +102,20 @@
       "docs": [
         "references/mediation-moderation-workflow.md"
       ]
+    },
+    "ch7_source_config": {
+      "label": "第七章显式换源配置：新源、原样回放与自动Step-3，只编译不估计",
+      "entry_functions": [
+        "scripts/ch7_source_entry_20261111.R:ch7_source_entry",
+        "scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1",
+        "scripts/ch7_figures_20261111.R:ch7_profile_data"
+      ],
+      "config_example": "assets/ch7_source_example_20261111.R",
+      "docs": [
+        "references/chapter7-source-entry-20261111.md",
+        "references/chapter7-step-chain-20261111.md",
+        "references/chapter7-model-figures-20261111.md"
+      ]
     }
   },
   "adapters": {
@@ -344,6 +358,17 @@
         "Linux"
       ]
     },
+    "ch7_syntax_boundaries": {
+      "path": "scripts/test_ch7_syntax_boundaries_20261113.R",
+      "lang": "R",
+      "function": "test_ch7_syntax_boundaries_20261113",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
     "ch5_mediation_moderation_synthetic": {
       "path": "scripts/test_ch5_mediation_moderation_20261105.R",
       "lang": "R",
@@ -486,6 +511,39 @@
       "needs_mplus": false,
       "ci": "mplus-guide-family-tests.yml",
       "shared_purpose": "具名系数/VCOV的二次项log比值导数、完整交叉cov与明确CI规则；仅合成合同，不作为历史图/真实换源验收"
+    },
+    "ch7_source_entry": {
+      "path": "scripts/test_ch7_source_entry_20261111.R",
+      "lang": "R",
+      "function": "test_ch7_source_entry_20261111",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "ch7_step_chain": {
+      "path": "scripts/test_ch7_step_chain_20261111.R",
+      "lang": "R",
+      "function": "test_ch7_step_chain_20261111",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
+    },
+    "ch7_model_figures": {
+      "path": "scripts/test_ch7_figures_20261111.R",
+      "lang": "R",
+      "function": "test_ch7_figures_20261111",
+      "args": [
+        "out_dir",
+        "skill_root"
+      ],
+      "needs_mplus": false,
+      "ci": "mplus-guide-family-tests.yml"
     }
   },
   "families": {
@@ -932,33 +990,43 @@
       "label_zh": "潜剖面/潜类别分析",
       "summary": "单期类别枚举、类别命名与后验分类；第七章为四连续加两分类的混合指标。",
       "routes": [
+        "ch7_source_config",
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "template",
+      "code_status": "configurable",
       "data_formats": [
         "csv",
+        "dta",
         "archived_dat"
       ],
       "docs": [
         "references/lpa-lca-workflow.md",
         "references/chapter7-replay-map.md",
         "references/chapter7-source-variable-contract-20261104.md",
-        "references/family-source-swap-contract.md"
+        "references/family-source-swap-contract.md",
+        "references/chapter7-source-entry-20261111.md",
+        "references/chapter7-step-chain-20261111.md",
+        "references/chapter7-model-figures-20261111.md"
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
         "ch7_mixture_compile",
-        "ch7_mixture_tools"
+        "ch7_syntax_boundaries",
+        "ch7_mixture_tools",
+        "ch7_source_entry",
+        "ch7_model_figures"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch7_mixture_compile",
-          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "source": "ch7_source_entry",
+          "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "source": "references/chapter7-native-acceptance-20261111.md",
+          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
         },
         "real_data_swap": {
           "status": "not_started"
@@ -972,14 +1040,22 @@
       "freshness_files": [
         "scripts/ch7_mixture_syntax.R",
         "scripts/ch7_mixture_tools.R",
-        "scripts/test_ch7_mixture_family_20261105.R"
+        "scripts/test_ch7_mixture_family_20261105.R",
+        "scripts/ch7_source_entry_20261111.R",
+        "scripts/ch7_step_chain_20261111.R",
+        "scripts/ch7_figures_20261111.R",
+        "scripts/test_ch7_source_entry_20261111.R",
+        "scripts/test_ch7_step_chain_20261111.R",
+        "scripts/test_ch7_figures_20261111.R",
+        "scripts/test_ch7_syntax_boundaries_20261113.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
-        "类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选"
+        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
+        "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
+        "类别语义和最终K必须显式声明，工具不代选、不自动重标类别"
       ]
     },
     "LTA": {
@@ -987,33 +1063,44 @@
       "label_zh": "潜转变分析",
       "summary": "测量不变、转移概率与三步法 Step-3。",
       "routes": [
+        "ch7_source_config",
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "template",
+      "code_status": "configurable",
       "data_formats": [
         "csv",
+        "dta",
         "archived_dat"
       ],
       "docs": [
         "references/lta-workflow.md",
         "references/chapter7-replay-map.md",
         "references/chapter7-source-variable-contract-20261104.md",
-        "references/family-source-swap-contract.md"
+        "references/family-source-swap-contract.md",
+        "references/chapter7-source-entry-20261111.md",
+        "references/chapter7-step-chain-20261111.md",
+        "references/chapter7-model-figures-20261111.md"
       ],
       "acceptance_doc": "references/chapter7-replay-map.md",
       "tests": [
         "ch7_mixture_compile",
-        "ch7_mixture_tools"
+        "ch7_syntax_boundaries",
+        "ch7_mixture_tools",
+        "ch7_source_entry",
+        "ch7_model_figures",
+        "ch7_step_chain"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch7_mixture_compile",
-          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "source": "ch7_source_entry",
+          "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "source": "references/chapter7-native-acceptance-20261111.md",
+          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
         },
         "real_data_swap": {
           "status": "not_started"
@@ -1027,14 +1114,22 @@
       "freshness_files": [
         "scripts/ch7_mixture_syntax.R",
         "scripts/ch7_mixture_tools.R",
-        "scripts/test_ch7_mixture_family_20261105.R"
+        "scripts/test_ch7_mixture_family_20261105.R",
+        "scripts/ch7_source_entry_20261111.R",
+        "scripts/ch7_step_chain_20261111.R",
+        "scripts/ch7_figures_20261111.R",
+        "scripts/test_ch7_source_entry_20261111.R",
+        "scripts/test_ch7_step_chain_20261111.R",
+        "scripts/test_ch7_figures_20261111.R",
+        "scripts/test_ch7_syntax_boundaries_20261113.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
-        "Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表"
+        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
+        "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
+        "类别语义和最终K必须显式声明，工具不代选、不自动重标类别"
       ]
     },
     "MS_LTA": {
@@ -1045,33 +1140,44 @@
       "label_zh": "动静潜转变分析",
       "summary": "G(2) mover/stayer 结构、有限 logit 与精确约束的区分。",
       "routes": [
+        "ch7_source_config",
         "mplus_object_syntax",
         "template_bundle"
       ],
-      "code_status": "template",
+      "code_status": "configurable",
       "data_formats": [
         "csv",
+        "dta",
         "archived_dat"
       ],
       "docs": [
         "references/ms-lta-workflow.md",
         "references/chapter7-replay-map.md",
         "references/chapter7-source-variable-contract-20261104.md",
-        "references/family-source-swap-contract.md"
+        "references/family-source-swap-contract.md",
+        "references/chapter7-source-entry-20261111.md",
+        "references/chapter7-step-chain-20261111.md",
+        "references/chapter7-model-figures-20261111.md"
       ],
       "acceptance_doc": "references/ms-lta-workflow.md",
       "tests": [
         "ch7_mixture_compile",
-        "ch7_mixture_tools"
+        "ch7_syntax_boundaries",
+        "ch7_mixture_tools",
+        "ch7_source_entry",
+        "ch7_model_figures",
+        "ch7_step_chain"
       ],
       "evidence": {
         "synthetic_compile": {
           "status": "pass",
-          "source": "ch7_mixture_compile",
-          "note": "17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛"
+          "source": "ch7_source_entry",
+          "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pending",
+          "source": "references/chapter7-native-acceptance-20261111.md",
+          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
         },
         "real_data_swap": {
           "status": "not_started"
@@ -1085,15 +1191,23 @@
       "freshness_files": [
         "scripts/ch7_mixture_syntax.R",
         "scripts/ch7_mixture_tools.R",
-        "scripts/test_ch7_mixture_family_20261105.R"
+        "scripts/test_ch7_mixture_family_20261105.R",
+        "scripts/ch7_source_entry_20261111.R",
+        "scripts/ch7_step_chain_20261111.R",
+        "scripts/ch7_figures_20261111.R",
+        "scripts/test_ch7_source_entry_20261111.R",
+        "scripts/test_ch7_step_chain_20261111.R",
+        "scripts/test_ch7_figures_20261111.R",
+        "scripts/test_ch7_syntax_boundaries_20261113.R"
       ],
       "thesis_refs": [
         "第七章"
       ],
       "gaps": [
-        "原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认",
-        "stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明",
-        "独立流量图接口已通过合成计算及 widget 载荷合同；历史 F30/F31、浏览器/PNG、新数据换源及 Step-1→Step-3 完整链仍需各自验收"
+        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
+        "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
+        "类别语义和最终K必须显式声明，工具不代选、不自动重标类别",
+        "stayer为有限logit近似，不能称精确不转移；总体转移与给定G条件转移分别声明"
       ]
     },
     "PP_LGCM": {

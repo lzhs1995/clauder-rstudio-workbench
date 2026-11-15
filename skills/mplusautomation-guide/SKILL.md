@@ -60,9 +60,9 @@ compile models, and its preparation receipt is not a real-data swap receipt.
 | MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| LPA_LCA | template | pass* | — | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
-| LTA | template | pass* | — | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
-| MS_LTA | template | pass* | — | — | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
+| LPA_LCA | configurable | pass* | pending* | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
+| LTA | configurable | pass* | pending* | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
+| MS_LTA | configurable | pass* | pending* | — | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
 | PP_LGCM | template | pass* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
 | OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
 
@@ -134,12 +134,20 @@ mediation-moderation-workflow.md §3).
 
 ## LPA/LCA, LTA and MS-LTA
 
-第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时使用 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，显式固定连续/分类指标、DEFINE、标准化和生产者；该文档是配置与验收合同，不是通用自动编译器入口。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
+第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时依照 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，再用 [统一配置入口](references/chapter7-source-entry-20261111.md) 显式编译 CSV/DTA 新源、变量映射、波次、K 和组合，或保持式回放归档输入。当前新源支持连续量与0/1二分类、各波同K；不自动选择类别、不推断标准化或阈值。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
 `scripts/test_ch7_mixture_family_20261105.R` 用合成数据生成并核验 LPA/LCA、四波 LTA、MS-LTA 与 Step-3 的输入，只调用 `mplusObject()`/`mplusModeler(run=0)`，不启动 Mplus；它不说明引擎接受语法或模型收敛。
 
 For existing transition estimates, use the [explicit transition-flow contract](references/chapter7-transition-flow.md) and `scripts/ch7_transition_flow.R` to prepare nodes/links and a Sankey widget. Overall posterior-weighted flows and scaled mover-conditional flows are separate modes. This synthetic-tested interface does not close historical F30/F31 or real-data source swaps.
 
 For quadratic covariate contrasts, use the [explicit log-scale curve contract](references/chapter7-quadratic-curves.md) and `scripts/ch7_quadratic_curves.R`. The interface retains named coefficients, full cross covariance, the outcome/reference contrast and the declared interval rule; it does not reinterpret a log-ratio derivative as a probability effect or certify a source/model from numeric inputs.
+
+Use the [automatic Step-1→Step-3 chain](references/chapter7-step-chain-20261111.md)
+to extract printed classification logits and bind savedata by ID. The
+[model-object figure adapters](references/chapter7-model-figures-20261111.md)
+cover profiles, proportions, conditional matrices and LL/BIC enumeration while
+delegating flows and curves to the existing functions above. These offline
+contracts and [native acceptance](references/chapter7-native-acceptance-20261111.md)
+have separate states; a compiled input is not a successful Mplus estimate.
 
 ## Parallel-process growth (PP-LGCM)
 
