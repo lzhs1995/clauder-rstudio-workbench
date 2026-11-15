@@ -68,10 +68,12 @@ ch5_fit_moderation_spec <- function(spec, data) {
 
 # 简单斜率：slope = b_focal + Σ g_k b_int_k，Var = g' V g（g 含协方差项）
 # level 必须显式给出（第五章同时用 0.95 与 0.90 两档，不设默认值）
-ch5_simple_slopes <- function(m, level, covariance = c('cluster_HC0', 'model', 'historical_ch5')) {
+ch5_simple_slopes <- function(m, level, covariance = 'cluster_HC0') {
   if (missing(level)) stop('level must be given explicitly, e.g. 0.95')
   if (!is.numeric(level) || length(level) != 1L || !is.finite(level) || level <= 0 || level >= 1) stop('level must be a single number in (0, 1)')
-  covariance <- match.arg(covariance)
+  if (!is.character(covariance) || length(covariance) != 1L || is.na(covariance) ||
+      !(covariance %in% c('cluster_HC0', 'model', 'historical_ch5')))
+    stop('covariance must be exactly one of: cluster_HC0, model, historical_ch5')
   spec <- m$spec; b <- stats::coef(m$fit)
   # 默认保留拟合时的聚类 HC0；普通模型协方差只通过显式选项启用，不作回退。
   V <- if (covariance == 'cluster_HC0') m$vcov else stats::vcov(m$fit)

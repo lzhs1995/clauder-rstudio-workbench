@@ -248,6 +248,12 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
   check('covariance_choice_changes_se_not_estimate', identical(ns$estimate, sm$estimate) &&
         max(abs(ns$se - sm$se)) > 1e-4 && all(ns$covariance == 'model'))
   reject('unknown_covariance_rejected', ch5_simple_slopes(m, .95, covariance = 'fallback'))
+  invalid_covariance <- list(h = 'h', c = 'c', m = 'm', historical_prefix = 'historical',
+    cluster_prefix = 'cluster', missing = NA_character_, empty = character(),
+    blank = '', multiple = c('cluster_HC0', 'model'), noncharacter = 1L)
+  for (key in names(invalid_covariance))
+    reject(paste0('invalid_covariance_', key),
+           ch5_simple_slopes(m, .95, covariance = invalid_covariance[[key]]))
   broken <- m; broken$vcov <- NULL
   reject('missing_cluster_covariance_does_not_fall_back', ch5_simple_slopes(broken, .95))
   check('explicit_model_covariance_does_not_need_cluster_matrix',
@@ -276,7 +282,42 @@ test_ch5_moderation_route <- function(output_dir, skill_root) {
   back <- utils::read.csv(file.path(output_dir, 'multifocal_slopes.csv'), stringsAsFactors = FALSE)
   check('display_columns_roundtrip_csv', identical(back$moderator_code, ls$moderator_code) &&
         identical(back$moderator_level, ls$moderator_level) && identical(back$focal, ls$focal))
-  plot_multi <- ch5_plot_simple_slopes(ls, file.path(output_dir, 'multifocal.pdf'))
+  # 二分类的单列效应码仍为字符；CSV 读回须显式保留该列类型。
+  two_spec <- modifyList(multi, list(level_order = c(3, 1),
+    moderator_labels = c('1' = '参照组', '3' = '甲组')))
+  two_data <- d[d$wcat %in% two_spec$level_order, , drop = FALSE]
+  two_slopes <- ch5_simple_slopes(ch5_fit_moderation_spec(two_spec, two_data), .95)
+  check('two_category_codes_are_character_in_focal_order',
+        identical(two_slopes$moderator_code, rep(c('1', '-1'), length(two_spec$focal))) &&
+        identical(two_slopes$focal, rep(two_spec$focal, each = 2L)))
+  two_recoded <- vapply(two_spec$level_order, function(k) {
+    z <- two_data; z$wf <- stats::relevel(factor(z$wcat), ref = as.character(k))
+    fit <- ch5_fit_moderation(ycc ~ (mc + ma + mb) * wf + xc + c1 + c2, z, cluster = 'cl')
+    got <- two_slopes[two_slopes$moderator_value == as.character(k), ]
+    max(abs(got$estimate - coef(fit$fit)[two_spec$focal])) < 1e-10 &&
+      max(abs(got$se - sqrt(diag(fit$vcov)[two_spec$focal]))) < 1e-10
+  }, logical(1))
+  check('two_category_slopes_equal_releveled_fits', all(two_recoded))
+  two_csv <- file.path(output_dir, 'two_category_slopes.csv')
+  utils::write.csv(two_slopes, two_csv, row.names = FALSE)
+  two_back <- utils::read.csv(two_csv, stringsAsFactors = FALSE,
+                              colClasses = c(moderator_code = 'character'))
+  check('two_category_display_columns_roundtrip_csv',
+        identical(two_back$moderator_code, two_slopes$moderator_code) &&
+        identical(two_back$moderator_level, two_slopes$moderator_level) &&
+        identical(two_back$focal, two_slopes$focal))
+
+  # 中文 PDF 必须实际走 Cairo；仅返回正确标签或生成空壳文件不能通过。
+  chinese_pdf <- file.path(output_dir, 'multifocal.pdf')
+  pdf_warnings <- character()
+  plot_multi <- withCallingHandlers(ch5_plot_simple_slopes(ls, chinese_pdf), warning = function(w) {
+    pdf_warnings <<- c(pdf_warnings, conditionMessage(w))
+    invokeRestart('muffleWarning')
+  })
+  check('chinese_pdf_written_without_warnings', file.exists(chinese_pdf) &&
+        file.info(chinese_pdf)$size > 1000 && !length(pdf_warnings))
+  pdf_bytes <- readBin(chinese_pdf, 'raw', n = file.info(chinese_pdf)$size)
+  check('chinese_pdf_has_valid_header', identical(pdf_bytes[1:5], charToRaw('%PDF-')))
   check('multifocal_plot_preserves_identity_and_labels',
         identical(plot_multi$focal, ls$focal) && identical(plot_multi$moderator_level, ls$moderator_level))
   utils::write.csv(sc, file.path(output_dir, 'categorical_slopes.csv'), row.names = FALSE)
