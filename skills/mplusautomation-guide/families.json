@@ -724,8 +724,9 @@
           "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+          "status": "pass",
+          "source": "assets/real_data_receipts/APIMoM__CHARLS__20261115.json",
+          "note": "CHARLS 2011 夫妻宽表追加经核实的住户城乡调节变量（h1rural，社区聚类 MLR），通过独立公式复算与全列改名重排不变性核验"
         },
         "historical_replay": {
           "status": "pass",
@@ -744,9 +745,7 @@
       "thesis_refs": [
         "第四章"
       ],
-      "gaps": [
-        "没有排期的真实数据换源测试"
-      ]
+      "gaps": []
     },
     "APIMeMoM": {
       "aliases": [
@@ -789,8 +788,9 @@
           "note": "a 与 ab 路径为后加"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行"
+          "status": "pass",
+          "source": "assets/real_data_receipts/APIMeMoM__CHARLS__20261115.json",
+          "note": "CHARLS 2011 夫妻宽表运行 moderated_paths a/b/ab 三模型（h1rural 住户城乡调节，社区聚类 MLR），通过独立公式复算与全列改名重排不变性核验"
         },
         "historical_replay": {
           "status": "pass",
@@ -808,9 +808,7 @@
       "thesis_refs": [
         "第四章"
       ],
-      "gaps": [
-        "没有排期的真实数据换源测试"
-      ]
+      "gaps": []
     },
     "MED": {
       "aliases": [
@@ -844,12 +842,14 @@
           "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus"
         },
         "native_synthetic": {
-          "status": "pending",
-          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 跑通线性与反事实中介代表模型（BOOTSTRAP=1000），正常收敛且约束代数与打印参数一致"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
+          "status": "pass",
+          "source": "assets/real_data_receipts/MED__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致"
         },
         "historical_replay": {
           "status": "archived_readback_only",
@@ -866,9 +866,7 @@
       "thesis_refs": [
         "第五章"
       ],
-      "gaps": [
-        "原生合成验收等 Windows 计算窗口"
-      ]
+      "gaps": []
     },
     "MOD": {
       "aliases": [
@@ -956,12 +954,14 @@
           "note": "合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus"
         },
         "native_synthetic": {
-          "status": "pending",
-          "note": "四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 跑通多组连续调节与三分类调节有调节中介代表模型（BOOTSTRAP=1000），正常收敛且组差/加权平均约束一致"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "第五章 Mplus 分层重估等待 Windows 计算窗口"
+          "status": "pass",
+          "source": "assets/real_data_receipts/MODMED__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变"
         },
         "historical_replay": {
           "status": "archived_readback_only",
@@ -979,7 +979,6 @@
         "第五章"
       ],
       "gaps": [
-        "原生合成验收等 Windows 计算窗口",
         "三分类 W 模板按样本分别拟合（USEOBSERVATIONS）；三分类 W 与 GROUPING 多组同时出现的模板尚无"
       ]
     },
@@ -1025,12 +1024,14 @@
           "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "pending",
-          "source": "references/chapter7-native-acceptance-20261111.md",
-          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "assets/real_data_receipts/LPA_LCA__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 基线65岁及以上队列经 ch7_source_config 编译并由 Windows Mplus 9 估计单期混合指标剖面（3连续+2二分类），源列改名重排不变"
         },
         "historical_replay": {
           "status": "pass",
@@ -1054,7 +1055,6 @@
         "第七章"
       ],
       "gaps": [
-        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
         "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
         "类别语义和最终K必须显式声明，工具不代选、不自动重标类别"
       ]
@@ -1099,12 +1099,14 @@
           "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "pending",
-          "source": "references/chapter7-native-acceptance-20261111.md",
-          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "assets/real_data_receipts/LTA__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 四期（2011–2018）基线65岁及以上队列经 ch7_source_config 完成新鲜 Step-1 测量不变模型与自动提取打印 logit 的 Step-3 LTA 估计，改名重排不变"
         },
         "historical_replay": {
           "status": "pending",
@@ -1128,7 +1130,6 @@
         "第七章"
       ],
       "gaps": [
-        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
         "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
         "类别语义和最终K必须显式声明，工具不代选、不自动重标类别"
       ]
@@ -1176,12 +1177,14 @@
           "note": "统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收"
         },
         "native_synthetic": {
-          "status": "pending",
-          "source": "references/chapter7-native-acceptance-20261111.md",
-          "note": "已准备合成语法和独立fresh Step-1→Step-3窗口；尚未获授权执行，不声明语法被引擎接受或收敛"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "assets/real_data_receipts/MS_LTA__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 四期（2011–2018）基线65岁及以上队列由新鲜 Step-1 输出自动编译并估计 G(2) Mover-Stayer LTA Step-3，改名重排不变"
         },
         "historical_replay": {
           "status": "pass",
@@ -1205,7 +1208,6 @@
         "第七章"
       ],
       "gaps": [
-        "原生合成与新鲜Step-1→Step-3尚待专属Windows RStudio/ClaudeR窗口；离线生成不替代原生验收",
         "新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译",
         "类别语义和最终K必须显式声明，工具不代选、不自动重标类别",
         "stayer为有限logit近似，不能称精确不转移；总体转移与给定G条件转移分别声明"
@@ -1224,6 +1226,8 @@
       ],
       "code_status": "template",
       "data_formats": [
+        "csv",
+        "dta",
         "archived_dat",
         "in_memory"
       ],
@@ -1247,11 +1251,14 @@
           "note": "只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计"
         },
         "native_synthetic": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 跑通双过程线性/二次/分段 3 组形状的 original 与改名重排一致性及改值敏感性共 7 个模型"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "两条真实数据线已运行，缺白名单回执"
+          "status": "pass",
+          "source": "assets/real_data_receipts/PP_LGCM__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 四期（2011–2018）抑郁与自评健康双过程协变型潜增长换源（MLR），通过源列改名重排一致性核验"
         },
         "historical_replay": {
           "status": "pending"
@@ -1280,6 +1287,8 @@
       ],
       "code_status": "template",
       "data_formats": [
+        "csv",
+        "dta",
         "in_memory"
       ],
       "docs": [
@@ -1298,11 +1307,14 @@
           "source": "other_growth_compile"
         },
         "native_synthetic": {
-          "status": "pending",
-          "note": "原生运行包已备好（线性、二次、分段及换名换序/改值复用核对共 5 个模型），等 Windows 窗口用 scripts/test_other_growth_native_20261105.R 运行"
+          "status": "pass",
+          "source": "assets/native_acceptance_20261115.json",
+          "note": "Windows RStudio + ClaudeR + Mplus 9 跑通 scripts/test_other_growth_native_20261105.R 全部 5 个模型（线性 A/B/C、二次、分段）"
         },
         "real_data_swap": {
-          "status": "not_started"
+          "status": "pass",
+          "source": "assets/real_data_receipts/OTHER_GROWTH__CHARLS__20261115.json",
+          "note": "Harmonized CHARLS 四期（2011–2018）不规则波次间隔潜增长换源（MLR），通过源列改名重排一致性核验"
         },
         "historical_replay": {
           "status": "not_applicable"
@@ -1315,9 +1327,7 @@
       ],
       "thesis_refs": [],
       "gaps": [
-        "原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）",
-        "growth_model_syntax() 只写单一过程的增长因子；固定时间的双过程协变型模型见 PP_LGCM 的 parallel_growth_model_syntax()，跨过程定向路径、交互、分类结果仍需手写 MODEL",
-        "真实数据换源未排期"
+        "growth_model_syntax() 只写单一过程的增长因子；固定时间的双过程协变型模型见 PP_LGCM 的 parallel_growth_model_syntax()，跨过程定向路径、交互、分类结果仍需手写 MODEL"
       ]
     }
   }

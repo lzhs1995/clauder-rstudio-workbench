@@ -55,16 +55,16 @@ compile models, and its preparation receipt is not a real-data swap receipt.
 |---|---|---|---|---|---|---|
 | APIM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
 | APIMeM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
-| APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| APIMoM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| APIMeMoM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| MED | template | pass* | pass* | pass* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MOD | configurable | pass* | n/a* | pass* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| LPA_LCA | configurable | pass* | pending* | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
-| LTA | configurable | pass* | pending* | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
-| MS_LTA | configurable | pass* | pending* | — | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
-| PP_LGCM | template | pass* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
-| OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
+| MODMED | template | pass* | pass* | pass* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| LPA_LCA | configurable | pass* | pass* | pass* | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
+| LTA | configurable | pass* | pass* | pass* | pending* | [lta-workflow.md](references/lta-workflow.md) |
+| MS_LTA | configurable | pass* | pass* | pass* | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
+| PP_LGCM | template | pass* | pass* | pass* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
+| OTHER_GROWTH | template | pass | pass* | pass* | n/a | [reusable-models.md](references/reusable-models.md) |
 
 `*`: the evidence has a stated limit; see [family-registry.md](references/family-registry.md).
 <!-- family-registry:end -->

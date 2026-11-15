@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "family": "PP_LGCM",
+  "dataset": "CHARLS",
+  "route": "mplus_object_mapping",
+  "generated_taipei": "2026-11-15T23:02:54+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "b88c6e495dfcd909a3f76d1ffd690ca30ae0412f79ccb7344996d5784326adfa",
+  "code_sha256": {
+    "scripts/run_rstudio_mplus_batch.R": "51b78833861e01ef5e836116e2f08f6ec7167126d0918a937c53062293546de3",
+    "scripts/durable_mplus_worker.py": "199cf1954c9d21cb51854034d97a93c075bb2304d697ffeeff3a853e66795dfe",
+    "scripts/growth_time_basis.R": "c3a33106b8e36f7502a4083525e77a12e01cd8195fe6a860e3b7dc6d5b4351a5",
+    "scripts/model_mapping.R": "d8ad946e8f43b4fb2ee85268466c5ccb4e7e86e593576efb9dce79857da3d569"
+  },
+  "output_sha256": {
+    "pp_lgcm_model.inp": "100821600766799385c2569fa860daf12646ef57fccf234415ced72349881f89",
+    "pp_lgcm_model.out": "813e5c5991a0e82fef96401bf14aed890112ba26c0e43e1fe54809e638cc5113",
+    "pp_lgcm_parameters.csv": "2957909e3966f374e8c00b7b703bf29969809a5834a3c90125c79673ce8fce6f",
+    "pp_lgcm_validation.json": "6e9d27c2df1e1d27f5e64e41b0daadbb1e7b626e45656a61b0b96ea2ab85d47d",
+    "pp_lgcm_renamed_model.out": "583823acf0f1bf606a57e56a9cac7515b99e0c1fe57cc09e4c5af65137434264"
+  },
+  "rows": 17028,
+  "columns": 11,
+  "column_names": [
+    "r1cesd10",
+    "r2cesd10",
+    "r3cesd10",
+    "r4cesd10",
+    "r1shlta",
+    "r2shlta",
+    "r3shlta",
+    "r4shlta",
+    "age_dec",
+    "female",
+    "rural11"
+  ],
+  "missing_by_column": {
+    "r1cesd10": 1112,
+    "r2cesd10": 3354,
+    "r3cesd10": 3370,
+    "r4cesd10": 4669,
+    "r1shlta": 89,
+    "r2shlta": 2726,
+    "r3shlta": 3322,
+    "r4shlta": 4472,
+    "age_dec": 0,
+    "female": 0,
+    "rural11": 0
+  },
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 116,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-pp-lgcm-swap-8796-20261115"
+}

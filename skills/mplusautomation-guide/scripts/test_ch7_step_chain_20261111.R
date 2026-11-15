@@ -230,6 +230,25 @@ test_ch7_step_chain_20261111 <- function(output_dir, skill_root) {
   d[1, 2] <- d[1, 2] + 1
   utils::write.table(d, dat, row.names = FALSE, col.names = FALSE)
   reject("reject_modified_projection", ch7_step3_chain_receipt(ms, inp))
+  # Mplus 9 实机输出：整数 IDVARIABLE 排在末尾并声明为 SID I4（如 45F10.3 I4，4 位 ID 紧贴前列无空格）
+  f_i4 <- fixture("mplus9_trailing_i4", 2L, 4L)
+  d_i4 <- data.frame(VALUE = f_i4$data$VALUE, MLCC1 = f_i4$data$MLCC1, MLCC2 = f_i4$data$MLCC2,
+    MLCC3 = f_i4$data$MLCC3, MLCC4 = f_i4$data$MLCC4, SID = 999L + seq_len(nrow(f_i4$data)))
+  rows_i4 <- c(paste(c("VALUE", "MLCC1", "MLCC2", "MLCC3", "MLCC4"), "F10.3"), "SID            I4")
+  out_i4 <- f_i4$text
+  ord_at <- grep("Order and format of variables", out_i4, fixed = TRUE)[1L]
+  fmt_at <- grep("Save file format", out_i4, fixed = TRUE)[1L]
+  out_i4 <- c(out_i4[seq_len(ord_at)], "", paste0("    ", rows_i4), "",
+    "  Save file format", "    5F10.3 I4", out_i4[(fmt_at + 2L):length(out_i4)])
+  writeLines(out_i4, f_i4$out)
+  dat_i4 <- vapply(seq_len(nrow(d_i4)), function(i) paste0(
+    paste(sprintf("%10.3f", as.numeric(d_i4[i, 1:5])), collapse = ""), sprintf("%4d", d_i4$SID[i])), "")
+  writeLines(dat_i4, f_i4$saved)
+  chain_i4 <- build(f_i4, family = "mslta")
+  inp_i4 <- compile(chain_i4, file.path(f_i4$root, "compiled_i4"))
+  check("mplus9_trailing_i4_chain_and_receipt",
+    identical(chain_i4$data$SID, as.numeric(d_i4$SID)) &&
+    identical(ch7_step3_chain_receipt(chain_i4, inp_i4)$status, "PASS_COMPILED_LINEAGE"))
   manifest <- list(test = "ch7_step_chain_20261111", status = "PASS_SYNTHETIC_GENERATION_AND_PARSE",
     native_fresh_chain = "NOT_RUN", mplus_calls = 0L, checks = names(checks))
   jsonlite::write_json(manifest, file.path(output_dir, "ch7_step_chain_manifest.json"), auto_unbox = TRUE, pretty = TRUE)

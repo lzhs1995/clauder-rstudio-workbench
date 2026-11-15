@@ -177,13 +177,17 @@ ch7_lta_body <- function(family, nw, K, waves, categorical, invariant, transitio
   body <- "%OVERALL%"
   if (isTRUE(transitions)) body <- c(body, paste0("c", 2:nw, " ON c", 1:(nw - 1), ";"))
   if (family == "mslta") {
-    body <- c(body, "c1 ON g;", "MODEL g:", "%g#1%",
-              vapply(2:nw, function(t) paste0("[", paste0("c", t, "#", seq_len(K - 1), collapse = " "), "];"), ""),
-              if (isTRUE(transitions)) paste0("c", 2:nw, " ON c", 1:(nw - 1), ";") else character(), "%g#2%")
-    # 有限 logit 逼近 stayer 的对角线转移，不是精确的 0/1 概率
+    # 有限 logit 逼近 stayer 的对角线转移，不是精确的 0/1 概率；
+    # Mplus 9 禁止在 MODEL g: 内写 [c_t#k]，须在 %OVERALL% 固定参照类 g#2 的基准截距，
+    # 并由 c2..cT ON g 放开非参照类 g#1 (mover) 的基准截距偏移。
     num <- function(x) as.character(x)
+    body <- c(body,
+              paste0("c", seq_len(nw), " ON g;"),
+              vapply(2:nw, function(t) paste0("[", paste0("c", t, "#", seq_len(K - 1), "@", num(stayer[["intercept"]]), collapse = " "), "];"), ""),
+              "MODEL g:", "%g#1%",
+              if (isTRUE(transitions)) paste0("c", 2:nw, " ON c", 1:(nw - 1), ";") else character(),
+              "%g#2%")
     for (t in 2:nw) {
-      body <- c(body, paste0("[", paste0("c", t, "#", seq_len(K - 1), "@", num(stayer[["intercept"]]), collapse = " "), "];"))
       for (j in seq_len(K - 1)) body <- c(body, paste0("c", t, "#", j, " ON ",
         paste0("c", t - 1, "#", seq_len(K - 1), "@", ifelse(seq_len(K - 1) == j, num(stayer[["slope"]]), "0"),
                collapse = " "), ";"))

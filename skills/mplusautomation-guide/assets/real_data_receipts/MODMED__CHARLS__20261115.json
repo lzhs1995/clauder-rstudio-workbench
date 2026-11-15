@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "family": "MODMED",
+  "dataset": "CHARLS",
+  "route": "template_bundle",
+  "generated_taipei": "2026-11-15T23:02:54+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "eaf68b92d0b90198e26a8107421960dfd07188f5922d45313a5a2821b8cf8ed7",
+  "code_sha256": {
+    "scripts/ch5_mediation_moderation.R": "4ed909c580431e9ed6dc09e5e59b93276c351a212ba4776e0d89204d15c1f8d4",
+    "scripts/ch5_synthetic_data.R": "b834f1d4c2bec3f8c170f0c9481ac122646bec4b2e67fa29a1ba1dfaa24389a3",
+    "assets/ch5/moderated_mediation_mg_template.txt": "5cb357f045de97cdf3dfaee22f5efb705c1efa8674c03287f7cd35b5d3ca87e1",
+    "assets/ch5/moderated_mediation_cat_template.txt": "5767df59173e3ef4233535dd5821ed9acadab66b1bc091ed52b784be8408b30f"
+  },
+  "output_sha256": {
+    "modmed_source_receipt.json": "febe8c1648d8cf6a2d0e57589893350778602fb3fa64f75d8a6ad7a7e2f1daf4",
+    "modmed_data.dat": "d8598fbc57ed3ee33eeb2cf532ff86236166de5ecc391dcdf3f1ec1bb008c692",
+    "modmed_model.inp": "bea01de802cc2f4a4fb104d7f8b7266299802bfa304ded8ed66cbe8767ee63a4",
+    "modmed_model.out": "b3784f5edb097ce530f7d448f600e500c4d673d5eceec8a76adef2f6622b67db",
+    "modmed_renamed_model.inp": "64ea3ade9700bf6cc015a877e32f7e094f2be971dee841f8e71970bb39374417",
+    "modmed_renamed_model.out": "c5a32d642c5ba5a3ebb2bc8b1df9d9ae49d3b970e563481136ca9ec573970613"
+  },
+  "rows": 15758,
+  "columns": 7,
+  "column_names": [
+    "age2011",
+    "adl2011",
+    "cesd2011",
+    "educ_cat",
+    "rural11",
+    "female",
+    "shlt2011"
+  ],
+  "missing_by_column": {
+    "age2011": 0,
+    "adl2011": 0,
+    "cesd2011": 0,
+    "educ_cat": 0,
+    "rural11": 0,
+    "female": 0,
+    "shlt2011": 0
+  },
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 72,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-modmed-swap-8796-20261115"
+}
