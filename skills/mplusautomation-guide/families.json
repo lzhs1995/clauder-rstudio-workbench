@@ -898,15 +898,16 @@
         "synthetic_compile": {
           "status": "pass",
           "source": "ch5_moderation_route",
-          "note": "合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus"
+          "note": "合成数据：配置校验、单/多 focal 完整交叉公式（无需预乘 px.*）、拟合、连续与三分类简单斜率（默认 cluster_HC0、完整 model 及历史复现专用 historical_ch5 协方差模式，对重新中心化/重设参照类的拟合逐位一致）、显式 moderator_labels 与 Cairo 绘图；不调用 Mplus"
         },
         "native_synthetic": {
           "status": "not_applicable",
           "note": "静态调节只在 R 中拟合，没有 Mplus 引擎步骤"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "尚无白名单换源回执"
+          "status": "pass",
+          "source": "assets/real_data_receipts/MOD__CFPS__20261115.json",
+          "note": "CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表逐格一致"
         },
         "historical_replay": {
           "status": "pass",
@@ -921,9 +922,7 @@
       "thesis_refs": [
         "第五章"
       ],
-      "gaps": [
-        "第五章历史复现用的是锁定脚本原样复跑，尚未改由 r_glm_moderation 路线重跑"
-      ]
+      "gaps": []
     },
     "MODMED": {
       "aliases": [

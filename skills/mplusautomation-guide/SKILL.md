@@ -58,7 +58,7 @@ compile models, and its preparation receipt is not a real-data swap receipt.
 | APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MOD | configurable | pass* | n/a* | pass* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
 | LPA_LCA | configurable | pass* | pending* | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
 | LTA | configurable | pass* | pending* | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
@@ -130,7 +130,20 @@ Chapter 5 single-level mediation and moderation (MED, MOD, MODMED) follow the
 [mediation and moderation workflow](references/mediation-moderation-workflow.md).
 After changing template variables, run `ch5_check_template_lists()` on the
 filled template and `ch5_check_inp_columns()` on each generated `.inp` (see
-mediation-moderation-workflow.md §3).
+mediation-moderation-workflow.md §3). For the R static moderation route (`MOD`,
+`scripts/ch5_moderation_route.R`): `focal` accepts one or more unique column
+names and builds the full `focal × moderator` cross in the formula without
+pre-multiplied `px.*` columns; `ch5_simple_slopes(m, level, covariance = ...)`
+computes per-focal simple slopes with `"cluster_HC0"` by default, `"model"` for
+the full ordinary covariance matrix, and `"historical_ch5"` strictly for
+historical Chapter 5 reproduction (ordinary full covariance for categorical
+moderators, clustered diagonal paired with ordinary cross terms for continuous
+moderators — never use for new robust inference, never alter defaults or normal
+quantiles, and never fall back silently); `moderator_labels` requires a complete
+explicit caller mapping (`moderator_level` is omitted when unset), categorical
+`moderator_code` stores the full vector in effect-coding column order (keep
+display labels separate from mathematical coding), and extended non-ASCII PDF
+plots use Cairo.
 
 ## LPA/LCA, LTA and MS-LTA
 

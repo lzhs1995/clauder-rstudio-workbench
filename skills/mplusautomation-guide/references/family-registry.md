@@ -26,7 +26,7 @@ For changing data sources or variables, follow
 | APIMoM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
 | APIMeMoM | configurable | apim_v2_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
 | MED | template | template_bundle | pass* | pending* | pending* | readback* |
-| MOD | configurable | r_glm_moderation | pass* | n/a* | pending* | pass* |
+| MOD | configurable | r_glm_moderation | pass* | n/a* | pass* | pass* |
 | MODMED | template | template_bundle | pass* | pending* | pending* | readback* |
 | LPA_LCA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pending* | — | pass* |
 | LTA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pending* | — | pending* |
@@ -135,12 +135,11 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_moderation_route_20261105.R` (CI mplus-ch5-synthetic.yml)
-- synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus
+- synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、单/多 focal 完整交叉公式（无需预乘 px.*）、拟合、连续与三分类简单斜率（默认 cluster_HC0、完整 model 及历史复现专用 historical_ch5 协方差模式，对重新中心化/重设参照类的拟合逐位一致）、显式 moderator_labels 与 Cairo 绘图；不调用 Mplus
 - native_synthetic: not_applicable; 静态调节只在 R 中拟合，没有 Mplus 引擎步骤
-- real_data_swap: pending; 尚无白名单换源回执
+- real_data_swap: pass; source `assets/real_data_receipts/MOD__CFPS__20261115.json`; CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表逐格一致
 - historical_replay: pass; source `references/chapter5-replay-map.md`; 在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致
 - Thesis: 第五章
-- Gap: 第五章历史复现用的是锁定脚本原样复跑，尚未改由 r_glm_moderation 路线重跑
 
 ## MODMED
 
