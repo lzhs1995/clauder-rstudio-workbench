@@ -21,8 +21,8 @@ For changing data sources or variables, follow
 
 | Family | Code | Routes | Synthetic compile | Native synthetic | Real-data swap | Historical replay |
 |---|---|---|---|---|---|---|
-| APIM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
-| APIMeM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
+| APIM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
+| APIMeM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
 | APIMoM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
 | APIMeMoM | configurable | apim_v2_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
 | MED | template | template_bundle | pass* | pending* | pending* | readback* |
@@ -48,7 +48,7 @@ For changing data sources or variables, follow
 - Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; CFPS → CHARLS 换源已排期
+- real_data_swap: pass; source `assets/real_data_receipts/APIM__CHARLS__20261112.json`; CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR）
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放；上游行身份来源未闭合
 - Thesis: 第四章
 
@@ -66,7 +66,7 @@ APIM 中介模型：在 APIM 中加入成员中介变量（a/b 路径与间接�
 - Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; CFPS → CHARLS 换源已排期
+- real_data_swap: pass; source `assets/real_data_receipts/APIMeM__CHARLS__20261112.json`; CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR；横截面间接关联，不作因果中介推断）
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放
 - Thesis: 第四章
 

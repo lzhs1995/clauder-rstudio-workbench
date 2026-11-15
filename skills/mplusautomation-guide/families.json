@@ -592,8 +592,9 @@
           "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "CFPS → CHARLS 换源已排期"
+          "status": "pass",
+          "source": "assets/real_data_receipts/APIM__CHARLS__20261112.json",
+          "note": "CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR）"
         },
         "historical_replay": {
           "status": "pass",
@@ -658,8 +659,9 @@
           "note": "10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑"
         },
         "real_data_swap": {
-          "status": "pending",
-          "note": "CFPS → CHARLS 换源已排期"
+          "status": "pass",
+          "source": "assets/real_data_receipts/APIMeM__CHARLS__20261112.json",
+          "note": "CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR；横截面间接关联，不作因果中介推断）"
         },
         "historical_replay": {
           "status": "pass",

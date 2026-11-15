@@ -53,8 +53,8 @@ compile models, and its preparation receipt is not a real-data swap receipt.
 <!-- family-registry:start -->
 | Family | Code | Synthetic | Native | Real-data swap | Historical | Start here |
 |---|---|---|---|---|---|---|
-| APIM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMeM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
+| APIM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| APIMeM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
 | APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
 | MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
