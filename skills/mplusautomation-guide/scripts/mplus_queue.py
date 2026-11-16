@@ -236,6 +236,31 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     return None
 
 
+def scale_up_memory_ok(snapshot, reserved_gib, policy=None):
+    """Return whether memory allows the queue to add one parallel slot.
+
+    The percentage rule is kept for compatibility, but it is not the only
+    route: a 16 GiB Windows host running editors and browsers can stay above
+    85% for hours while still having several GiB available.  In that case the
+    slot is added when the same byte headroom used by ``admission_reason`` can
+    cover the running reservations plus one more ``scale_up_step_gib``.
+    """
+    policy = {**DEFAULT_POLICY, **(policy or {})}
+    if snapshot["memory_percent"] < policy["memory_resume_percent"]:
+        return True
+    if snapshot.get("host_memory_unverified"):
+        return False
+    step = float(policy.get("scale_up_step_gib", 0.5))
+    if snapshot["available_gib"] - reserved_gib - step < policy["reserve_gib"]:
+        return False
+    commit_reserve = policy.get("commit_reserve_gib")
+    if commit_reserve is not None:
+        headroom = snapshot.get("free_virtual_gib")
+        if headroom is None or headroom - reserved_gib - step < commit_reserve:
+            return False
+    return True
+
+
 def inspect_output(path, savedata_contract=None):
     path = Path(path)
     if not path.exists():
@@ -335,6 +360,17 @@ class Queue:
             initial = int(settings.get("initial_parallel_limit", 1))
             if initial < 1 or initial > cap or (initial > 1 and not settings.get("calibrated")):
                 raise ValueError("Parallel start requires a measured calibration")
+            self.set("limit", initial)
+        elif (not settings.get("apim_v2") and ("parallel_cap" in settings or "initial_parallel_limit" in settings)
+              and not self.db.execute("SELECT 1 FROM events LIMIT 1").fetchone()):
+            # 普通队列可在首次建库时直接声明并发起点与上限；每次 claim 仍逐项核内存/提交/CPU/线程/磁盘。
+            cap = int(settings.get("parallel_cap", 3))
+            initial = int(settings.get("initial_parallel_limit", 1))
+            if cap < 1 or cap > int(self.policy["processor_budget"]):
+                raise ValueError("parallel_cap must be between 1 and processor_budget")
+            if initial < 1 or initial > cap:
+                raise ValueError("initial_parallel_limit must be between 1 and parallel_cap")
+            self.set("cap", cap)
             self.set("limit", initial)
         # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
         self.success_policy = settings.get("historical_success_policy")
@@ -754,7 +790,12 @@ class Queue:
         with self.transaction():
             if snapshot["at"] - self.get("last_sample") < 30:
                 return
-            good = snapshot["memory_percent"] < self.policy["memory_resume_percent"] and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"] and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"]
+            # 扩槽与准入同口径：内存按扣除在跑预留后的字节余量判断，百分比只作兼容快捷路径。
+            reserved = sum(float(json.loads(r[0]).get("memory_gib", 0.5))
+                           for r in self.db.execute("SELECT payload FROM tasks WHERE status='running'"))
+            good = (scale_up_memory_ok(snapshot, reserved, self.policy)
+                    and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"]
+                    and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"])
             healthy = self.get("healthy") + 1 if good else 0
             limit = self.get("limit")
             if healthy >= 5 and limit < self.get("cap"):

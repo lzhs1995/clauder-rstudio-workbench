@@ -87,10 +87,23 @@ applications without authorization.
 The queue's initial profile is intentionally conservative for a 16 GiB,
 16-logical-CPU workstation: start at one, cap at three, reserve 1.5 GiB, admit
 below 90% predicted memory, hold at 90% CPU/memory, and reserve 10 GiB disk. Five
-healthy 30-second samples below 85% memory and 75% CPU add one slot. The sum of
-declared Mplus processors must stay within twelve. These are starting values,
-not universal Mac/Windows requirements; calibrate the profile to the host and
-representative model peaks before production use.
+healthy 30-second samples add one slot. A sample is healthy when CPU is below
+75%, disk is above its reserve, and memory either is below 85% or still has
+byte headroom for the running reservations plus `scale_up_step_gib` (default
+0.5 GiB) above `reserve_gib`, and above `commit_reserve_gib` when that is set.
+The byte route matters on Windows: editors and browsers can hold the
+percentage above 85% for hours while several GiB remain available, and a
+percent-only rule would keep the queue at one slot. The sum of declared Mplus
+processors must stay within twelve. These are starting values, not universal
+Mac/Windows requirements; calibrate the profile to the host and representative
+model peaks before production use.
+
+A new queue can start wider. Put `parallel_cap` (1 to `processor_budget`) and
+`initial_parallel_limit` (1 to the cap) in `config.json` before the first
+command creates the database; an existing queue keeps its stored values. The
+slot limit is only an upper bound: every claim still passes the memory,
+commit, CPU, processor and disk checks above. APIM v2 queues keep their own
+calibrated `parallel_cap` rule.
 
 Override the numerical thresholds with `resource_policy` in the queue root's
 `config.json`: `memory_hold_percent`, `memory_resume_percent`, `reserve_gib`,
