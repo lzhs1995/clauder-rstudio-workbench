@@ -236,6 +236,31 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     return None
 
 
+def scale_up_memory_ok(snapshot, reserved_gib, policy=None):
+    """Return whether memory allows the queue to add one parallel slot.
+
+    The percentage rule is kept for compatibility, but it is not the only
+    route: a 16 GiB Windows host running editors and browsers can stay above
+    85% for hours while still having several GiB available.  In that case the
+    slot is added when the same byte headroom used by ``admission_reason`` can
+    cover the running reservations plus one more ``scale_up_step_gib``.
+    """
+    policy = {**DEFAULT_POLICY, **(policy or {})}
+    # 未验真的宿主机快照（WSL 视图、过期或损坏的 profile）不计入健康样本，百分比路径也不例外。
+    if snapshot.get("host_memory_unverified"):
+        return False
+    step = float(policy.get("scale_up_step_gib", 0.5))
+    # 声明了提交余量时，两条路径都先核页面文件/提交余量。
+    commit_reserve = policy.get("commit_reserve_gib")
+    if commit_reserve is not None:
+        headroom = snapshot.get("free_virtual_gib")
+        if headroom is None or headroom - reserved_gib - step < commit_reserve:
+            return False
+    if snapshot["memory_percent"] < policy["memory_resume_percent"]:
+        return True
+    return snapshot["available_gib"] - reserved_gib - step >= policy["reserve_gib"]
+
+
 def inspect_output(path, savedata_contract=None):
     path = Path(path)
     if not path.exists():
@@ -311,6 +336,8 @@ class Queue:
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY, at TEXT, kind TEXT, payload TEXT);
         """)
+        # init/enable 只写 settings 不写 events，所以“首次建库”以 settings 表为空判定。
+        fresh_db = not self.db.execute("SELECT 1 FROM settings LIMIT 1").fetchone()
         for key, value in dict(enabled=False, limit=1, cap=3, healthy=0, last_sample=0, producers_done=False).items():
             self.db.execute("INSERT OR IGNORE INTO settings VALUES(?,?)", (key, json.dumps(value)))
         config = self.root / "config.json"
@@ -335,6 +362,19 @@ class Queue:
             initial = int(settings.get("initial_parallel_limit", 1))
             if initial < 1 or initial > cap or (initial > 1 and not settings.get("calibrated")):
                 raise ValueError("Parallel start requires a measured calibration")
+            self.set("limit", initial)
+        elif (not settings.get("apim_v2") and fresh_db
+              and ("parallel_cap" in settings or "initial_parallel_limit" in settings)):
+            # 普通队列可在首次建库时直接声明并发起点与上限；每次 claim 仍逐项核内存/提交/CPU/线程/磁盘。
+            cap = settings.get("parallel_cap", 3)
+            initial = settings.get("initial_parallel_limit", 1)
+            if any(isinstance(v, bool) or not isinstance(v, int) for v in (cap, initial)):
+                raise ValueError("parallel_cap and initial_parallel_limit must be integers")
+            if cap < 1 or cap > int(self.policy["processor_budget"]):
+                raise ValueError("parallel_cap must be between 1 and processor_budget")
+            if initial < 1 or initial > cap:
+                raise ValueError("initial_parallel_limit must be between 1 and parallel_cap")
+            self.set("cap", cap)
             self.set("limit", initial)
         # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
         self.success_policy = settings.get("historical_success_policy")
@@ -754,7 +794,14 @@ class Queue:
         with self.transaction():
             if snapshot["at"] - self.get("last_sample") < 30:
                 return
-            good = snapshot["memory_percent"] < self.policy["memory_resume_percent"] and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"] and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"]
+            # 扩槽与准入同口径：内存按扣除在跑预留后的字节余量判断，百分比只作兼容快捷路径。
+            reserved = sum(float(json.loads(r[0]).get("memory_gib", 0.5))
+                           for r in self.db.execute("SELECT payload FROM tasks WHERE status='running'"))
+            good = (scale_up_memory_ok(snapshot, reserved, self.policy)
+                    and not snapshot.get("host_cpu_unverified")
+                    and not snapshot.get("host_disk_unverified")
+                    and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"]
+                    and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"])
             healthy = self.get("healthy") + 1 if good else 0
             limit = self.get("limit")
             if healthy >= 5 and limit < self.get("cap"):
