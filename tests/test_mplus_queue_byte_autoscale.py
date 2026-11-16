@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -120,6 +122,25 @@ class ByteAutoscaleTest(unittest.TestCase):
                     q.event("resources", {})
                 q2 = self._queue(name, {"parallel_cap": 6, "initial_parallel_limit": 4})
                 self.assertEqual((q2.get("limit"), q2.get("cap")), (1, 3))
+
+    def test_cli_status_does_not_rewrite_existing_queue(self) -> None:
+        # 正式 CLI：init → enable → 改 config → status，默认起点与已声明起点都保持原值
+        for first, expected in ((None, (1, 3)), ({"parallel_cap": 2, "initial_parallel_limit": 2}, (2, 2))):
+            with self.subTest(first=first):
+                root = self.tmp / f"cli{expected[1]}"
+                root.mkdir()
+                if first is not None:
+                    (root / "config.json").write_text(json.dumps(first), encoding="utf-8")
+                for action in ("init", "enable"):
+                    subprocess.run([sys.executable, str(SCRIPT), action, "--root", str(root)],
+                                   check=True, capture_output=True)
+                (root / "config.json").write_text(json.dumps({"parallel_cap": 4, "initial_parallel_limit": 3}),
+                                                  encoding="utf-8")
+                subprocess.run([sys.executable, str(SCRIPT), "status", "--root", str(root)],
+                               check=True, capture_output=True)
+                q = MODULE.Queue(root)
+                self.queues.append(q)
+                self.assertEqual((q.get("limit"), q.get("cap")), expected)
 
     def test_invalid_declared_limits_are_rejected(self) -> None:
         cases = [
