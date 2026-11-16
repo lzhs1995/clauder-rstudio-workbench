@@ -1,0 +1,83 @@
+1
+00:00:00,000 --> 00:00:08,000
+From one task to a table and inspectable outputs.
+
+2
+00:00:08,000 --> 00:00:20,000
+Codex reaches RStudio through MCP; this demo uses synthetic data only.
+
+3
+00:00:20,000 --> 00:00:29,500
+Start the named demo session in the ClaudeR addin.
+
+4
+00:00:29,500 --> 00:00:37,500
+Discover sessions, then connect explicitly to demo.
+
+5
+00:00:37,500 --> 00:00:45,500
+Check R and ClaudeR versions, sample size and IDs.
+
+6
+00:00:45,500 --> 00:00:53,500
+Hash the input, read the dataset and inspect its structure.
+
+7
+00:00:53,500 --> 00:00:58,500
+Group counts are 704 and 496; missing values and duplicate IDs are reported.
+
+8
+00:00:58,500 --> 00:01:08,500
+Education has 24 missing values; health has 36; duplicate IDs: zero.
+
+9
+00:01:08,500 --> 00:01:20,500
+The specification defines groups, summary methods and missing categories.
+
+10
+00:01:20,500 --> 00:01:30,500
+The background task returns a job ID; subsequent checks use that same ID.
+
+11
+00:01:30,500 --> 00:01:40,500
+This is the actual submission; the console remains available during computation.
+
+12
+00:01:40,500 --> 00:01:50,500
+The run produces DOCX, CSV, RDS, metadata and a hash manifest.
+
+13
+00:01:50,500 --> 00:02:00,500
+This view is rendered from the newly generated DOCX; values are not retyped.
+
+14
+00:02:00,500 --> 00:02:08,500
+Bilingual labels, group summaries and test results remain editable.
+
+15
+00:02:08,500 --> 00:02:16,500
+Missing categories are retained; the three-line table has no vertical grid.
+
+16
+00:02:16,500 --> 00:02:26,500
+Reopen the outputs and check numeric values, display values and hashes.
+
+17
+00:02:26,500 --> 00:02:39,500
+All six checks are TRUE; the input SHA-256 is unchanged.
+
+18
+00:02:39,500 --> 00:02:49,500
+Validation covers document structure, value consistency and input integrity.
+
+19
+00:02:49,500 --> 00:02:57,500
+Behind the footage are four real Codex MCP calls; times come from its session log.
+
+20
+00:02:57,500 --> 00:03:07,500
+Follow the README to install compatible versions and connect your named session.
+
+21
+00:03:07,500 --> 00:03:15,500
+Built on IMNMV/ClaudeR; a synthetic-data demo with retained outputs.

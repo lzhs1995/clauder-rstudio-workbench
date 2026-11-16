@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:03,000
+Real Codex working in a live RStudio session.
+
+2
+00:00:03,000 --> 00:00:07,000
+Start the named demo session in the ClaudeR addin.
+
+3
+00:00:07,000 --> 00:00:12,000
+Audit 1,200 synthetic records first.
+
+4
+00:00:12,000 --> 00:00:18,000
+Generate the table asynchronously; the main session stays available.
+
+5
+00:00:18,000 --> 00:00:24,000
+Produce an editable table and machine-readable data.
+
+6
+00:00:24,000 --> 00:00:29,000
+Independent validation passes; the input is unchanged.
+
+7
+00:00:29,000 --> 00:00:33,000
+Built on IMNMV/ClaudeR; see the README for the full workflow.
