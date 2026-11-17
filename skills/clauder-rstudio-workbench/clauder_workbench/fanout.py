@@ -16,11 +16,17 @@ state/manifest/validation 三件套，动态资源门，并在全部完成后做
 from __future__ import annotations
 
 import json
+import math
+import ntpath
+import posixpath
 import time
 from pathlib import Path
 from typing import Any, Callable
 
-from .resource import cpu_used_percent, disk_free_gb, memory_used_percent, upload_backlog_count
+from .resource import (
+    fanout_admission, normalize_fanout_policy,
+    cpu_used_percent, disk_free_gb, memory_used_percent, upload_backlog_count,
+)
 from .worker_lint import lint_worker_file
 
 WORKER_FILE_KEYS = ("expected_state", "expected_manifest", "expected_validation")
@@ -343,27 +349,67 @@ def _validate_contract(contract: dict[str, Any]) -> list[str]:
     return problems
 
 
-def plan_fanout(contract: dict[str, Any], *, advise_parallel: bool = True) -> dict[str, Any]:
+def worker_output_root_of(contract: dict[str, Any]) -> str | None:
+    rg = contract.get("resource_gate") or {}
+    return rg.get("worker_output_root") or output_root_of(contract)
+
+
+def _worker_path_key(value: str) -> str:
+    # 只做目标路径词法比较，不以本机 cwd 或文件系统解析远端路径。
+    value = value.replace("\\", "/")
+    if ntpath.isabs(value) and ntpath.splitdrive(value)[0]:
+        return ntpath.normcase(ntpath.normpath(value))
+    return posixpath.normpath(value)
+
+
+def _fanout_sample(probe: Callable[[], dict[str, Any] | None] | None,
+                   contract: dict[str, Any]) -> dict[str, Any] | None:
+    # 缺目标探针时不使用编排主机资源代替 worker 主机。
+    if probe is None:
+        return None
+    try:
+        sample = probe()
+        if not isinstance(sample, dict):
+            return None
+        expected = worker_output_root_of(contract)
+        observed = sample.get("requested_output_root") or sample.get("output_root")
+        if not isinstance(expected, str) or not isinstance(observed, str) or _worker_path_key(expected) != _worker_path_key(observed):
+            return {"host_verified": False, "reason": "worker output volume binding unknown or mismatched; HOLD"}
+        return sample
+    except Exception as exc:
+        return {"host_verified": False, "reason": f"worker host resources unknown: {type(exc).__name__}: {exc}"}
+
+
+def plan_fanout(
+    contract: dict[str, Any], *, advise_parallel: bool = True,
+    resource_probe_fn: Callable[[], dict[str, Any] | None] | None = None,
+) -> dict[str, Any]:
     problems = _validate_contract(contract)
     lint = lint_contract_workers(contract)
     problems = problems + list(lint["issues"])  # sink()/unsafe worker = hard problem
     workers = contract.get("workers") or []
     rg = contract.get("resource_gate") or {}
-    memory_threshold = float(rg.get("memory_threshold", 85.0)) if isinstance(rg, dict) else 85.0
+    memory_threshold = rg.get("memory_threshold", 85.0) if isinstance(rg, dict) else 85.0
     requested = contract.get("max_parallel")
     recommended = requested
-    advice_reason = "max_parallel taken from contract"
-    if advise_parallel and not requested:
-        mem = memory_used_percent()
-        if mem is None:
-            recommended = 1
-            advice_reason = "memory unknown; conservative start at 1"
-        elif mem >= memory_threshold:
-            recommended = 1
-            advice_reason = f"memory {mem:.1f}% >= threshold; start at 1"
-        else:
-            recommended = min(len(workers), 3)
-            advice_reason = f"memory {mem:.1f}% < threshold; conservative start min(workers,3)"
+    advice_reason = "resource advice disabled; contract validation only"
+    admission = None
+    admitted = None
+    try:
+        policy = normalize_fanout_policy(rg)
+        if requested is not None and (isinstance(requested, bool) or not isinstance(requested, int) or requested < 1):
+            raise ValueError("max_parallel must be a positive integer")
+        if advise_parallel and not problems:
+            admission = fanout_admission(_fanout_sample(resource_probe_fn, contract), policy)
+            slots = admission["available_slots"]
+            if requested is None:
+                recommended = min(len(workers), 3, slots)
+            admitted = min(len(workers), int(recommended or 0), slots)
+            advice_reason = "; ".join(admission["reasons"])
+            if requested is not None:
+                advice_reason = "max_parallel retained from contract; resource admission separately enforced: " + advice_reason
+    except (TypeError, ValueError) as exc:
+        problems.append(str(exc))
     worker_plans = []
     for w in workers if isinstance(workers, list) else []:
         if not isinstance(w, dict):
@@ -385,6 +431,9 @@ def plan_fanout(contract: dict[str, Any], *, advise_parallel: bool = True) -> di
         "requested_max_parallel": requested,
         "recommended_max_parallel": recommended,
         "advice_reason": advice_reason,
+        "admitted_parallel": admitted,
+        "admission_ok": bool(admitted) if advise_parallel else None,
+        "resource_admission": admission,
         "memory_threshold": memory_threshold,
         "output_root": output_root_of(contract),
         "workers": worker_plans,
@@ -505,6 +554,7 @@ def run_fanout(
     upload_backlog_hold: int | None = None,
     healthy_samples_for_scale_up: int = 1,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    resource_probe_fn: Callable[[], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     """mcp-stdio 模式：提交 N 个 worker 并 file-poll 至完成。
 
@@ -515,12 +565,10 @@ def run_fanout(
     ``reuse_existing=True`` 时（断点续跑）才把更早的完成产出当作已完成、跳过提交。
     ``first_artifact_timeout_min`` 用于尽早发现"提交成功但子 R 进程静默死亡"（一直无产出）。
 
-    ``auto_scale=True`` 时实现源文档 §6 的动态并发：以 ``max_parallel`` 为**起始**并发，
-    每个轮询周期前用 ``mem_probe_fn``（默认 ``memory_used_percent``）采样系统内存：
-      - 内存 < ``memory_threshold`` 且仍有 pending 且当前并发 < 上限 → 并发 +1（扩）；
-      - 内存 >= ``memory_threshold`` → 不再提交新 worker（把并发回压到当前在跑数，等其排空）。
-    上限默认是 worker 总数（也可由 ``max_parallel_cap`` 收紧）。运行中的 job 不会被杀，
-    回压只阻止**新**提交。每次调整记入 ``scale_log``。
+    ``max_parallel`` 在固定模式为上限，在 auto_scale 模式为起点。
+    每个新提交均须通过实际 worker 主机的四维字节/线程准入；未知或陈旧样本 HOLD。
+    在跑 worker 按本批预算全额预约，不推断宿主机其他队列的预约。
+    旧百分比参数保留为诊断；不以默认85%限制并发，不杀已运行 job。
     """
     problems = _validate_contract(contract)
     if problems:
@@ -530,6 +578,11 @@ def run_fanout(
     if not lint["ok"]:
         return {"ok": False, "problems": lint["issues"],
                 "transport_class": "BLOCKED", "lint": lint}
+
+    for name, value in (("max_parallel", max_parallel), ("contract.max_parallel", contract.get("max_parallel")),
+                        ("max_parallel_cap", max_parallel_cap)):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            return {"ok": False, "problems": [f"{name} must be a positive integer"], "transport_class": "BLOCKED"}
 
     run_started = time.time()
     fresh_boundary = run_started - 2.0  # 容忍文件系统 mtime 秒级粒度；旧产出仍远早于此
@@ -543,41 +596,38 @@ def run_fanout(
     cap = max(1, min(cap, len(workers))) if workers else 1
     if level > cap:
         level = cap
-    mem_probe = mem_probe_fn or memory_used_percent
-    cpu_probe = cpu_probe_fn or cpu_used_percent
-    disk_probe = disk_probe_fn or (lambda: disk_free_gb(output_root_of(contract)))
     rg = contract.get("resource_gate") or {}
-    if isinstance(rg, dict) and rg.get("memory_threshold") is not None:
-        try:
-            memory_threshold = float(rg.get("memory_threshold"))
-        except (TypeError, ValueError):
-            pass
+    try:
+        policy = normalize_fanout_policy(rg)
+    except (TypeError, ValueError) as exc:
+        return {"ok": False, "problems": [str(exc)], "transport_class": "BLOCKED"}
     if isinstance(rg, dict):
-        def _number(name: str, current: float | None) -> float | None:
-            value = rg.get(name)
-            if value is None:
-                return current
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return current
-
-        memory_scale_up_percent = _number("memory_scale_up_percent", memory_scale_up_percent)
-        memory_hold_percent = _number("memory_hold_percent", memory_hold_percent)
-        cpu_scale_up_percent = _number("cpu_scale_up_percent", cpu_scale_up_percent)
-        cpu_hold_percent = _number("cpu_hold_percent", cpu_hold_percent)
-        min_disk_free_gb_scale_up = _number("min_disk_free_gb_scale_up", min_disk_free_gb_scale_up)
-        min_disk_free_gb_hold = _number("min_disk_free_gb_hold", min_disk_free_gb_hold)
-        if rg.get("upload_backlog_hold") is not None:
-            upload_backlog_hold = int(rg["upload_backlog_hold"])
-        if rg.get("healthy_samples_for_scale_up") is not None:
-            healthy_samples_for_scale_up = int(rg["healthy_samples_for_scale_up"])
+        memory_threshold = rg.get("memory_threshold", memory_threshold)
+        memory_scale_up_percent = rg.get("memory_scale_up_percent", memory_scale_up_percent)
+        memory_hold_percent = rg.get("memory_hold_percent", memory_hold_percent)
+        cpu_scale_up_percent = rg.get("cpu_scale_up_percent", cpu_scale_up_percent)
+        cpu_hold_percent = rg.get("cpu_hold_percent", cpu_hold_percent)
+        min_disk_free_gb_scale_up = rg.get("min_disk_free_gb_scale_up", min_disk_free_gb_scale_up)
+        min_disk_free_gb_hold = rg.get("min_disk_free_gb_hold", min_disk_free_gb_hold)
+        upload_backlog_hold = rg.get("upload_backlog_hold", upload_backlog_hold)
+        healthy_samples_for_scale_up = rg.get("healthy_samples_for_scale_up", healthy_samples_for_scale_up)
         if upload_backlog_probe_fn is None and rg.get("upload_backlog_dir"):
             upload_backlog_probe_fn = lambda: upload_backlog_count(str(rg["upload_backlog_dir"]))
-    memory_scale_up_percent = memory_threshold if memory_scale_up_percent is None else memory_scale_up_percent
-    memory_hold_percent = memory_threshold if memory_hold_percent is None else memory_hold_percent
-    healthy_samples_for_scale_up = max(1, int(healthy_samples_for_scale_up))
+    for name, value, integer in (
+        ("healthy_samples_for_scale_up", healthy_samples_for_scale_up, True),
+        ("upload_backlog_hold", upload_backlog_hold, True),
+        ("min_disk_free_gb_hold", min_disk_free_gb_hold, False),
+        ("min_disk_free_gb_scale_up", min_disk_free_gb_scale_up, False),
+    ):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                  or not math.isfinite(value) or value < (1 if integer else 0)
+                                  or (integer and int(value) != value)):
+            return {"ok": False, "problems": [f"{name} must be finite and within its declared budget range"],
+                    "transport_class": "BLOCKED"}
+    healthy_samples_for_scale_up = int(healthy_samples_for_scale_up)
     upload_probe = upload_backlog_probe_fn or (lambda: 0)
+    admission_log: list[dict[str, Any]] = []
+    bound_identity: tuple[Any, Any] | None = None
     scale_log: list[dict[str, Any]] = []
     healthy_streak = 0
 
@@ -599,68 +649,78 @@ def run_fanout(
     iterations = 0
 
     while (pending or running) and not failed:
-        if auto_scale:
-            mem = mem_probe()
-            cpu = cpu_probe()
-            free_gb = disk_probe()
-            upload_backlog = upload_probe()
-            old_level = level
-            action = "hold"
-            hard_hold = (
-                (mem is not None and mem >= memory_hold_percent)
-                or (cpu_hold_percent is not None and cpu is not None and cpu >= cpu_hold_percent)
-                or (min_disk_free_gb_hold is not None and free_gb is not None and free_gb < min_disk_free_gb_hold)
-                or (upload_backlog_hold is not None and upload_backlog >= upload_backlog_hold)
-            )
-            healthy = (
-                mem is not None and mem < memory_scale_up_percent
-                and (cpu_scale_up_percent is None or (cpu is not None and cpu < cpu_scale_up_percent))
-                and (min_disk_free_gb_scale_up is None or (free_gb is not None and free_gb >= min_disk_free_gb_scale_up))
-                and (upload_backlog_hold is None or upload_backlog < upload_backlog_hold)
-            )
-            healthy_streak = healthy_streak + 1 if healthy else 0
-            if mem is None:
-                action = "hold_mem_unknown"
-            elif hard_hold:
-                # 回压：不再提交新 worker，等在跑的排空（不杀在跑 job）
-                if level > max(1, len(running)):
-                    level = max(1, len(running))
-                action = "throttle"
-            elif pending and level < cap and healthy_streak >= healthy_samples_for_scale_up:
+        sample = _fanout_sample(resource_probe_fn, contract) if pending else None
+        if sample and sample.get("host_verified"):
+            identity = (sample.get("host_id"), sample.get("session_pid"))
+            if bound_identity is not None and identity != bound_identity:
+                sample = {"host_verified": False, "reason": "worker host identity changed; HOLD"}
+            else:
+                bound_identity = identity
+        admission = fanout_admission(sample, policy, running_count=len(running))
+        # 旧磁盘阈值只可附加收紧，仍使用目标卷字节而非编排端磁盘。
+        extra_reasons = []
+        if pending:
+            for threshold in (min_disk_free_gb_hold, min_disk_free_gb_scale_up if auto_scale else None):
+                if threshold is not None:
+                    free_bytes = (sample or {}).get("output_free_bytes")
+                    if free_bytes is None or free_bytes < float(threshold) * 1024 ** 3:
+                        extra_reasons.append("worker output volume below explicit minimum; HOLD")
+            if upload_backlog_hold is not None:
+                try:
+                    if upload_probe() >= int(upload_backlog_hold):
+                        extra_reasons.append("upload backlog at explicit hold threshold")
+                except Exception:
+                    extra_reasons.append("upload backlog unknown; HOLD")
+        if extra_reasons:
+            admission = {**admission, "decision": "hold", "available_slots": 0,
+                         "reasons": admission["reasons"] + extra_reasons}
+        admission_log.append({"iteration": iterations, "running": len(running),
+                              "pending": len(pending), **admission})
+        healthy = admission["available_slots"] > 0
+        healthy_streak = healthy_streak + 1 if healthy else 0
+        old_level = level
+        action = "hold"
+        if not healthy and pending:
+            action = "hold_resources"
+        elif auto_scale and pending and level < cap:
+            if healthy_streak >= healthy_samples_for_scale_up:
                 level += 1
-                action = "scale_up"
                 healthy_streak = 0
-            elif pending and healthy and healthy_streak < healthy_samples_for_scale_up:
+                action = "scale_up"
+            else:
                 action = "hold_health_warmup"
-            if action != "hold":
-                scale_log.append({
-                    "iteration": iterations,
-                    "memory_used_percent": mem,
-                    "memory_scale_up_percent": memory_scale_up_percent,
-                    "memory_hold_percent": memory_hold_percent,
-                    "cpu_used_percent": cpu,
-                    "cpu_scale_up_percent": cpu_scale_up_percent,
-                    "cpu_hold_percent": cpu_hold_percent,
-                    "disk_free_gb": free_gb,
-                    "min_disk_free_gb_scale_up": min_disk_free_gb_scale_up,
-                    "min_disk_free_gb_hold": min_disk_free_gb_hold,
-                    "upload_backlog": upload_backlog,
-                    "upload_backlog_hold": upload_backlog_hold,
-                    "healthy_streak": healthy_streak,
-                    "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
-                    "from_level": old_level,
-                    "to_level": level,
-                    "action": action,
-                    "running": len(running),
-                    "pending": len(pending),
-                })
+        scale_log.append({"iteration": iterations, "from_level": old_level, "to_level": level,
+                          "action": action, "running": len(running), "pending": len(pending),
+                          "memory_used_percent": (sample or {}).get("memory_used_percent"),
+                          "healthy_streak": healthy_streak,
+                          "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
+                          "resource_admission": admission})
         while pending and len(running) < level and not failed:
+            # 同一采样周期每提交一项即增加预约，不能重复花用余量。
+            candidate = fanout_admission(sample, policy, running_count=len(running))
+            if extra_reasons:
+                candidate = {**candidate, "decision": "hold", "available_slots": 0,
+                             "reasons": candidate["reasons"] + extra_reasons}
+            admission_log.append({"iteration": iterations, "worker_id": pending[0],
+                                  "running": len(running), "pending": len(pending), **candidate})
+            if candidate["available_slots"] < 1:
+                break
             wid = pending.pop(0)
             worker = by_id[wid]
             code = build_submit_code(worker)
             result = submit_fn(code)
-            entry = {"id": wid, "ok": bool(result.get("ok")), "job_id": result.get("job_id"), "text": result.get("text")}
+            entry = {"iteration": iterations, "id": wid, "ok": bool(result.get("ok")),
+                     "job_id": result.get("job_id"), "text": result.get("text"),
+                     "reason": result.get("reason"), "hold": bool(result.get("hold")),
+                     "status": result.get("status"),
+                     "submission_attempted": result.get("submission_attempted")}
             submit_log.append(entry)
+            if result.get("hold") and not result.get("job_id"):
+                pending.insert(0, wid)
+                admission_log.append({"iteration": iterations, "worker_id": wid,
+                                      "decision": "hold", "available_slots": 0,
+                                      "reasons": [result.get("reason") or result.get("text") or "worker host resources unknown"]})
+                break
             if not result.get("ok") or not result.get("job_id"):
                 failed.append(wid)
                 break
@@ -675,6 +735,7 @@ def run_fanout(
             worker = by_id[wid]
             job_id = running[wid]["job_id"]
             terminal_error = None
+            poll_result = None
             if poll_fn:
                 try:
                     poll_result = poll_fn(job_id)
@@ -692,7 +753,13 @@ def run_fanout(
             status = worker_status(
                 contract, worker, fresh_after=None if reuse_existing else fresh_boundary
             )
-            if status["complete"]:
+            poll_text = str((poll_result or {}).get("text") or "").lower()
+            process_pending = poll_fn is not None and (
+                not (poll_result or {}).get("ok") or not poll_text.strip()
+                or "still running" in poll_text or "no job found" in poll_text
+                or "unknown" in poll_text or "unrecognized response" in poll_text
+            )
+            if status["complete"] and not process_pending and not terminal_error:
                 running.pop(wid, None)
                 done.append(wid)
                 continue
@@ -709,11 +776,10 @@ def run_fanout(
             elapsed_min = (time.time() - running[wid]["submitted_at"]) / 60
             no_artifact = not any(f["exists"] for f in status["files"].values())
             if first_artifact_timeout_min is not None and no_artifact and elapsed_min > first_artifact_timeout_min:
-                running.pop(wid, None)
+                # 观察超时不证明进程退出；保留本批预约与原job身份。
                 failed.append(wid)
                 continue
             if elapsed_min > job_timeout_min:
-                running.pop(wid, None)
                 failed.append(wid)
 
         if progress_callback:
@@ -753,6 +819,12 @@ def run_fanout(
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:
             break
+        if pending and not running and not failed and not any(
+            entry.get("ok") for entry in submit_log if entry.get("iteration") == iterations - 1
+        ):
+            # 无在跑任务时将HOLD交回调用者，不在前景无限等待未知资源。
+            if not healthy or (admission_log and admission_log[-1].get("decision") == "hold"):
+                break
         if (pending or running) and not failed:
             sleep_fn(poll_interval_sec)
 
@@ -807,4 +879,7 @@ def run_fanout(
         "upload_backlog_hold": upload_backlog_hold,
         "healthy_samples_for_scale_up": healthy_samples_for_scale_up,
         "scale_log": scale_log,
+        "admission_log": admission_log,
+        "resource_reservation_scope": "this_fanout_batch_only",
+        "percentage_policy": "diagnostic_only",
     }

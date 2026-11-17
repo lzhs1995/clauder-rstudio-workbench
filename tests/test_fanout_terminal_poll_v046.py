@@ -2,10 +2,29 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from clauder_workbench.fanout import async_poll_terminal_error, load_fanout_contract, run_fanout
+
+
+def _resource_sample(root: Path, **updates: object) -> dict:
+    # 合成目标主机样本；测试不读取实际机器资源或连接 RStudio。
+    sample = {
+        "sampled_at": time.time(),
+        "host_verified": True,
+        "host_id": "synthetic-worker",
+        "session_pid": 1234,
+        "output_root": str(root),
+        "physical_available_bytes": 32 * 1024 ** 3,
+        "commit_available_bytes": 64 * 1024 ** 3,
+        "logical_processors": 16,
+        "output_free_bytes": 512 * 1024 ** 3,
+        "memory_used_percent": 90.0,
+    }
+    sample.update(updates)
+    return sample
 
 
 class FanoutTerminalPollTests(unittest.TestCase):
@@ -39,7 +58,7 @@ class FanoutTerminalPollTests(unittest.TestCase):
 
             result = run_fanout(
                 load_fanout_contract(contract_path),
-                submit_fn=submit,
+                submit_fn=submit, resource_probe_fn=lambda: _resource_sample(root),
                 poll_fn=lambda _: {"ok": True, "text": "Async job error: postprocess failed"},
                 poll_interval_sec=0,
                 sleep_fn=lambda _: None,

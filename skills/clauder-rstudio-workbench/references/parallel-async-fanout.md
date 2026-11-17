@@ -72,10 +72,19 @@ poll_interval_sec: 30
 job_timeout_min: 180
 max_parallel: 3                        # optional; omit to get planning advice
 artifacts:
-  output_root: C:/runs/2026-05-30     # absolute, or relative to this file
+  output_root: C:/runs/fanout          # directory readable by the Python poller
   max_age_h: 24                        # optional: merge-gate rejects older outputs
 resource_gate:
-  memory_threshold: 85
+  worker_mem_gib: 1                    # physical memory reserved per worker
+  worker_commit_gib: 1                 # commit headroom reserved per worker
+  worker_processors: 1                 # logical processors/threads per worker
+  worker_output_gib: 1                 # output space reserved per worker
+  reserve_mem_gib: 1
+  reserve_commit_gib: 1
+  reserve_processors: 1
+  reserve_output_gib: 2
+  sample_max_age_sec: 60
+  worker_output_root: C:/runs/fanout  # absolute path on the actual R worker host
 workers:
   - id: msat_c12_2
     code_file: C:/runs/workers/submitted_msat_c12_2.R
@@ -97,6 +106,20 @@ handles this exact nested shape (scalars, nested maps, list-of-dict workers,
 anchors/aliases, and flow collections — install PyYAML (`pip install '.[fanout]'`)
 if your contract needs those. JSON contracts (`task.json`) are also accepted.
 
+All byte budgets above use GiB (`2^30` bytes). The shown values are the defaults:
+each worker reserves 1 GiB physical memory, 1 GiB commit, one logical processor,
+and 1 GiB output space; the host retains 1 GiB physical memory, 1 GiB commit,
+one logical processor, and 2 GiB output space. Choose larger worker budgets for
+larger jobs. Worker budgets must be positive finite numbers, processor budgets
+must be integers, and reserves must be nonnegative. Booleans, NaN and infinity
+are not budgets. Defaults are applied by the runtime; schema defaults describe
+them and do not themselves modify a JSON document.
+
+`session_name` selects one RStudio session for the whole batch. A CLI
+`--session-name` overrides it consistently for sampling and submission; the
+legacy per-worker `session` field does not route workers to other sessions.
+If present, it must match the effective batch session; a mismatch holds admission.
+
 ## Commands
 
 ```powershell
@@ -107,7 +130,7 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 .\harness\run.ps1 fanout-run --contract task.yaml --max-parallel 3 `
     --first-artifact-timeout-min 10 --job-timeout-min 180
 
-#     dry-run validates + plans without submitting anything
+#     dry-run validates + samples worker resources without submitting jobs
 .\harness\run.ps1 fanout-run --contract task.yaml --dry-run
 
 #     resume a partially-finished run (skip already-complete workers)
@@ -128,9 +151,13 @@ if your contract needs those. JSON contracts (`task.json`) are also accepted.
 
 ### Exit codes
 
-- `fanout-plan`: `0 PASS` (valid) / `5 CONTRACT_FAILED` (missing fields).
+- `fanout-plan`: `0 PASS` (valid and admitted) / `3 BLOCK` (resource HOLD)
+  / `5 CONTRACT_FAILED` (invalid contract). `--no-advise` performs structure-only
+  validation without sampling and grants no resource permission.
 - `fanout-run`: `0 PASS` (all done) / `3 BLOCK` (a worker failed/timed out, or
-  `native-wrapper` requested). Evidence `transport_class = MCP_STDIO_OK`.
+  resource admission holds, or `native-wrapper` requested). Evidence
+  `transport_class = MCP_STDIO_OK`. A dry run samples resources without submitting
+  jobs and also returns BLOCK on resource HOLD.
 - `fanout-poll`: `0 PASS` (all complete) / `2 WARN` (still pending).
 - `merge-gate`: `0 PASS` / `5 CONTRACT_FAILED` (not all complete) / `3 BLOCK`
   (all complete but with violations such as stale outputs).
@@ -149,29 +176,105 @@ attached. The default remains strict and blocks before submission.
 
 ## Dynamic concurrency
 
-`fanout-run` treats `--max-parallel` as the starting concurrency ceiling. Without
-`--auto-scale`, that ceiling stays fixed for the whole run. With `--auto-scale`,
-the harness samples memory, CPU, free disk, and (when configured) the durable
-upload queue each poll cycle. A contract may require several consecutive healthy
-samples before concurrency rises by exactly one. Omitted v0.4.4 fields retain
-the pre-v0.4.4 memory-only behavior and one-sample scale-up.
+Plan and run use the actual worker host's available physical memory, commit
+headroom, logical processor budget and output-volume free bytes. Each dimension
+has its own measured value, reservation and reason. Memory percentage remains
+diagnostic: even at 90% used, sufficient byte headroom can admit several workers.
+Unknown, malformed, stale or unbound worker-host samples hold new admission at
+zero; they do not mean that the machine can run only one worker.
 
-When any configured hold threshold is reached, `fanout-run` stops launching new
-workers and lets existing workers drain; it never kills an already-running job
-just to reduce concurrency. Each decision and the observed memory/CPU/disk/
-backlog values are written to `scale_log` in the run result/evidence.
+For each dimension, the remaining budget is the measured availability minus
+the configured host reserve minus the **full declared budget of every running
+worker in this batch**. The next worker must fit all four dimensions. The
+physical and commit calculations conservatively subtract full reservations
+without crediting current resident use; output reservations similarly allow
+for later growth. Logical processor capacity is the observed logical count
+less its reserve and running-worker thread reservations. These are batch-local
+reservations: other queues or agents have no shared lease with this scheduler.
+Do not describe this as host-wide or cross-queue reservation.
 
-For the Mac CMAverse chain, the frozen policy is: start at 1, cap at 3, sample
-every 30 seconds, and require five consecutive samples with memory below 70%,
-CPU below 75%, disk above 200 GB, and upload backlog below 2 before adding one
-slot. Memory at/above 80%, CPU at/above 90%, disk below 150 GB, or backlog at/
-above 2 holds new admissions. These are admission rules; hard safety cancellation
-remains the monitor's separate responsibility.
+Without an explicit `max_parallel`, `fanout-plan` recommends the minimum of
+worker count, three and the number of additional workers that fit. An explicit
+`max_parallel` remains visible as `recommended_max_parallel`; the separate
+`admitted_parallel` reports the requested count bounded by current capacity.
+A structurally valid contract or a requested count is not resource permission.
+The plan preserves `ok` for structural validity and exposes `admission_ok`
+separately. When admission is on HOLD, `admitted_parallel` is zero and the CLI
+returns BLOCK; submit no new worker even if the requested count is positive.
+
+`fanout-run` retains the existing concurrency controls: without `--auto-scale`,
+`--max-parallel` is a fixed ceiling; with it, the value is the starting ceiling,
+and `--max-parallel-cap` limits growth. Every new submission must pass the four
+resource checks, including submissions below an explicit ceiling. A contract
+may require several consecutive healthy samples before raising the ceiling by
+one. Admission holds stop new launches and let existing workers drain; they
+never kill a running job merely to lower concurrency. Decisions and sample
+details are retained in `scale_log` and the per-submission `admission_log` in the run evidence.
+
+The legacy `memory_threshold`, `memory_scale_up_percent` and
+`memory_hold_percent` keys are accepted as diagnostic values only. They no
+longer impose a percentage gate on fanout. Explicit CPU percentage thresholds
+are also retained as diagnostic values only; the logical processor/thread
+budget is enforced. The worker probe collects the four resource dimensions and
+identity without extra CPU-usage sampling. A supplied diagnostic percentage may
+be displayed, but missing diagnostics do not replace a valid byte sample.
+The legacy `min_disk_free_gb_scale_up` and `min_disk_free_gb_hold` thresholds
+remain additional checks in GiB despite their `gb` names, using bytes from the
+worker's output volume. Configured upload-backlog checks remain separate.
+
+An existing task with a frozen percentage policy is not silently migrated by
+this change. Preserve its runtime and accepted contract, or explicitly revise
+the contract before starting a new batch. The standalone `resource-gate`
+command and monitor policies are separate interfaces; their percentage rules
+are not changed by this fanout admission update.
+
+### Bind sampling to the worker host
+
+The Python orchestrator and the RStudio worker host may differ. Local Python
+`psutil`, CPU count or disk usage cannot establish resources on another host.
+The harness obtains its sample through `execute_r` in the selected RStudio
+session, records the actual host and R PID, and checks that binding again in
+the same MCP connection used for submission. A changed identity or unavailable
+host sample holds new work. No local-host fallback replaces an unknown worker
+host. Samples expire after `resource_gate.sample_max_age_sec` (60 seconds by
+default). The target probe is a short synchronous read capped by a 10-second
+MCP timeout; its Windows commit subprocess has a 3-second timeout. A Python
+timeout causes HOLD and does not prove a remote read has been cancelled.
+This update has injected-probe test coverage; it does not establish
+live Windows qualification.
+
+The output volume is sampled on the R host. `resource_gate.worker_output_root`
+is an absolute path there. If omitted, the unchanged `artifacts.output_root`
+string is resolved by R on that host, not by Python for resource admission.
+For cross-host polling, `artifacts.output_root` must be a local readable mapping
+of the same durable outputs and `worker_output_root` must name their actual
+destination on the worker host. A missing/nonabsolute target path or a sample
+for another output path holds admission. The harness does not verify a cross-host
+mount mapping or transfer files; the task owner must establish that mapping. The R worker's own
+driver must write to that destination, and its code/input paths must already
+be available on the worker host.
+
+For example, a Mac poller can read a mounted output directory while the
+Windows worker writes to the corresponding directory on its output volume:
+
+```yaml
+artifacts:
+  output_root: /Volumes/worker-results/fanout
+resource_gate:
+  worker_output_root: D:/worker-results/fanout
+```
+
+The two paths must refer to the same outputs; the harness does not create this
+mapping. Retain the actual target's byte sample and each original job ID across
+polls. A plan's sample does not grant an indefinite reservation for later runs.
 
 This auto-scaling path belongs to `fanout-run`'s Python MCP stdio mode. The
 agent-native wrapper path is still explicit: plan the workers, submit through
 the native tool layer, register real job ids with `async-guard`, then use
-`fanout-poll` and `merge-gate`.
+`fanout-poll` and `merge-gate`. A resource sample from an independent stdio
+connection remains that evidence class; it cannot prove agent-native wrapper
+execution. The agent remains responsible for honoring the current admission
+decision before its own native submissions. The merge gate is unchanged.
 
 ## Failure handling
 
