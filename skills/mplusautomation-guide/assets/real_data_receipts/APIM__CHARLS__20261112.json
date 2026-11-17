@@ -48,7 +48,6 @@
     "member1_cesd10",
     "member2_cesd10"
   ],
-  "missing_by_column": {},
   "comparisons": {
     "verdict": "PASS",
     "items": 80,

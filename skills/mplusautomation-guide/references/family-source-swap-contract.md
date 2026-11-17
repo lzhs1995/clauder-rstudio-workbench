@@ -60,9 +60,9 @@ MOD（`r_glm_moderation`）同样只接收数据框，文件读取和缺失码�
 
 ## 5. 公开回执（白名单）
 真实数据只在本机运行，仓库只收汇总回执：`assets/real_data_receipts/<family>__<dataset>__<日期>.json`。
-- 允许的键：`schema_version, family, dataset, route, generated_taipei, platform{os,r,mplus}, data_sha256, code_sha256, output_sha256, rows, columns, column_names, missing_by_column, comparisons{verdict,items,max_abs_diff}, verdict, evidence_logical_name`。
-- 不允许：估计值（系数、SE、CI、LL、BIC、AIC、类别比例、转移概率）、个体值与 ID、本机路径、样本量以外的描述统计。白名单之外的键会被校验器拒绝。
-- 每个字段的类型也锁定，允许的字段里放对象或数组同样被拒绝：`family`、`dataset`、`route` 是已登记的 id，且 `route` 属于该家族；`generated_taipei` 是 `YYYY-MM-DDTHH:MM:SS+08:00`；`evidence_logical_name` 与 `platform` 各值是单行短文本；`column_names` 是不重复的变量名数组，个数等于 `columns`；`missing_by_column` 非空时必须同时给 `column_names`，其键都在 `column_names` 里，值是不超过 `rows` 的非负整数；`comparisons` 必须有 `verdict`，`max_abs_diff` 是有限非负数。重复键的 JSON 不收。
+- 允许的键：`schema_version, family, dataset, route, generated_taipei, platform{os,r,mplus}, data_sha256, code_sha256, output_sha256, rows, columns, column_names, comparisons{verdict,items,max_abs_diff}, verdict, evidence_logical_name`。
+- 不允许：估计值（系数、SE、CI、LL、BIC、AIC、类别比例、转移概率）、个体值与 ID、本机路径、样本量以外的描述统计（逐列缺失计数也算，`rows` 已给出样本量；本机准备回执里的计数留在本机）。白名单之外的键会被校验器拒绝。
+- 每个字段的类型也锁定，允许的字段里放对象或数组同样被拒绝：`family`、`dataset`、`route` 是已登记的 id，且 `route` 属于该家族；`generated_taipei` 是 `YYYY-MM-DDTHH:MM:SS+08:00`；`evidence_logical_name` 与 `platform` 各值是单行短文本；`column_names` 是不重复的变量名数组，个数等于 `columns`；`comparisons` 必须有 `verdict`，`max_abs_diff` 是有限非负数。重复键的 JSON 不收。
 - `verdict=PASS` 不得与 `comparisons.verdict=FAIL` 共存。FAIL 回执可以保留，但不计入覆盖。
 - 骨架：`python scripts/family_registry.py receipt-template <family> <dataset> <route>`，`code_sha256` 按当前文件自动计算。
 - 只有结构、身份都有效、`verdict=PASS` 且代码哈希与当前文件一致的回执，才能作为某家族 `real_data_swap: pass` 的来源并计入覆盖。CI 中 PASS 回执过期（代码在回执之后改过）只发警告；发布前用 `python scripts/family_registry.py check --strict` 把过期与缺失当作错误。

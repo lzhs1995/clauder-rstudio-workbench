@@ -123,7 +123,6 @@
     "year3",
     "year4"
   ],
-  "missing_by_column": {},
   "comparisons": {
     "verdict": "PASS",
     "items": 13687,

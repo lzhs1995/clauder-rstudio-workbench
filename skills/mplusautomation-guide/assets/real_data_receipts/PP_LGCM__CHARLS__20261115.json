@@ -38,19 +38,6 @@
     "female",
     "rural11"
   ],
-  "missing_by_column": {
-    "r1cesd10": 1112,
-    "r2cesd10": 3354,
-    "r3cesd10": 3370,
-    "r4cesd10": 4669,
-    "r1shlta": 89,
-    "r2shlta": 2726,
-    "r3shlta": 3322,
-    "r4shlta": 4472,
-    "age_dec": 0,
-    "female": 0,
-    "rural11": 0
-  },
   "comparisons": {
     "verdict": "PASS",
     "items": 116,
