@@ -118,7 +118,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus
 - native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通线性与反事实中介代表模型（BOOTSTRAP=1000），正常收敛且约束代数与打印参数一致
-- real_data_swap: pass; source `assets/real_data_receipts/MED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致
+- real_data_swap: pass; source `assets/real_data_receipts/MED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定
 - historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
 
@@ -134,7 +134,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_moderation_route_20261105.R` (CI mplus-ch5-synthetic.yml)
 - synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、单/多 focal 完整交叉公式（无需预乘 px.*）、拟合、连续与三分类简单斜率（默认 cluster_HC0、完整 model 及历史复现专用 historical_ch5 协方差模式，对重新中心化/重设参照类的拟合逐位一致）、显式 moderator_labels 与 Cairo 绘图；不调用 Mplus
 - native_synthetic: not_applicable; 静态调节只在 R 中拟合，没有 Mplus 引擎步骤
-- real_data_swap: pass; source `assets/real_data_receipts/MOD__CFPS__20261115.json`; CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表逐格一致
+- real_data_swap: pass; source `assets/real_data_receipts/MOD__CFPS__20261115.json`; CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表按印刷精度逐格一致（最大绝对差 < 5e-4）
 - historical_replay: pass; source `references/chapter5-replay-map.md`; 在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致
 - Thesis: 第五章
 
@@ -150,7 +150,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus
 - native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通多组连续调节与三分类调节有调节中介代表模型（BOOTSTRAP=1000），正常收敛且组差/加权平均约束一致
-- real_data_swap: pass; source `assets/real_data_receipts/MODMED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变
+- real_data_swap: pass; source `assets/real_data_receipts/MODMED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定
 - historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
 - Gap: 三分类 W 模板按样本分别拟合（USEOBSERVATIONS）；三分类 W 与 GROUPING 多组同时出现的模板尚无

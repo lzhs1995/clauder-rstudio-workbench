@@ -849,7 +849,7 @@
         "real_data_swap": {
           "status": "pass",
           "source": "assets/real_data_receipts/MED__CHARLS__20261115.json",
-          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致"
+          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定"
         },
         "historical_replay": {
           "status": "archived_readback_only",
@@ -905,7 +905,7 @@
         "real_data_swap": {
           "status": "pass",
           "source": "assets/real_data_receipts/MOD__CFPS__20261115.json",
-          "note": "CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表逐格一致"
+          "note": "CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表按印刷精度逐格一致（最大绝对差 < 5e-4）"
         },
         "historical_replay": {
           "status": "pass",
@@ -961,7 +961,7 @@
         "real_data_swap": {
           "status": "pass",
           "source": "assets/real_data_receipts/MODMED__CHARLS__20261115.json",
-          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变"
+          "note": "Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定"
         },
         "historical_replay": {
           "status": "archived_readback_only",
