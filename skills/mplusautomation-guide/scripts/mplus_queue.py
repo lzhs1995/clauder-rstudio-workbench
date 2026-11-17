@@ -379,16 +379,11 @@ class Queue:
                     raise ValueError("initial_parallel_limit must be between 1 and parallel_cap")
                 self.set("cap", cap)
                 self.set("limit", initial)
-            self.db.execute("COMMIT")
-        except BaseException:
-            self.db.execute("ROLLBACK")
-            self.db.close()
-            raise
-        # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
-        self.success_policy = settings.get("historical_success_policy")
-        self.success_names = None
-        if self.success_policy is not None:
-            try:
+            # 可选范围门控也在提交前校验；失败不留下默认值，修正后仍按首次建库处理。
+            # 同名历史成功输出只表示候选资格，不证明数值复现。
+            self.success_policy = settings.get("historical_success_policy")
+            self.success_names = None
+            if self.success_policy is not None:
                 manifest = Path(self.success_policy["manifest"])
                 if sha256(manifest) != self.success_policy["sha256"]:
                     raise ValueError("Historical-success manifest changed")
@@ -396,9 +391,11 @@ class Queue:
                 if not isinstance(names, list) or any(not isinstance(n, str) or Path(n).name != n or not n.lower().endswith('.out') for n in names):
                     raise ValueError("Invalid historical-success output names")
                 self.success_names = {n.lower() for n in names}
-            except BaseException:
-                self.db.close()
-                raise
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            self.db.close()
+            raise
 
     @contextlib.contextmanager
     def transaction(self):

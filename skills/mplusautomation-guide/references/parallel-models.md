@@ -105,6 +105,12 @@ slot limit is only an upper bound: every claim still passes the memory,
 commit, CPU, processor and disk checks above. APIM v2 queues keep their own
 calibrated `parallel_cap` rule.
 
+The first initialization commits settings only after configuration and optional
+`historical_success_policy` validation succeed. A failed initialization leaves
+settings empty, so correcting the manifest and retrying still applies the
+declared starting limit and cap. Concurrent initializers wait for that transaction
+and cannot return partially initialized settings.
+
 Override the numerical thresholds with `resource_policy` in the queue root's
 `config.json`: `memory_hold_percent`, `memory_resume_percent`, `reserve_gib`,
 `cpu_hold_percent`, `cpu_resume_percent`, `disk_reserve_gib`, and
