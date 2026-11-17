@@ -142,6 +142,30 @@ class ByteAutoscaleTest(unittest.TestCase):
                 self.queues.append(q)
                 self.assertEqual((q.get("limit"), q.get("cap")), expected)
 
+    def test_failed_first_init_leaves_queue_uninitialised(self) -> None:
+        # 首次 init 因声明非法或 JSON 损坏失败时整体回滚；修正后重试仍按首次建库应用声明，非法声明重试仍失败
+        for name, first in (("cap0", '{"parallel_cap": 0}'), ("badjson", '{"parallel_cap": 2,')):
+            with self.subTest(first=name):
+                root = self.tmp / name
+                root.mkdir()
+                (root / "config.json").write_text(first, encoding="utf-8")
+                for _ in range(2):
+                    with self.assertRaises((ValueError, json.JSONDecodeError)):
+                        MODULE.Queue(root)
+                (root / "config.json").write_text(json.dumps({"parallel_cap": 2, "initial_parallel_limit": 2}),
+                                                  encoding="utf-8")
+                q = MODULE.Queue(root)
+                self.queues.append(q)
+                self.assertEqual((q.get("limit"), q.get("cap"), q.get("enabled")), (2, 2, False))
+
+    def test_cli_failed_init_does_not_enable_queue(self) -> None:
+        root = self.tmp / "cli_bad"
+        root.mkdir()
+        (root / "config.json").write_text(json.dumps({"parallel_cap": 0}), encoding="utf-8")
+        for action in ("init", "init", "enable"):
+            done = subprocess.run([sys.executable, str(SCRIPT), action, "--root", str(root)], capture_output=True)
+            self.assertNotEqual(done.returncode, 0, action)
+
     def test_invalid_declared_limits_are_rejected(self) -> None:
         cases = [
             {"parallel_cap": 0},
