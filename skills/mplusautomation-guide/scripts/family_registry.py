@@ -38,7 +38,8 @@ FAMILY_KEYS = {"aliases", "label_zh", "summary", "routes", "code_status", "data_
                "acceptance_doc", "tests", "evidence", "freshness_files", "thesis_refs", "gaps"}
 RECEIPT_REQUIRED = {"schema_version", "family", "dataset", "route", "generated_taipei", "data_sha256",
                     "code_sha256", "rows", "columns", "verdict", "evidence_logical_name"}
-RECEIPT_OPTIONAL = {"platform", "output_sha256", "column_names", "missing_by_column", "comparisons"}
+# 逐列缺失计数属于样本量以外的描述统计（规则 9），不在白名单里
+RECEIPT_OPTIONAL = {"platform", "output_sha256", "column_names", "comparisons"}
 # 本机路径（Mac/Linux 用户目录、Windows 盘符、WSL 共享路径）
 PRIVATE_PATH = re.compile(r"/Users/[^\s/]+|/home/[^\s/]+|[A-Za-z]:[\\/]|\\\\wsl")
 SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -557,18 +558,6 @@ def _column_errors(receipt: dict, name: str) -> list[str]:
             errors.append(f"{name}: column_names must not repeat")
         elif _count(receipt["columns"]) and len(names) != receipt["columns"]:
             errors.append(f"{name}: column_names has {len(names)} entries but columns is {receipt['columns']}")
-    counts = receipt.get("missing_by_column", {})
-    if not isinstance(counts, dict) or not all(
-            COLUMN_NAME.fullmatch(k) and _count(v) for k, v in counts.items()):
-        errors.append(f"{name}: missing_by_column must map variable names to nonnegative integer counts")
-        return errors
-    if counts and "column_names" not in receipt:
-        # 缺失计数的键必须能对上已公开的列名，否则键本身就成了不受约束的文本
-        errors.append(f"{name}: missing_by_column requires column_names")
-    elif names_ok and set(counts) - set(names):
-        errors.append(f"{name}: missing_by_column names columns not in column_names {sorted(set(counts) - set(names))}")
-    if _count(receipt["rows"]) and any(v > receipt["rows"] for v in counts.values()):
-        errors.append(f"{name}: a missing count exceeds rows")
     return errors
 
 
@@ -671,7 +660,7 @@ def receipt_template(reg: dict, family: str, dataset: str, route: str, root: Pat
         "generated_taipei": datetime.now(TAIPEI).isoformat(timespec="seconds"),
         "platform": {"os": "", "r": "", "mplus": ""},
         "data_sha256": "", "code_sha256": {rel: sha256_text_file(root / rel) for rel in fam["freshness_files"]},
-        "output_sha256": {}, "rows": 0, "columns": 0, "column_names": [], "missing_by_column": {},
+        "output_sha256": {}, "rows": 0, "columns": 0, "column_names": [],
         "comparisons": {"verdict": "FAIL", "items": 0, "max_abs_diff": 0},
         "verdict": "FAIL", "evidence_logical_name": "",
     }
