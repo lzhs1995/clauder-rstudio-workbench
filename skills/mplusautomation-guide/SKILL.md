@@ -169,8 +169,13 @@ For a two-process covariance LGCM with fixed time scores, use
 `variables` and `model` to `mplus_from_mapping()`. See
 [PP-LGCM source and variable mapping](references/pp-lgcm-source-variable-mapping.md)
 for process roles, time coding and covariate subsets. The synthetic fixture
-proves column rename/reorder compilation only; native execution and advanced
-production PP-LGCM specifications require separate evidence.
+proves column rename/reorder compilation only. Native execution is recorded
+separately: the `pp_lgcm` suite in `assets/native_acceptance_20261115.json` and
+the real-data receipt listed in the PP_LGCM section of
+[family-registry.md](references/family-registry.md). That native suite covers
+fixed-time parallel covariance growth via `parallel_growth_model_syntax()`, not
+full MI latent-product dissertation models; advanced production PP-LGCM
+specifications still require separate evidence.
 
 ## Mac 控制 Windows
 
