@@ -112,6 +112,20 @@ class HostReservations:
     def release(self, key, pid, created):
         self.db.execute('DELETE FROM reservations WHERE key=? AND pid=? AND ABS(created-?)<.001', (key, pid, created))
 
+    def configure_measured_policy(self, policy_id, policy):
+        """新严格协议由宿主负责人显式登记一次；不改旧预约及旧调用契约。"""
+        from host_measured import configure_policy
+        return configure_policy(self.db, policy_id, policy)
+
+    def acquire_measured(self, key, pid, created, physical_bytes, commit_bytes,
+                         processors, volume_bytes, policy_id, *, sampler=None,
+                         owner_probe=None, clock_ns=None):
+        """同库事务内测量并预约；测试注入不能通过 JSON/旧 CLI 使用。"""
+        from host_measured import acquire_measured
+        return acquire_measured(self.db, key, pid, created, physical_bytes,
+                                commit_bytes, processors, volume_bytes, policy_id,
+                                sampler=sampler, owner_probe=owner_probe, clock_ns=clock_ns)
+
 
 def main():
     ap = argparse.ArgumentParser()
