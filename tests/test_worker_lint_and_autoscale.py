@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -14,6 +15,24 @@ from clauder_workbench.worker_lint import (
     lint_worker_file,
     lint_worker_text,
 )
+
+def _resource_sample(root: Path, **updates: object) -> dict:
+    # 合成目标主机样本；测试不读取实际机器资源或连接 RStudio。
+    sample = {
+        "sampled_at": time.time(),
+        "host_verified": True,
+        "host_id": "synthetic-worker",
+        "session_pid": 1234,
+        "output_root": str(root),
+        "physical_available_bytes": 32 * 1024 ** 3,
+        "commit_available_bytes": 64 * 1024 ** 3,
+        "logical_processors": 16,
+        "output_free_bytes": 512 * 1024 ** 3,
+        "memory_used_percent": 90.0,
+    }
+    sample.update(updates)
+    return sample
+
 
 # --- F1: sink() worker lint --------------------------------------------------
 
@@ -144,7 +163,7 @@ class FanoutSinkGateTests(unittest.TestCase):
                 return {"ok": True, "job_id": "j", "text": "started"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=1,
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1,
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=3,
             )
             self.assertFalse(result["ok"])
@@ -165,7 +184,10 @@ class FanoutSinkGateTests(unittest.TestCase):
                 return {"ok": True, "job_id": "j", "text": "started"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=1,
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             self.assertTrue(result["ok"])
@@ -215,7 +237,7 @@ def _complete(root: Path, wid: str) -> None:
 
 
 class AutoScaleTests(unittest.TestCase):
-    def test_low_memory_scales_up(self) -> None:
+    def test_sufficient_bytes_scale_up_despite_high_memory_percent(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             contract = load_fanout_contract(_multi_contract(root, 4))
@@ -228,8 +250,11 @@ class AutoScaleTests(unittest.TestCase):
                 return {"ok": False, "job_id": None, "text": "no match"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=1, auto_scale=True,
-                mem_probe_fn=lambda: 10.0,  # plenty of headroom
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1, auto_scale=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
+                mem_probe_fn=lambda: 95.0,  # 百分比仅诊断，字节余量足够。
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=20,
             )
             self.assertTrue(result["ok"])
@@ -239,12 +264,14 @@ class AutoScaleTests(unittest.TestCase):
             self.assertTrue(any(e["action"] == "scale_up" for e in result["scale_log"]))
             self.assertGreater(result["max_parallel"], 1)
 
-    def test_high_memory_throttles(self) -> None:
+    def test_insufficient_physical_bytes_hold_new_submissions(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             contract = load_fanout_contract(_multi_contract(root, 3))
-            # start at 3, but memory is pinned high -> should throttle, never scale up
+            # 字节只够保留量，不应提交首个 worker，也不能虚报单槽。
+            submitted = []
             def submit_fn(code: str) -> dict:
+                submitted.append(code)
                 for i in range(1, 4):
                     if f"w{i}" in code:
                         _complete(root, f"w{i}")
@@ -252,20 +279,28 @@ class AutoScaleTests(unittest.TestCase):
                 return {"ok": False, "job_id": None, "text": "no match"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=3, auto_scale=True,
-                mem_probe_fn=lambda: 95.0,  # over threshold
+                contract, submit_fn=submit_fn,
+                resource_probe_fn=lambda: _resource_sample(root, physical_available_bytes=1024 ** 3),
+                max_parallel=3, auto_scale=True,
+                mem_probe_fn=lambda: 10.0,
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=20,
             )
             self.assertTrue(result["auto_scale"])
-            # no scale_up entries when memory is always over threshold
+            self.assertFalse(result["ok"])
+            self.assertEqual(submitted, [])
+            self.assertEqual(result["pending"], ["w1", "w2", "w3"])
+            self.assertTrue(any("physical" in reason for event in result["admission_log"]
+                                for reason in event["reasons"]))
             self.assertFalse(any(e["action"] == "scale_up" for e in result["scale_log"]))
 
-    def test_unknown_memory_holds(self) -> None:
+    def test_unknown_worker_host_resources_hold_without_submitting(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             contract = load_fanout_contract(_multi_contract(root, 2))
+            submitted = []
 
             def submit_fn(code: str) -> dict:
+                submitted.append(code)
                 for i in range(1, 3):
                     if f"w{i}" in code:
                         _complete(root, f"w{i}")
@@ -273,12 +308,16 @@ class AutoScaleTests(unittest.TestCase):
                 return {"ok": False, "job_id": None, "text": "no match"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=1, auto_scale=True,
-                mem_probe_fn=lambda: None,  # probe unavailable
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: None,
+                max_parallel=1, auto_scale=True,
+                mem_probe_fn=lambda: None,
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=20,
             )
-            self.assertTrue(result["ok"])
-            # never scaled up because memory was unknown
+            self.assertFalse(result["ok"])
+            self.assertEqual(submitted, [])
+            self.assertEqual(result["pending"], ["w1", "w2"])
+            self.assertTrue(any("unknown" in reason for event in result["admission_log"]
+                                for reason in event["reasons"]))
             self.assertFalse(any(e["action"] == "scale_up" for e in result["scale_log"]))
 
     def test_cap_respects_max_parallel_cap(self) -> None:
@@ -294,7 +333,10 @@ class AutoScaleTests(unittest.TestCase):
                 return {"ok": False, "job_id": None, "text": "no match"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=1, auto_scale=True,
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1, auto_scale=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel_cap=2, mem_probe_fn=lambda: 5.0,
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=30,
             )

@@ -2,11 +2,30 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from clauder_workbench.fanout import load_fanout_contract, run_fanout
 from clauder_workbench.resource import decide_resource_gate
+
+
+def _resource_sample(root: Path, **updates: object) -> dict:
+    # 合成目标主机样本；测试不读取实际机器资源或连接 RStudio。
+    sample = {
+        "sampled_at": time.time(),
+        "host_verified": True,
+        "host_id": "synthetic-worker",
+        "session_pid": 1234,
+        "output_root": str(root),
+        "physical_available_bytes": 32 * 1024 ** 3,
+        "commit_available_bytes": 64 * 1024 ** 3,
+        "logical_processors": 16,
+        "output_free_bytes": 512 * 1024 ** 3,
+        "memory_used_percent": 90.0,
+    }
+    sample.update(updates)
+    return sample
 
 
 def write_contract(root: Path, worker_count: int = 7) -> Path:
@@ -71,7 +90,10 @@ class CpuAwareAutoScaleTests(unittest.TestCase):
 
             result = run_fanout(
                 contract,
-                submit_fn=submit,
+                submit_fn=submit, resource_probe_fn=lambda: _resource_sample(root),
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel=1,
                 max_parallel_cap=3,
                 auto_scale=True,
@@ -89,34 +111,46 @@ class CpuAwareAutoScaleTests(unittest.TestCase):
             self.assertGreaterEqual(scale_events[0]["iteration"], 4)
             self.assertLessEqual(result["max_parallel"], 3)
 
-    def test_cpu_and_upload_backlog_throttle_without_killing(self) -> None:
+    def test_upload_backlog_holds_new_workers_without_killing_running_jobs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             contract = load_fanout_contract(write_contract(root, worker_count=3))
             submitted = []
+            polled = []
+            backlog_samples = iter([0, 2])
 
             def submit(code: str) -> dict:
                 wid = worker_id_from_code(code, 3)
                 submitted.append(wid)
-                complete(root, wid)
                 return {"ok": True, "job_id": f"job-{wid}", "text": "started"}
+
+            def poll(job_id: str) -> dict:
+                polled.append(job_id)
+                return {"ok": True, "text": f"Job {job_id} is still running"}
 
             result = run_fanout(
                 contract,
-                submit_fn=submit,
-                max_parallel=3,
+                submit_fn=submit, resource_probe_fn=lambda: _resource_sample(root),
+                poll_fn=poll,
+                max_parallel=2,
                 auto_scale=True,
                 mem_probe_fn=lambda: 60.0,
-                cpu_probe_fn=lambda: 95.0,
+                cpu_probe_fn=lambda: 95.0,  # 旧CPU百分比只诊断，不触发准入。
                 disk_probe_fn=lambda: 300.0,
-                upload_backlog_probe_fn=lambda: 2,
+                upload_backlog_probe_fn=lambda: next(backlog_samples, 2),
                 poll_interval_sec=0,
                 sleep_fn=lambda _: None,
-                max_iterations=20,
+                max_iterations=2,
             )
-            self.assertTrue(result["ok"])
-            self.assertEqual(submitted, ["w1", "w2", "w3"])
-            self.assertTrue(any(event["action"] == "throttle" for event in result["scale_log"]))
+            self.assertFalse(result["ok"])
+            self.assertEqual(submitted, ["w1", "w2"])
+            self.assertEqual(set(polled), {"job-w1", "job-w2"})
+            self.assertEqual(set(result["still_running"]), {"w1", "w2"})
+            self.assertEqual(result["pending"], ["w3"])
+            self.assertEqual(result["failed"], [])
+            self.assertTrue(any("upload backlog" in reason for event in result["admission_log"]
+                                for reason in event["reasons"]))
+            self.assertTrue(any(event["action"] == "hold_resources" for event in result["scale_log"]))
             self.assertFalse(any(event["action"] == "scale_up" for event in result["scale_log"]))
 
     def test_resource_gate_reports_cpu_disk_and_backlog(self) -> None:

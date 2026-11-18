@@ -20,6 +20,24 @@ from clauder_workbench.fanout import (
     worker_status,
 )
 
+def _resource_sample(root: Path, **updates: object) -> dict:
+    # 合成目标主机样本；测试不读取实际机器资源或连接 RStudio。
+    sample = {
+        "sampled_at": time.time(),
+        "host_verified": True,
+        "host_id": "synthetic-worker",
+        "session_pid": 1234,
+        "output_root": str(root),
+        "physical_available_bytes": 32 * 1024 ** 3,
+        "commit_available_bytes": 64 * 1024 ** 3,
+        "logical_processors": 16,
+        "output_free_bytes": 512 * 1024 ** 3,
+        "memory_used_percent": 90.0,
+    }
+    sample.update(updates)
+    return sample
+
+
 CONTRACT_TEMPLATE = """task_key: t_demo
 transport: mcp-stdio
 session_name: default2
@@ -60,6 +78,14 @@ def _complete_worker(root: Path, wid: str) -> None:
 
 
 class FanoutTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # 旧 CLI 回归必须注入资源探针；遗漏时在进程启动前失败。
+        guard = mock.patch("clauder_workbench.mcp_client._session_run",
+                           side_effect=AssertionError("fanout unit test attempted real MCP transport"))
+        blocked = guard.start()
+        self.addCleanup(guard.stop)
+        self.addCleanup(blocked.assert_not_called)
+
     def test_minimal_yaml_parses_nested_workers(self) -> None:
         data = _minimal_yaml(CONTRACT_TEMPLATE.format(root="C:/r"))
         self.assertEqual(data["task_key"], "t_demo")
@@ -87,10 +113,12 @@ class FanoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             contract = load_fanout_contract(_write_contract(root))
-            plan = plan_fanout(contract)
+            plan = plan_fanout(contract, resource_probe_fn=lambda: _resource_sample(root))
             self.assertTrue(plan["ok"])
             self.assertEqual(plan["worker_count"], 2)
             self.assertEqual(plan["requested_max_parallel"], 2)
+            self.assertTrue(plan["admission_ok"])
+            self.assertEqual(plan["admitted_parallel"], 2)
 
     def test_plan_reports_missing_fields(self) -> None:
         contract = {"workers": [{"id": "x"}], "_contract_path": "x"}
@@ -147,7 +175,10 @@ class FanoutTests(unittest.TestCase):
             progress: list[dict] = []
             result = run_fanout(
                 contract,
-                submit_fn=submit_fn,
+                submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root),
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel=2,
                 poll_interval_sec=0,
                 sleep_fn=lambda s: None,
@@ -177,11 +208,12 @@ class FanoutTests(unittest.TestCase):
 
             def poll_fn(job_id: str) -> dict:
                 polled.append(job_id)
-                return {"ok": True, "text": f"complete {job_id}"}
+                return {"ok": True, "job_id": job_id, "status": "complete",
+                        "success": True, "text": f"complete {job_id}"}
 
             result = run_fanout(
                 contract,
-                submit_fn=submit_fn,
+                submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root),
                 poll_fn=poll_fn,
                 max_parallel=2,
                 poll_interval_sec=0,
@@ -203,7 +235,7 @@ class FanoutTests(unittest.TestCase):
 
             result = run_fanout(
                 contract,
-                submit_fn=submit_fn,
+                submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root),
                 max_parallel=2,
                 poll_interval_sec=0,
                 sleep_fn=lambda s: None,
@@ -235,7 +267,10 @@ class FanoutTests(unittest.TestCase):
                 return {"ok": True, "job_id": f"job_{wid}", "text": f"Job job_{wid} started"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=2,
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=2,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             # 默认不复用旧产出：两个 worker 都被重新提交
@@ -256,7 +291,10 @@ class FanoutTests(unittest.TestCase):
                 return {"ok": True, "job_id": f"job_{wid}", "text": f"Job job_{wid} started"}
 
             result = run_fanout(
-                contract, submit_fn=submit_fn, max_parallel=2, reuse_existing=True,
+                contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=2, reuse_existing=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             self.assertEqual(submitted, ["w2"])  # 仅 w2 被提交
@@ -450,7 +488,10 @@ class FanoutTests(unittest.TestCase):
             )
             ev_path = write_evidence(ev, evidence_dir=root)
             buf = io.StringIO()
-            with redirect_stdout(buf):
+            with redirect_stdout(buf), mock.patch(
+                "clauder_workbench.cli.FanoutResourceProbe.sample",
+                return_value=_resource_sample(root),
+            ):
                 rc = cli.main(["fanout-plan", "--contract", str(contract), "--parent-evidence", str(ev_path)])
             self.assertEqual(rc, cli.PASS)
             doc = json.loads(buf.getvalue())
