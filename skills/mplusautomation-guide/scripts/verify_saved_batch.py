@@ -45,7 +45,11 @@ def snapshot(path):
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd, "rb") as handle:
         first = os.fstat(handle.fileno())
-        data = handle.read(128 * 1024 * 1024 + 1)
+        # 先核已打开身份和原128MiB上限；小文件不请求128MiB缓冲。
+        if identity(before) != identity(first) or first.st_size > 128 * 1024 * 1024:
+            raise Rejected(f"File changed before reading: {path}")
+        # 多读一字节检测增长；读后身份、短读、SHA检查全部保留。
+        data = handle.read(first.st_size + 1)
         last = os.fstat(handle.fileno())
     after = path.lstat()
     if not identity(before) == identity(first) == identity(last) == identity(after):
