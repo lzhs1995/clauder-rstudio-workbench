@@ -13,6 +13,7 @@ import unittest
 from unittest import mock
 
 import psutil
+from durable_fixture_processes import FixtureProcesses, preserve_fixture, read_fixture_json
 
 SCRIPTS = Path(os.environ.get("DURABLE_MPLUS_SCRIPTS",
                              Path(__file__).resolve().parents[1] / "skills/mplusautomation-guide/scripts"))
@@ -54,13 +55,15 @@ def dump(path, doc):
 
 
 def read(path):
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    return read_fixture_json(path)
 
 
 class DurableMplusWorkerTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="durable-mplus-synthetic-")
-        self.root = Path(self.temporary.name).resolve()
+        # 无自动finalizer：退出未确认时必须保留原夹具。
+        self.root = Path(tempfile.mkdtemp(prefix="durable-mplus-synthetic-")).resolve()
+        self.processes = FixtureProcesses(self.root)
+        self.coordinator = None
         self.source, self.work = self.root / "source", self.root / "work"
         self.plan_path = self.root / "plan.json"
         self.fake = self.root / "synthetic_engine.py"
@@ -98,35 +101,27 @@ class DurableMplusWorkerTests(unittest.TestCase):
         dump(self.plan_path, self.plan)
 
     def tearDown(self):
-        # 先释放本测试合成引擎，再仅清理明确绑定到本临时目录的 Python 子进程。
-        for member in self.members:
-            directory = self.work / "models" / member
-            if directory.exists():
-                (directory / "FAKE_RELEASE").write_text("release")
-        for proc in self.children:
-            if proc.poll() is None:
-                try:
-                    proc.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait(timeout=5)
-        for marker_path in list((self.work / "models").glob("*/ENGINE_STARTED.json")) + list((self.work / "attempts").glob("*/CLAIM.json")):
-            try:
-                marker = read(marker_path)
-                proc = psutil.Process(marker["pid"])
-                if (abs(proc.create_time() - marker["created"]) < 1e-3
-                        and any(str(self.root) in argument for argument in proc.cmdline())):
-                    proc.kill()
-                    psutil.wait_procs([proc], timeout=5)
-            except (psutil.Error, OSError, ValueError, KeyError):
-                pass
-        for stream in self.streams:
-            stream.close()
-        evidence = os.environ.get("DURABLE_MPLUS_TEST_EVIDENCE")
-        if evidence:
-            # 所有夹具均为合成数据；保留失败现场及正例原回执，避免断言后只剩 rc。
-            shutil.copytree(self.root, Path(evidence) / self._testMethodName)
-        self.temporary.cleanup()
+        cleanup_error = None
+        try:
+            for member in self.members:
+                directory = self.work / "models" / member
+                if directory.exists():
+                    (directory / "FAKE_RELEASE").write_text("release")
+            self.processes.cleanup(self.children, self.work)
+        except BaseException as error:
+            cleanup_error = error
+            self.processes.event("CLEANUP_UNCONFIRMED", error=repr(error))
+        finally:
+            for stream in self.streams:
+                stream.close()
+            # 默认也保留副本；正式测试runner显式指定独立证据目录。
+            evidence = os.environ.get("DURABLE_MPLUS_TEST_EVIDENCE")
+            destination = (Path(evidence) / self._testMethodName if evidence else
+                           self.root.with_name(self.root.name + "-evidence"))
+            preserve_fixture(self.root, destination, cleanup_error)
+        if cleanup_error is not None:
+            raise cleanup_error
+        shutil.rmtree(self.root)
 
     def run_worker(self, *, with_plan=True):
         output = self.root / ("direct-worker-%03d.log" % len(list(self.root.glob("direct-worker-*.log"))))
@@ -136,19 +131,57 @@ class DurableMplusWorkerTests(unittest.TestCase):
     def child(self, command, label):
         stream = (self.root / (label + ".log")).open("wb")
         self.streams.append(stream)
-        proc = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT)
+        # Windows venv 入口和实际子进程都从本夹具启动；不依赖瞬时 cmdline。
+        proc = subprocess.Popen(command, cwd=self.root, stdout=stream, stderr=subprocess.STDOUT)
         self.children.append(proc)
+        self.processes.remember(psutil.Process(proc.pid), "popen:" + label)
+        self.processes.event("POPEN_BOUND", pid=proc.pid, command=command, label=label)
         return proc
 
     def launch_worker(self, label="coordinator"):
-        return self.child([sys.executable, "-B", str(SCRIPTS / "durable_mplus_worker.py"), "run",
+        proc = self.child([sys.executable, "-B", str(SCRIPTS / "durable_mplus_worker.py"), "run",
                            "--work", str(self.work), "--plan", str(self.plan_path), "--synthetic-test"], label)
+        self.coordinator = proc
+        return proc
+
+    def wait_phase(self, name, predicate, timeout, *, coordinator=None, member=None):
+        # 每阶段一次固定期限；状态变化不重置期限，不重发任务。
+        started = time.monotonic()
+        deadline = started + timeout
+        while True:
+            if predicate():
+                self.processes.event("PHASE_READY", phase=name, elapsed=time.monotonic()-started)
+                return
+            status = self.work / "STATUS.json"
+            if coordinator is not None:
+                if status.exists() and read_fixture_json(status, deadline=deadline).get("stage") == "HOLD":
+                    self.fail("Worker HOLD before " + name + "\n" + self.logs())
+                if coordinator.poll() is not None:
+                    self.fail("Coordinator entry exited before " + name + "\n" + self.logs())
+            if member is not None:
+                terminal = self.work / "attempts" / member / "ENGINE_EXIT.json"
+                if terminal.exists():
+                    self.fail("Engine exited before " + name + ": " + str(read(terminal)))
+            if time.monotonic() >= deadline:
+                self.processes.event("PHASE_TIMEOUT", phase=name, budget=timeout)
+                self.fail("Phase timeout " + name + "\n" + self.logs())
+            time.sleep(.02)
 
     def wait_path(self, path, *, timeout=20):
-        end = time.monotonic() + timeout
-        while not path.exists() and time.monotonic() < end:
-            time.sleep(0.02)
-        self.assertTrue(path.exists(), "Missing " + str(path) + "\n" + self.logs())
+        if path.name in {"FAKE_STARTED", "FAKE_OUTPUTS_READY"} and self.coordinator is not None:
+            member = path.parent.name
+            attempt = self.work / "attempts" / member
+            self.wait_phase("coordinator_initialized", lambda: (self.work / "STATUS.json").exists(),
+                            30, coordinator=self.coordinator)
+            self.wait_phase("intent_prepared", lambda: (attempt / "INTENT.json").exists(),
+                            30, coordinator=self.coordinator)
+            self.wait_phase("guardian_claim", lambda: (attempt / "CLAIM.json").exists(),
+                            30, coordinator=self.coordinator)
+            self.wait_phase("engine_started", lambda: (path.parent / "ENGINE_STARTED.json").exists(),
+                            10, coordinator=self.coordinator, member=member)
+            self.wait_phase(path.name, path.exists, timeout, coordinator=self.coordinator, member=member)
+        else:
+            self.wait_phase(path.name, path.exists, timeout)
         return path
 
     def logs(self):
@@ -177,8 +210,7 @@ class DurableMplusWorkerTests(unittest.TestCase):
         self.wait_path(dest / "FAKE_STARTED")
         claim = read(self.work / "attempts" / self.members[0] / "CLAIM.json")
         engine = read(dest / "ENGINE_STARTED.json")
-        first.kill()
-        first.wait(timeout=5)
+        self.processes.crash_coordinator(first, self.work)
         self.assertTrue(psutil.pid_exists(engine["pid"]))
         second = self.launch_worker("resumed-coordinator")
         self.wait_path(self.root / "resumed-coordinator.log")
@@ -293,8 +325,7 @@ class DurableMplusWorkerTests(unittest.TestCase):
         dest = self.work / "models" / self.members[0]
         self.wait_path(dest / "FAKE_STARTED")
         claim = read(self.work / "attempts" / self.members[0] / "CLAIM.json")
-        first.kill()
-        first.wait(timeout=5)
+        self.processes.crash_coordinator(first, self.work)
         second = self.launch_worker("resumed-cap")
         self.assertEqual(second.wait(timeout=15), 2, self.logs())
         receipt = read(self.work / "attempts" / self.members[0] / "ENGINE_EXIT.json")
@@ -311,8 +342,7 @@ class DurableMplusWorkerTests(unittest.TestCase):
         dest = self.work / "models" / self.members[0]
         self.wait_path(dest / "FAKE_OUTPUTS_READY")
         claim = read(self.work / "attempts" / self.members[0] / "CLAIM.json")
-        first.kill()
-        first.wait(timeout=5)
+        self.processes.crash_coordinator(first, self.work)
         supervisor = psutil.Process(claim["pid"])
         self.assertAlmostEqual(supervisor.create_time(), claim["created"], places=3)
         supervisor.kill()
