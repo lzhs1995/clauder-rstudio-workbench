@@ -194,7 +194,7 @@ and `RLOGCRITERION=1e-11`; neither the data/model nor these gates were relaxed.
 
 The original R reader accepted all 134 parameters and the full covariance
 comparison. Maximum A/B parameter difference was about 5.2e-7 reference SE;
-relative covariance eigenvalues ranged from 0.9999877 to 1.0000282. A separate
+relative covariance eigenvalues ranged from `见本机证据 <r1c-native-relative-covariance-eigenvalue-lower>` to `见本机证据 <r1c-native-relative-covariance-eigenvalue-upper>`. A separate
 saved-output R audit verified both actual calls to MplusAutomation 1.3,
 normal termination, original criteria, input/output hashes and agreement
 with the independent exact likelihood. The same script can be sourced by a

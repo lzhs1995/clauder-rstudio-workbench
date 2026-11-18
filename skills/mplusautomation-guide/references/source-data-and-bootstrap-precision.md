@@ -151,7 +151,7 @@ actual reported number of clusters after missing-X exclusions. The Chapter 4
 corrected-data examples returned 4,073 couple clusters (1,933 for sibling-complete
 rows), or 3,957 connected family/person components (1,921 sibling-complete).
 All ten checks preserved point estimates, and the four mediation examples had
-target-SE median ratios around 1.19–1.21 versus unclustered ML; some unadjusted
+target-SE median ratios around `见本机证据 <r1c-source-bootstrap-target-se-median-ratio-range>` versus unclustered ML; some unadjusted
 Wald flags changed. This establishes dependence sensitivity in those examples,
 not restored CFPS population design, full-family correction, or main-text release.
 

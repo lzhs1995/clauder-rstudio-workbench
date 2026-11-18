@@ -113,7 +113,7 @@ Test exact software combinations on synthetic data before expanding a queue:
   Bayes interactions are unsupported. Removing the option can change an
   observed category predictor into its underlying latent-response predictor.
 - Joint ordinal-control MLR reproduced the conditional model's complete-data
-  structural paths to about 0.000004 reference SE. Adding missing ADL required
+  structural paths to about `见本机证据 <r1c-charls-ordinal-control-reference-se-difference>` reference SE. Adding missing ADL required
   Monte Carlo integration. Two fixed-seed 5,000-point synthetic runs reached
   their four-minute limits; neither yielded usable missing-control inference.
   Preserve both outputs. Do not turn a concrete interface correction into
@@ -190,10 +190,10 @@ the actual predictor matrix.
 
 If a high-dimensional GLMM is slow, benchmark the same formula before changing
 the scientific specification. In the retained SD benchmark, TMB and warm-start
-lme4 estimates agreed within about 0.00006 reference SE, but their reported SEs
-differed by up to 6%. The installed lme4 fit had no finite-difference Hessian and
+lme4 estimates agreed within about `见本机证据 <r1c-charls-sd-backend-reference-se-difference>` reference SE, but their reported SEs
+differed by up to `见本机证据 <r1c-charls-sd-backend-relative-se-difference>`. The installed lme4 fit had no finite-difference Hessian and
 used its RX approximation. A finite-difference check of the TMB likelihood
-gradient reproduced its full fixed-parameter covariance to within 0.000001 in
+gradient reproduced its full fixed-parameter covariance to within `见本机证据 <r1c-charls-sd-covariance-relative-se-difference>` in
 relative SE. Point-estimate agreement alone would not have established this.
 
 Also inspect random-effect uncertainty, not just fixed-effect covariance. For
@@ -201,7 +201,7 @@ this unit-weight binary-logit **random-intercept-only** model, the conditional
 Laplace variance at fitted parameters is
 `1 / (sum_j p_j * (1-p_j) + 1 / psi)` within each community. The saved TMB
 `ranef(..., condVar=TRUE)` variance differed from this conditional curvature by
-up to 16.5%, whereas lme4's saved `postVar` agreed to about 0.002%. Renaming the
+up to `见本机证据 <r1c-charls-sd-tmb-conditional-variance-difference>`, whereas lme4's saved `postVar` agreed to about `见本机证据 <r1c-charls-sd-lme4-postvar-difference>`. Renaming the
 attribute was not an equivalent backend substitution. The local adapter now
 calculates the conditional curvature explicitly, rejects unsupported random
 slopes/weights/families, and retains the original stochastic draw sequence.

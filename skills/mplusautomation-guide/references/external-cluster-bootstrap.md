@@ -76,7 +76,7 @@ inspect their actual terminal evidence before claiming bootstrap completion.
 The first 1,000-replicate run subsequently completed with 1,000 successes;
 all selected cluster identities were replayed from saved seeds. Its 32 effects
 included one BC-versus-delta 95% classification difference and two split-half
-classification differences. The smallest adjusted tail had only about 5.07
+classification differences. The smallest adjusted tail had only about `见本机证据 <r1c-external-bootstrap-smallest-adjusted-tail-count>`
 effective draws. Thus success counts and exact endpoint reconstruction do not
 establish adequate Monte Carlo precision. Increase draws and use an independent
 seed for the complete pilot effect set before deciding a boundary result.

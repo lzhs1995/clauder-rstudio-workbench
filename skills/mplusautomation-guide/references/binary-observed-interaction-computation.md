@@ -84,8 +84,8 @@ do not justify another Mplus fit.
 
 The 2026-10-17 calibration compared 128 real-data parent parameters, including
 226 cross-resource households, and 39 synthetic parameters with three nonzero
-interactions. Maximum parameter differences were approximately 0.000272 and
-0.000117 of a reference SE; complete robust covariance comparisons also passed.
+interactions. Maximum parameter differences were approximately `见本机证据 <r1c-binary-calibration-first-reference-se-difference>` and
+`见本机证据 <r1c-binary-calibration-second-reference-se-difference>` of a reference SE; complete robust covariance comparisons also passed.
 These are case-specific observations, not universal acceptance thresholds.
 
 Three authorized CFPS resource models previously reached their 240-second
