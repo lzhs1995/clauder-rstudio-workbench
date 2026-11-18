@@ -91,6 +91,9 @@ class CpuAwareAutoScaleTests(unittest.TestCase):
             result = run_fanout(
                 contract,
                 submit_fn=submit, resource_probe_fn=lambda: _resource_sample(root),
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel=1,
                 max_parallel_cap=3,
                 auto_scale=True,

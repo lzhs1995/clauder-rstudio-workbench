@@ -10,6 +10,7 @@ from unittest import mock
 from clauder_workbench import mcp_client
 from clauder_workbench.resource import (
     FanoutResourceProbe,
+    _fanout_r_final_peek_code,
     _fanout_r_probe_code,
     fanout_admission,
     normalize_fanout_policy,
@@ -47,6 +48,10 @@ class FakeSession:
             text = "Output:\n" + marker + json.dumps(payload) + "\n"
         elif name == "execute_r_async":
             text = "Job synthetic_job started"
+        elif name == "get_async_result":
+            return SimpleNamespace(isError=self.error,
+                                   structuredContent={"job_id": arguments["job_id"], "status": "running"},
+                                   content=[SimpleNamespace(text="still running")])
         return SimpleNamespace(isError=self.error, content=[SimpleNamespace(text=text)])
 
 
@@ -306,6 +311,121 @@ class FanoutAdmissionMathTests(unittest.TestCase):
             with self.subTest(key=key, value=value):
                 with self.assertRaises(ValueError):
                     normalize_fanout_policy({key: value})
+
+
+class PollStatusSession(FakeSession):
+    def __init__(self, *, structured=None, text="synthetic output", final=None, poll_error=False,
+                 peek_error=False, peek_timeout=False):
+        super().__init__()
+        self.structured = structured
+        self.text = text
+        self.final = final
+        self.poll_error = poll_error
+        self.peek_error = peek_error
+        self.peek_timeout = peek_timeout
+
+    async def call_tool(self, name, arguments):
+        if name == "get_async_result":
+            self.calls.append((name, arguments))
+            return SimpleNamespace(isError=self.poll_error, structuredContent=self.structured,
+                                   content=[SimpleNamespace(text=self.text)])
+        if name == "execute_r" and "FANOUT_FINAL_" in arguments["code"]:
+            self.calls.append((name, arguments))
+            if self.peek_timeout:
+                raise TimeoutError("terminal cache unavailable")
+            marker = re.search(r'cat\("(FANOUT_FINAL_[a-f0-9]+=)"', arguments["code"])[1]
+            text = "Output:\n" + marker + json.dumps(self.final) + "\n"
+            return SimpleNamespace(isError=self.peek_error, content=[SimpleNamespace(text=text)])
+        return await super().call_tool(name, arguments)
+
+
+class WorkerPollStatusTests(unittest.TestCase):
+    def poll(self, session):
+        async def run(timeout, runner):
+            return await runner(session, "synthetic-bridge", [])
+        with mock.patch.object(mcp_client, "_session_run", side_effect=run):
+            probe = FanoutResourceProbe("selected-worker", "/worker/output")
+            self.assertTrue(probe.sample()["host_verified"])
+            return probe.poll("original_job")
+
+    def test_structured_success_ignores_legal_stdout_error_words(self):
+        for text in ["Error: legitimate printed label", "Async job error: printed example",
+                     "Job original_job not found", "No job found with ID 'original_job'."]:
+            with self.subTest(text=text):
+                session = PollStatusSession(structured={"job_id": "original_job", "status": "completed", "success": True}, text=text)
+                result = self.poll(session)
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["status"], "completed")
+                self.assertTrue(result["success"])
+                self.assertEqual(result["text"], text)
+                self.assertFalse(any("FANOUT_FINAL_" in args.get("code", "") for _, args in session.calls))
+
+    def test_structured_status_requires_exact_job_and_explicit_success(self):
+        payloads = [None, {}, {"job_id": "other", "status": "error"},
+                    {"status": "complete", "success": True},
+                    {"job_id": "original_job", "status": "completed"},
+                    {"job_id": "original_job", "status": "completed", "success": "true"},
+                    {"job_id": "original_job", "status": "not_found"}]
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                result = self.poll(PollStatusSession(structured=payload))
+                self.assertEqual(result["status"], "unknown")
+                self.assertEqual(result["job_id"], "original_job")
+
+    def test_structured_errors_cancel_and_running_are_distinct(self):
+        for payload, expected in [({"status": "complete", "success": False}, "error"),
+                                  ({"status": "failed"}, "error"), ({"status": "error"}, "error"),
+                                  ({"status": "cancelled"}, "cancelled"), ({"status": "running"}, "running")]:
+            with self.subTest(payload=payload):
+                result = self.poll(PollStatusSession(structured={"job_id": "original_job", **payload}))
+                self.assertEqual(result["status"], expected)
+
+    def test_mcp_error_overrides_structured_terminal(self):
+        session = PollStatusSession(structured={"job_id": "original_job", "status": "complete", "success": True}, poll_error=True)
+        result = self.poll(session)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "unknown")
+        self.assertFalse(any("FANOUT_FINAL_" in args.get("code", "") for _, args in session.calls))
+
+    def test_legacy_cache_success_and_failure_ignore_poll_text(self):
+        for success, expected in [(True, "completed"), (False, "error")]:
+            session = PollStatusSession(text="Error: legitimate output; Async job error: printed example",
+                                        final={"job_id": "original_job", "status": "complete", "success": success})
+            result = self.poll(session)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["status"], expected)
+            self.assertEqual(result["status_source"], "clauder_final_cache")
+            self.assertEqual([name for name, _ in session.calls],
+                             ["connect_session", "execute_r", "connect_session", "execute_r", "get_async_result", "execute_r"])
+
+    def test_legacy_missing_unverified_and_timeout_keep_unknown(self):
+        for session in [
+            PollStatusSession(text="Async job error: Error communicating with RStudio: reset", final={"job_id": "original_job", "status": "unknown"}),
+            PollStatusSession(text="Job original_job not found"),
+            PollStatusSession(text="No job found with ID 'original_job'."),
+            PollStatusSession(final={"job_id": "other", "status": "complete", "success": True}),
+            PollStatusSession(final={"job_id": "original_job", "status": "complete"}),
+            PollStatusSession(final={"job_id": "original_job", "status": "error", "success": False}),
+            PollStatusSession(final={"job_id": "original_job", "status": "cancelled", "success": False}),
+            PollStatusSession(peek_error=True), PollStatusSession(peek_timeout=True),
+        ]:
+            with self.subTest(session=session):
+                result = self.poll(session)
+                self.assertEqual(result["status"], "unknown")
+                self.assertEqual(result["job_id"], "original_job")
+                self.assertNotIn("execute_r_async", [name for name, _ in session.calls])
+
+    def test_terminal_cache_probe_is_read_only_and_excludes_stdout(self):
+        code = _fanout_r_final_peek_code("synthetic=", "original_job")
+        self.assertTrue(code.startswith("local({"))
+        self.assertIn('exists(".claude_bg_jobs", envir = ns, inherits = FALSE)', code)
+        self.assertIn('identical(metadata[["job_id"]], requested_id)', code)
+        self.assertIn('entry[["final"]]', code)
+        self.assertIn('final[["success"]]', code)
+        self.assertIn('identical(status, "complete")', code)
+        for forbidden in ["check_background_job(", "$is_alive(", "$get_result(", "$kill(",
+                          'final[["output"]]', 'final[["error"]]', "assign(", "rm("]:
+            self.assertNotIn(forbidden, code)
 
 
 if __name__ == "__main__":

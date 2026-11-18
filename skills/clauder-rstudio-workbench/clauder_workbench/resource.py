@@ -393,6 +393,57 @@ RESOURCE_CODE
     return re.sub(r"OUTPUT_ROOT|RESOURCE_CODE|MARKER", lambda match: values[match[0]], template)
 
 
+def _fanout_structured_job_status(payload: Any, job_id: str) -> dict[str, Any]:
+    """只信精确 job_id 的结构字段；日志正文不参与终态判断。"""
+    unknown = {"status": "unknown", "job_id": job_id,
+               "reason": "original job terminal state is unverified; reservation retained"}
+    if not isinstance(payload, dict) or payload.get("job_id") != job_id:
+        return {**unknown, "reason": "structured job_id missing or mismatched; reservation retained"}
+    status = payload.get("status")
+    if not isinstance(status, str):
+        return unknown
+    status = status.lower()
+    if status in {"complete", "completed", "done"}:
+        success = payload.get("success")
+        if not isinstance(success, bool):
+            return {**unknown, "reason": "completed status lacks boolean success; reservation retained"}
+        return {"job_id": job_id, "status": "completed" if success else "error", "success": success}
+    if status in {"error", "failed", "cancelled", "canceled"}:
+        return {"job_id": job_id, "status": "cancelled" if status in {"cancelled", "canceled"} else "error",
+                "success": False}
+    if status == "running":
+        return {"job_id": job_id, "status": "running"}
+    return unknown
+
+
+def _fanout_r_final_peek_code(marker: str, job_id: str) -> str:
+    """只读已收集的 ClaudeR final 缓存；不检查进程、不收集或取消任务。"""
+    template = r'''local({
+  requested_id <- JOB_ID
+  result <- list(job_id = requested_id, status = "unknown")
+  ns <- if ("ClaudeR" %in% loadedNamespaces()) asNamespace("ClaudeR") else NULL
+  if (!is.null(ns) && exists(".claude_bg_jobs", envir = ns, inherits = FALSE)) {
+    jobs <- get(".claude_bg_jobs", envir = ns, inherits = FALSE)
+    if (is.environment(jobs) && exists(requested_id, envir = jobs, inherits = FALSE)) {
+      entry <- get(requested_id, envir = jobs, inherits = FALSE)
+      final <- if (is.list(entry)) entry[["final"]] else NULL
+      metadata <- if (is.list(final)) final[["metadata"]] else NULL
+      if (is.list(metadata) && identical(metadata[["job_id"]], requested_id)) {
+        status <- final[["status"]]
+        success <- final[["success"]]
+        if (identical(status, "complete") &&
+            is.logical(success) && length(success) == 1L && !is.na(success)) {
+          result <- list(job_id = requested_id, status = status, success = success)
+        }
+      }
+    }
+  }
+  cat(MARKER, jsonlite::toJSON(result, auto_unbox = TRUE, null = "null", na = "null"), "\n", sep = "")
+})'''
+    values = {"JOB_ID": json.dumps(job_id, ensure_ascii=False), "MARKER": json.dumps(marker)}
+    return re.sub(r"JOB_ID|MARKER", lambda match: values[match[0]], template)
+
+
 class FanoutResourceProbe:
     """固定 RStudio 选择器采样；不以 Python 本机资源替代 worker 主机。"""
 
@@ -470,10 +521,42 @@ class FanoutResourceProbe:
                 return {"ok": False, "reason": "worker resource sample required before submission"}
             if job_id is not None:
                 # 原 job_id 只在原目标轮询；资源余量不足不阻止观察已经提交的任务。
-                polled = mcp_client._tool_result(await session.call_tool(
-                    "get_async_result", {"job_id": job_id}), tool_name="get_async_result")
-                return {**polled, "job_id": job_id, "transport_class": "MCP_STDIO_OK",
-                        "worker_host": identity[0], "session_pid": identity[1]}
+                raw = await session.call_tool("get_async_result", {"job_id": job_id})
+                is_error = bool(getattr(raw, "isError", False) or getattr(raw, "is_error", False))
+                polled = {"ok": not is_error, "is_error": is_error, "text": mcp_client._result_text(raw),
+                          "job_id": job_id, "transport_class": "MCP_STDIO_OK",
+                          "worker_host": identity[0], "session_pid": identity[1]}
+                if is_error:
+                    return {**polled, "status": "unknown",
+                            "reason": "MCP polling error; original job and reservation retained"}
+                structured = getattr(raw, "structuredContent", None)
+                if structured is None:
+                    structured = getattr(raw, "structured_content", None)
+                if structured is not None:
+                    status_result = _fanout_structured_job_status(structured, job_id)
+                    return {**polled, **status_result, "ok": status_result["status"] != "unknown",
+                            "status_source": "mcp_structured_content"}
+                # 旧桥接仅返回 TextContent；从同一 R 会话读取已收集 final，绝不解析 stdout。
+                status_marker = "FANOUT_FINAL_" + secrets.token_hex(12) + "="
+                peek = await asyncio.wait_for(session.call_tool(
+                    "execute_r", {"code": _fanout_r_final_peek_code(status_marker, job_id)}),
+                    timeout=self.sample_timeout)
+                if bool(getattr(peek, "isError", False) or getattr(peek, "is_error", False)):
+                    return {**polled, "ok": False, "status": "unknown",
+                            "reason": "terminal-cache probe failed; original job and reservation retained"}
+                lines = [line[len(status_marker):] for line in mcp_client._result_text(peek).splitlines()
+                         if line.startswith(status_marker)]
+                try:
+                    if len(lines) != 1:
+                        raise ValueError("terminal-cache marker missing or ambiguous")
+                    final = json.loads(lines[0])
+                except (ValueError, TypeError):
+                    final = None
+                if not isinstance(final, dict) or final.get("status") != "complete":
+                    final = None
+                status_result = _fanout_structured_job_status(final, job_id)
+                return {**polled, **status_result, "ok": status_result["status"] != "unknown",
+                        "status_source": "clauder_final_cache"}
             latest = self._last_sample
             age = time.time() - latest["sampled_at"] if latest is not None else None
             if age is None or age < 0 or age > self.sample_max_age_sec:
@@ -503,12 +586,12 @@ class FanoutResourceProbe:
 
     def poll(self, job_id: str) -> dict[str, Any]:
         if not isinstance(job_id, str) or not job_id.strip():
-            return {"ok": False, "job_id": job_id, "reason": "original job_id is required"}
+            return {"ok": False, "job_id": job_id, "status": "unknown", "reason": "original job_id is required"}
         if self._binding is None:
-            return {"ok": False, "job_id": job_id,
+            return {"ok": False, "job_id": job_id, "status": "unknown",
                     "reason": "worker host identity unknown; original job_id retained without polling"}
         result = self._invoke(job_id=job_id)
-        return {**result, "job_id": job_id}
+        return {"status": "unknown", **result, "job_id": job_id}
 
     def sample(self) -> dict[str, Any]:
         started = time.time()

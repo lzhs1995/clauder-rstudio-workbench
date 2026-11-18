@@ -248,25 +248,36 @@ def state_is_complete(state: Any) -> bool:
     return str(state).strip().lower() in done
 
 
-def async_poll_terminal_error(result: Any) -> str | None:
-    """Return a durable async terminal error without treating transport loss as job failure."""
-    if not isinstance(result, dict):
+def async_poll_status(result: Any, job_id: str | None = None) -> str:
+    """只信原任务的独立控制字段；R stdout 和工具调用成功都不证明进程退出。"""
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        return "unknown"
+    original_id = result.get("job_id")
+    if (not isinstance(original_id, str) or not original_id.strip()
+            or (job_id is not None and original_id != job_id)):
+        return "unknown"
+    status = result.get("status")
+    if status in ("complete", "completed", "done"):
+        if result.get("success") is True:
+            return "completed"
+        if result.get("success") is False:
+            return "error"
+    elif status in ("error", "failed"):
+        return "error"
+    elif status in ("cancelled", "canceled"):
+        return "cancelled"
+    elif status == "running":
+        return "running"
+    return "unknown"
+
+
+def async_poll_terminal_error(result: Any, job_id: str | None = None) -> str | None:
+    """可靠终态失败保留诊断；通信失败、not-found、普通 stdout 不归为失败。"""
+    status = async_poll_status(result, job_id)
+    if status not in ("error", "cancelled"):
         return None
-    text = str(result.get("text") or result.get("reason") or "").strip()
-    lower = text.lower()
-    if not text or "still running" in lower:
-        return None
-    terminal_prefixes = (
-        "async job error:",
-        "async job failed:",
-        "async job cancelled",
-        "async job canceled",
-    )
-    if lower.startswith(terminal_prefixes):
-        return text
-    if lower.startswith("job ") and (" not found" in lower or " was cancelled" in lower or " was canceled" in lower):
-        return text
-    return None
+    return str(result.get("error") or result.get("text") or result.get("reason")
+               or f"Async job {status}")
 
 
 def worker_status(
@@ -649,6 +660,7 @@ def run_fanout(
     iterations = 0
 
     while (pending or running) and not failed:
+        completed_this_iteration = False
         sample = _fanout_sample(resource_probe_fn, contract) if pending else None
         if sample and sample.get("host_verified"):
             identity = (sample.get("host_id"), sample.get("session_pid"))
@@ -746,22 +758,20 @@ def run_fanout(
                     "id": wid,
                     "job_id": job_id,
                     "ok": bool(poll_result.get("ok")),
+                    "status": async_poll_status(poll_result, job_id),
                     "text": str(poll_result.get("text") or poll_result.get("reason") or "")[:4000],
                 })
-                terminal_error = async_poll_terminal_error(poll_result)
+                terminal_error = async_poll_terminal_error(poll_result, job_id)
             # 只有本轮 run 开始后写入的产出才算完成（reuse_existing 时放宽）
             status = worker_status(
                 contract, worker, fresh_after=None if reuse_existing else fresh_boundary
             )
-            poll_text = str((poll_result or {}).get("text") or "").lower()
-            process_pending = poll_fn is not None and (
-                not (poll_result or {}).get("ok") or not poll_text.strip()
-                or "still running" in poll_text or "no job found" in poll_text
-                or "unknown" in poll_text or "unrecognized response" in poll_text
-            )
+            # durable 文件可能在进程退出前写完；必须另有原 job 的可靠完成信号。
+            process_pending = async_poll_status(poll_result, job_id) != "completed"
             if status["complete"] and not process_pending and not terminal_error:
                 running.pop(wid, None)
                 done.append(wid)
+                completed_this_iteration = True
                 continue
             if terminal_error:
                 running.pop(wid, None)
@@ -819,7 +829,7 @@ def run_fanout(
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:
             break
-        if pending and not running and not failed and not any(
+        if pending and not running and not failed and not completed_this_iteration and not any(
             entry.get("ok") for entry in submit_log if entry.get("iteration") == iterations - 1
         ):
             # 无在跑任务时将HOLD交回调用者，不在前景无限等待未知资源。
@@ -847,9 +857,10 @@ def run_fanout(
                     "job_id": job_id,
                     "attempt": attempt,
                     "ok": bool(collected.get("ok")),
+                    "status": async_poll_status(collected, str(job_id)),
                     "text": text[:4000],
                 })
-                if "still running" not in text.lower():
+                if async_poll_status(collected, str(job_id)) != "running":
                     break
                 sleep_fn(min(poll_interval_sec, 1.0))
 

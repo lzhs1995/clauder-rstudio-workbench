@@ -185,6 +185,9 @@ class FanoutSinkGateTests(unittest.TestCase):
 
             result = run_fanout(
                 contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             self.assertTrue(result["ok"])
@@ -248,6 +251,9 @@ class AutoScaleTests(unittest.TestCase):
 
             result = run_fanout(
                 contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1, auto_scale=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 mem_probe_fn=lambda: 95.0,  # 百分比仅诊断，字节余量足够。
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=20,
             )
@@ -328,6 +334,9 @@ class AutoScaleTests(unittest.TestCase):
 
             result = run_fanout(
                 contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=1, auto_scale=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel_cap=2, mem_probe_fn=lambda: 5.0,
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=30,
             )

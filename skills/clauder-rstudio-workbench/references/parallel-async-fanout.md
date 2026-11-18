@@ -62,6 +62,37 @@ worker's original `job_id` and records the replies in `progress_log`. After the
 file gate completes it collects each result with the same id into
 `final_collect_log`; it never resubmits merely because a job is still running.
 
+Poll text is diagnostic output, not a process-status protocol. A successful R
+program may print `Async job error:`, `Job ... not found`, `unknown`, or JSON
+that resembles a status report. None of those strings declares a terminal job
+or overrides a separately verified status. Conversely, a successful MCP call
+does not by itself prove that its background R process has exited.
+
+The resource-bound poller accepts terminal status only when it is explicitly
+bound to the original `job_id`. It first checks the MCP response's
+`structuredContent`. For a legacy ClaudeR bridge that returns only text, it
+performs a short, read-only `execute_r` check in the same MCP connection and
+selected RStudio session. This check reads the existing ClaudeR namespace entry
+`.claude_bg_jobs[[job_id]]$final`; it does not collect the job again, kill a
+process, assign outputs, or change the cache. A random marker separates this
+probe's JSON from ordinary output. The cached `metadata.job_id` must match,
+`status` must be `complete`, and `success` must be an explicit boolean. ClaudeR
+writes that final cache after its background process is no longer alive;
+`success: true` confirms successful termination and `success: false` confirms
+failed termination. The harness normalizes them to `completed` and `error`.
+An explicit structured `cancelled` status is also terminal; a deleted cache
+entry after cancellation is not proof of cancellation.
+
+Missing or mismatched identity, missing final cache, unsupported cache shape,
+and polling without independently verified terminal evidence leave the process
+status unknown. Communication-error or not-found text alone cannot release the
+reservation. The original job ID and its full resource reservation remain active,
+and later polls reuse that ID. A verified successful terminal status still
+requires all three durable artifacts before the worker counts as done. A
+verified terminal error or cancellation releases its reservation and marks the
+worker failed. No stdout prefix, arbitrary nonempty reply, timeout, or complete
+artifact set alone releases a reservation when process exit is unconfirmed.
+
 ## Contract (`task.yaml`)
 
 ```yaml
@@ -169,7 +200,8 @@ Every `fanout-run` poll atomically writes
 
 When a task-local native wrapper is unavailable because its tool registry was
 frozen at task creation, `--defer-native-smoke` permits an explicitly authorized
-MCP stdio computation on both Windows and macOS. The command returns WARN even
+MCP stdio computation with a Windows or macOS orchestrator, subject to the
+worker-host resource checks below. It does not bypass resource HOLD. The command returns WARN even
 when the scientific workers pass, records `NATIVE-SMOKE-DEFERRED`, and leaves
 strict completion blocked until fresh four-step `NATIVE_MCP_OK` evidence is
 attached. The default remains strict and blocks before submission.
@@ -242,6 +274,15 @@ MCP timeout; its Windows commit subprocess has a 3-second timeout. A Python
 timeout causes HOLD and does not prove a remote read has been cancelled.
 This update has injected-probe test coverage; it does not establish
 live Windows qualification.
+
+The current probe has no commit-headroom source for a **macOS worker host**.
+Its commit availability remains unknown, so plan and run keep admission on HOLD
+at zero until a supported, valid target sample exists. A Mac acting as the
+Python orchestrator for a Windows or Linux RStudio target is a different case:
+admission uses that target's resources, not the Mac's. Neither
+`--defer-native-smoke` nor an explicit `max_parallel` grants a slot when a
+resource dimension is unknown. `fanout-plan --no-advise` only checks contract
+structure; it does not sample resources, lift HOLD, or authorize submission.
 
 The output volume is sampled on the R host. `resource_gate.worker_output_root`
 is an absolute path there. If omitted, the unchanged `artifacts.output_root`

@@ -29,9 +29,12 @@ def _resource_sample(root: Path, **updates: object) -> dict:
 
 class FanoutTerminalPollTests(unittest.TestCase):
     def test_only_explicit_job_terminal_messages_are_classified(self) -> None:
-        self.assertIsNotNone(async_poll_terminal_error({"ok": True, "text": "Async job error: boom"}))
+        self.assertIsNone(async_poll_terminal_error({"ok": True, "text": "Async job error: boom"}))
         self.assertIsNone(async_poll_terminal_error({"ok": False, "text": "ConnectionError: bridge reset"}))
         self.assertIsNone(async_poll_terminal_error({"ok": True, "text": "Job a is still running"}))
+        self.assertIsNotNone(async_poll_terminal_error({
+            "ok": True, "job_id": "original-job", "status": "error", "text": "boom",
+        }, "original-job"))
 
     def test_run_fanout_stops_on_async_job_error_without_resubmission(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -59,7 +62,10 @@ class FanoutTerminalPollTests(unittest.TestCase):
             result = run_fanout(
                 load_fanout_contract(contract_path),
                 submit_fn=submit, resource_probe_fn=lambda: _resource_sample(root),
-                poll_fn=lambda _: {"ok": True, "text": "Async job error: postprocess failed"},
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "error",
+                    "text": "Async job error: postprocess failed",
+                },
                 poll_interval_sec=0,
                 sleep_fn=lambda _: None,
                 max_iterations=5,

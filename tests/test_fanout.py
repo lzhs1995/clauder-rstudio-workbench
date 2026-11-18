@@ -176,6 +176,9 @@ class FanoutTests(unittest.TestCase):
             result = run_fanout(
                 contract,
                 submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root),
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 max_parallel=2,
                 poll_interval_sec=0,
                 sleep_fn=lambda s: None,
@@ -205,7 +208,8 @@ class FanoutTests(unittest.TestCase):
 
             def poll_fn(job_id: str) -> dict:
                 polled.append(job_id)
-                return {"ok": True, "text": f"complete {job_id}"}
+                return {"ok": True, "job_id": job_id, "status": "complete",
+                        "success": True, "text": f"complete {job_id}"}
 
             result = run_fanout(
                 contract,
@@ -264,6 +268,9 @@ class FanoutTests(unittest.TestCase):
 
             result = run_fanout(
                 contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=2,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             # 默认不复用旧产出：两个 worker 都被重新提交
@@ -285,6 +292,9 @@ class FanoutTests(unittest.TestCase):
 
             result = run_fanout(
                 contract, submit_fn=submit_fn, resource_probe_fn=lambda: _resource_sample(root), max_parallel=2, reuse_existing=True,
+                poll_fn=lambda job_id: {
+                    "ok": True, "job_id": job_id, "status": "complete", "success": True,
+                },
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=5,
             )
             self.assertEqual(submitted, ["w2"])  # 仅 w2 被提交
