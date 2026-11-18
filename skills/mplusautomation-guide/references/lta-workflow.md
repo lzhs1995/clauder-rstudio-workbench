@@ -26,7 +26,7 @@ LTA 是把多个时间点的潜在类别连接起来的纵向模型。它同时�
 
 Vermunt 三步法、BCH 和一步法必须区分用途。三步法用于固定测量结构并减少辅助变量对类别测量的反向影响；BCH 更适合某些 distal outcome。具体选择取决于模型是普通 LTA、multiple-group LTA、MS-LTA 还是含 distal outcome 的模型。
 
-第七章曾计划在 Mplus 中直接估计转移路径的直接/调节效应，但稀疏转移单元造成标准误膨胀、收敛失败和交互项编码复杂。最终把描述性 LTA 与机制回归分开：Mplus 负责类别/转移描述，R 负责导出 most-likely class 后的二元 logistic 回归。
+若在 Mplus 中直接估计转移路径的直接/调节效应，须记录稀疏转移单元、标准误、收敛状态和交互项编码问题。对于将描述性 LTA 与机制回归分开的既有流程，应如实保留其分工：Mplus 负责类别/转移描述，R 负责导出 most-likely class 后的二元 logistic 回归；流程分工本身不证明模型有效。
 
 ## 2. MplusAutomation 批量模式
 

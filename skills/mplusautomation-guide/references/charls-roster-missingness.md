@@ -46,13 +46,7 @@ or infer the cause of a source discrepancy without evidence.
 
 ## Scoped model entry and reuse
 
-The audit retained the published 3,006-person trajectory cohort and generated
-separate complete-case pilot entries with verified roster scope. Four entries
-contained 2,726, 2,156, 2,510 and 2,369 people. They are data-ready scopes, not
-estimates or complete MI families. Their child-count and age distributions differ
-from excluded participants; a complete-case pilot does not establish unbiased
-population inference. Keep original baseline missing flags when distinguishing
-complete cases from legitimate cross-wave source recovery.
+Retain the original trajectory cohort and verify each complete-case roster scope separately. These are data-ready scopes, not estimates or complete MI families. Compare inclusion and exclusion mechanisms in private evidence; a complete-case pilot does not establish unbiased population inference. Keep original baseline missing flags when distinguishing complete cases from legitimate cross-wave source recovery.
 
 Preserve existing trajectory scaling and missing masks; record the moderator's
 sample-specific centering and scale explicitly. Reuse additive core/resource MI
@@ -61,8 +55,7 @@ justified compatible imputation or joint model; convergence and small FMI from
 an additive model do not supply that justification.
 
 Independent verification should reread raw files, not merely rerun the producer.
-The audit used pandas/Stata and R/haven and matched 42,084 person fields within
-double precision. Private records, IDs, DAT and RDS remain local; publish only
+Use independent pandas/Stata and R/haven readers to compare person fields at the declared numerical precision. Keep coverage counts, private records, IDs, DAT and RDS local; publish only
 aggregate checks and code. Do not add an Mplus run to settle a roster identity
 problem or rerun an unchanged failed CFPS specification.
 
@@ -83,14 +76,7 @@ and call them independent starts. A second start is a diagnostic call, never a
 second imputation. Predeclare numerical comparison tolerances and retain any
 failure; do not introduce successively tighter checks after the batch ends.
 
-The actual CHARLS follow-up completed four parents and eight interaction calls
-in about 595 seconds of engine/launcher wall time, with one engine slot. All four
-families passed their two-start pilot checks; all four interaction intervals
-crossed zero. This proves neither absence of moderation nor complete MI
-inference. The existing additive 20/40-imputation results remain additive results.
-Their small missing fraction or FMI cannot establish interaction compatibility.
-Do not launch unchanged failed CFPS specifications because a different CHARLS
-sample now yields a legal pilot.
+Successful two-start pilot checks do not establish absence of moderation or complete MI inference. Existing additive-imputation results remain additive results; favorable missingness or FMI diagnostics do not establish interaction compatibility. Do not launch unchanged failed CFPS specifications because a different CHARLS sample yields a legal pilot.
 
 Read saved parameter vectors and TECH3 covariance directly, independently of the
 R table producer. Bind path identities to raw TECH1, reconstruct the triangular
@@ -113,16 +99,9 @@ Do not duplicate the raw participant data to make the public verifier runnable.
 A nonmissing harmonized score need not mean every item was observed. The local
 2011 CHARLS ADL construction sums available items when at least one is observed.
 Raw db010–db015, including the documented skip rule, reproduced its item coding.
-Of 3,006 participants, 2 had partial-item totals and 20 had all six items missing;
-none of those 20 totals could be recovered from the same-wave raw items. Retain
-the official definition and item-completeness flags. Do not silently turn partial
-totals into complete totals, fill all-missing scores with zero, or call an official
-partial-sum definition a coding error without a scientific reason.
+Audit partial-item totals and all-missing records separately, including whether same-wave raw items can recover a total. Retain the official definition and item-completeness flags. Do not silently turn partial totals into complete totals, fill all-missing scores with zero, or call an official partial-sum definition a coding error without a scientific reason.
 
-In the four verified moderator scopes, residual missing core controls were only
-ADL (18, 15, 18 and 18 participants). Small counts do not establish ignorability
-or compatibility with an interaction model. Existing additive MI does not become
-interaction-compatible because its diagnostics are favorable.
+Check residual missingness within each moderator scope. Small missing counts do not establish ignorability or compatibility with an interaction model. Existing additive MI does not become interaction-compatible because its diagnostics are favorable.
 
 Test exact software combinations on synthetic data before expanding a queue:
 
@@ -179,31 +158,11 @@ joint test. Its rejection alone does not establish “stronger” or “weaker�
 association: inspect group-specific direction, scale and uncertainty. Signed
 child contrasts and nonnegative SD do not share one direction of disharmony.
 
-Before reopening an income family, resolve the original grouping in the actual
-data. The CFPS source code used personal income above its median. In its original
-export, corrected pre-MI input and all ten frozen members, that median was zero;
-the stored grouping agreed with both `income > median` and `income > 0`. Different
-wording was not a numerical discrepancy and did not justify another engine run.
-Retain the substantive interpretation: above a zero median need not mean affluent.
+Before reopening an income family, resolve the original grouping in the actual data and reproduce the above-median rule from the frozen source and MI members. A threshold described with different wording is not automatically a numerical discrepancy and does not justify another engine run. If an observed median is zero, above that median need not mean affluent; keep the actual median and grouping audit in private receipts.
 
-Do not substitute CHARLS household income or respondent earnings for that
-personal-income construct without labeling the new estimand. The local household
-total had 734 missing values among 3,006 participants; the four roster scopes had
-670, 529, 605 and 568 missing values. An observed-resource ADL-only MI cannot be
-reused as a complete income-interaction family. Preserve negative net income and
-derive each product from its own member. A passive transformation enforces an
-identity; it does not prove substantive-model compatibility.
+Do not substitute CHARLS household income or respondent earnings for a personal-income construct without labeling the new estimand. Check resource missingness within every roster scope before reusing an observed-resource ADL-only MI as an income-interaction family. Preserve negative net income and derive each product from its own member. A passive transformation enforces an identity; it does not prove substantive-model compatibility.
 
-Before imputing a household resource on person rows, join the actual participant
-keys back to the official household identifier and count respondents per household
-within each analysis scope. A unique temporary analysis ID is not that check.
-The retained CHARLS cohort had 3,006 respondents from 3,006 official households;
-all four scopes also had one respondent per household. Consequently there was no
-within-household duplicate income-group draw to reconcile in this particular
-batch. Do not generalize that sampling fact to another CHARLS cohort. With
-multiple respondents per household, household resources require shared draws or
-a justified household-level imputation design; a community random intercept does
-not enforce equality of household values.
+Before imputing a household resource on person rows, join the actual participant keys back to the official household identifier and count respondents per household within each analysis scope. A unique temporary analysis ID is not that check. Do not generalize one cohort's household structure to another. With multiple respondents per household, household resources require shared draws or a justified household-level imputation design; a community random intercept does not enforce equality of household values.
 
 Check the installed imputer's code as well as current online documentation.
 The inspected `mice 3.19.0` binary two-level function lacked the newer
@@ -285,8 +244,7 @@ have concealed this scheduling constraint.
 The registered follow-up completed all eight education/residence families, each
 with 20 usable imputations, a complete-case comparison and a second-start check:
 176 calls in total. Independent raw-parameter/TECH3 calculations reproduced all
-eight pooled families. Joint group-difference P values ranged from 0.204 to
-0.883; this is inconclusive evidence, not proof of equal associations. Complete
+eight pooled families. Keep the actual joint group-difference P values in private receipts; a non-significant test does not prove equal associations. Complete
 conditional families do not resolve the stated FCS compatibility limitation or
 the income and dynamic branches that were unestimated at that stage. Engine/launcher time totaled about
 50 minutes; coordinator process wall time including preparation and readback
@@ -487,13 +445,7 @@ as successful. Record which job estimated and which only reconciled completion.
 ## Check whether chained iteration is actually needed
 
 Before multiplying imputations by iteration counts, inspect the dependency graph.
-In the four observed-baseline CHARLS moderation sensitivity scopes, only ADL was
-incomplete. Every conditional predictor was a fixed, fully populated auxiliary
-representation. The numeric PMM routine fitted only observed ADL and used only
-observed donors; prior imputations did not enter the fit. Twenty independent
-conditional draws therefore required one pass per member, not twenty rounds of
-burn-in. Each scope's deterministic mixed-model fit was identical across the
-twenty calls, while coefficient, random-effect and donor draws remained fresh.
+If only one target is incomplete and every conditional predictor is a fixed, fully populated auxiliary representation, check whether the numeric PMM routine uses only observed target values and observed donors, with no prior imputations entering the fit. Under those conditions, independent conditional draws can require one pass per member rather than repeated chained burn-in. Verify that the deterministic fit is identical while coefficient, random-effect and donor draws remain fresh.
 Cache exact fits only, and record the actual predictor matrix, package versions,
 fit hashes and draw count. Do not apply this shortcut to mutually incomplete
 income/ADL targets, changing passive predictors or latent-variable samplers.
@@ -697,12 +649,7 @@ public manifest and next-task handoff.
 
 ## Reopen a failed imputation only with new numerical evidence
 
-An unfinished SD-income conditional fit was revisited without rerunning the
-failed CFPS specifications. Capture its exact design before changing the
-optimizer: the saved design hash matched the historical call, with 67 fixed
-effects, full column rank and condition number 30.129. A linear-programming
-check found no fixed-effect complete or quasi-complete separation. These checks
-do not establish mixed-model identification or the missing-at-random assumption.
+Before revisiting an unfinished conditional fit, capture its exact design without rerunning unchanged failed specifications. Save the design hash, fixed-effect dimensions, column rank and condition number, and check fixed-effect complete or quasi-complete separation before changing the optimizer. Keep the actual diagnostics in private receipts. These checks do not establish mixed-model identification or the missing-at-random assumption.
 
 For this design, `glmmTMBControl(profile=TRUE)` was the sole numerical change.
 The [official control documentation](https://glmmtmb.github.io/glmmTMB/reference/glmmTMBControl.html)
@@ -745,14 +692,7 @@ Do not attribute success to a buffer or retry option that was never exercised.
 
 ## Follow-up waves can invalidate a technically completed family
 
-An October 2026 Windows/ClaudeR run completed all 40 income-interaction
-imputations, and independent parameter/TECH3 pooling checks passed. A later
-raw-wave audit found that the input builder omitted 2018 children who reported
-12 months of co-residence and therefore skipped the frequency question.
-Current residential address did not recover every such record. The independent
-R/pandas check found 235 omitted child records for 206 parents; in the unchanged
-legacy roster, 163 observed means changed and 36 previously missing means became
-defined. Every actual model DAT in the 40-member family contained the old X4.
+A technically completed income-interaction family can pass independent parameter/TECH3 pooling checks while retaining an input-builder error. Audit children whose co-residence responses route them past the frequency question; current residential address alone need not recover every eligible record. Compare the roster rebuild with an independent reader, retain changes in observed means and missingness in private receipts, and bind every actual model DAT to the input version it used.
 
 Model execution, parameter extraction and MI pooling acceptance therefore remain
 true statements about the **old input**. They do not establish correct survey
@@ -767,21 +707,9 @@ follow-up waves. Keep PDF hash, printed page and physical page separately:
 different questionnaire layouts can have the same printed page but different
 PDF page numbers.
 
-An unmatched key first requires a source-map diagnosis. In the measured 2013
-case, 1,207 official child-to-household links matched raw xchildmembercv exactly.
-Do not concatenate both records as different children. Keep identity agreement
-separate from disagreements in sex, birth year or contact, and record the chosen
-same-wave source rule. Conversely, 248 observed 2015 contact cells were outside
-the same-wave child count and had no constructed-child record. Preserve these
-values and quarantine the unsupported identity; a valid response range alone
-does not prove that a cell represents an additional child. Do not invent the
-unique cause of such a release inconsistency.
+An unmatched key first requires a source-map diagnosis. Compare official child-to-household links with the corresponding raw roster field; do not concatenate linked records as different children. Keep identity agreement separate from disagreements in sex, birth year or contact, and record the chosen same-wave source rule. Preserve observed cells whose identity is unsupported and quarantine them for adjudication; a valid response range alone does not prove that a cell represents an additional child. Do not invent the unique cause of a release inconsistency.
 
-Rebuild one isolated candidate across all affected waves before refitting each
-family. A separate pandas reader verified 32,795 child records and 72,144
-person-by-wave indicator cells against the R rebuild. This establishes numeric
-agreement under the stated roster/proxy rules, not the truth of every survey
-answer or the identifiability of a longitudinal interaction.
+Rebuild one isolated candidate across all affected waves before refitting each family. Use a separate reader to compare child records and person-by-wave indicator cells against the rebuild. Numerical agreement under stated roster/proxy rules does not establish the truth of every survey answer or the identifiability of a longitudinal interaction.
 
 Keep available-contact contrasts and full-listed-child contrasts distinct.
 The oldest observed child need not be the oldest child on the roster. Structural
