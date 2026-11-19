@@ -658,7 +658,7 @@ bounded, separately initialized diagnostic fits used the same data, formula
 and Laplace likelihood. They completed in 11.614 and 11.824 seconds, with
 optimizer code zero, positive-definite Hessians and fixed-effect covariance,
 positive random-effect variance, and a log-likelihood difference of
-2.27e-12. The maximum coefficient difference was 1.24e-10 reference standard
+`见本机证据 <r1c-charls-roster-single-loglik-difference>`. The maximum coefficient difference was 1.24e-10 reference standard
 errors. Retain the reported gradient and all diagnostics rather than hiding
 them behind a success flag. The unfinished historical fit is not a timed
 baseline, so these observations do not establish a controlled speedup ratio.
