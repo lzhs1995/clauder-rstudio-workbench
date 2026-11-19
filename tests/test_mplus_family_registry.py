@@ -334,11 +334,14 @@ class StrictGateCliTests(unittest.TestCase):
     """在临时副本里跑 `family_registry.py check --strict`：合法 PASS 回执通过，负例必须 rc=1。"""
     RECEIPT = "assets/real_data_receipts/APIM__CHARLS__20261105.json"
 
-    def run_case(self, mutate_receipt=None, workflow_text=None, strict=True):
+    def run_case(self, mutate_receipt=None, workflow_text=None, strict=True, mutate_tree=None):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             skill = repo / "skills" / "mplusautomation-guide"
-            shutil.copytree(registry.SKILL_ROOT, skill, ignore=shutil.ignore_patterns("__pycache__"))
+            # CLI 合同使用自己的合成回执，不复制历史真实验收的代码哈希。
+            shutil.copytree(registry.SKILL_ROOT, skill,
+                            ignore=shutil.ignore_patterns("__pycache__", "real_data_receipts"))
+            (skill / "assets" / "real_data_receipts").mkdir()
             shutil.copytree(ROOT / ".github" / "workflows", repo / ".github" / "workflows")
             reg = registry.load()
             for family in reg["families"].values():
@@ -352,11 +355,14 @@ class StrictGateCliTests(unittest.TestCase):
             if mutate_receipt:
                 mutate_receipt(receipt)
             (skill / self.RECEIPT).write_text(json.dumps(receipt), encoding="utf-8")
+            self.assertTrue((skill / self.RECEIPT).is_file())
             (skill / "families.json").write_text(json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             for path, text in registry.render_outputs(reg, skill).items():
                 path.write_text(text, encoding="utf-8", newline="\n")
             if workflow_text is not None:
                 (repo / ".github" / "workflows" / "mplus-guide-family-tests.yml").write_text(workflow_text, encoding="utf-8")
+            if mutate_tree:
+                mutate_tree(skill)
             command = [sys.executable, "-B", str(skill / "scripts" / "family_registry.py"), "check"] + (["--strict"] if strict else [])
             env = dict(os.environ, PYTHONIOENCODING="utf-8")
             return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", env=env)
@@ -366,9 +372,31 @@ class StrictGateCliTests(unittest.TestCase):
         self.assertIn(text, result.stdout)
 
     def test_valid_pass_receipt_passes_strict(self):
-        result = self.run_case()
+        def verify_synthetic_receipt(skill):
+            reg = json.loads((skill / "families.json").read_text(encoding="utf-8"))
+            errors, stale, by_family = registry.check_receipts(reg, skill)
+            self.assertEqual((errors, stale), ([], []))
+            self.assertEqual(by_family["APIM"], [Path(self.RECEIPT).name])
+        result = self.run_case(mutate_tree=verify_synthetic_receipt)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("0 errors, 0 warnings", result.stdout)
+
+    def test_missing_synthetic_receipt_rejected(self):
+        def remove_synthetic_receipt(skill):
+            (skill / self.RECEIPT).unlink()
+        self.assertRejected(self.run_case(mutate_tree=remove_synthetic_receipt),
+                            "without a fresh PASS real-data swap receipt: APIM")
+
+    def test_unreferenced_stale_receipt_rejected(self):
+        def add_unreferenced_stale_receipt(skill):
+            # evidence 仍指向新鲜回执；目录里另一份未引用的过期回执也必须被 strict 读取。
+            receipt = json.loads((skill / self.RECEIPT).read_text(encoding="utf-8"))
+            receipt["code_sha256"]["scripts/workflow.R"] = "0" * 64
+            extra = skill / "assets" / "real_data_receipts" / "APIM__CHARLS__20261106.json"
+            extra.write_text(json.dumps(receipt), encoding="utf-8")
+        result = self.run_case(mutate_tree=add_unreferenced_stale_receipt)
+        self.assertRejected(result, "APIM__CHARLS__20261106.json: scripts/workflow.R changed since this receipt")
+        self.assertNotIn("without a fresh PASS real-data swap receipt: APIM", result.stdout)
 
     def test_nested_estimate_and_id_rejected(self):
         payload = {"estimates": [0.31], "individual_id": "SYNTHETIC_TEST_ID"}

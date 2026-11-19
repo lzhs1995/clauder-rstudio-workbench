@@ -257,10 +257,11 @@ class DurableMplusWorkerTests(unittest.TestCase):
         claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
         def exiting_error(_process):
             release.touch()
+            # 沿用原5秒退出期限作事件屏障，不假定child必在生产的0.2秒内被调度。
+            proc.wait(timeout=5)
             raise psutil.AccessDenied(proc.pid)
         with mock.patch.object(psutil.Process, "cmdline", exiting_error):
             self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
-        proc.wait(timeout=5)
 
     def test_guardian_empty_identity_during_exit_is_reobserved(self):
         # 复现 CI 竞态：终态前一瞬 cmdline 读成空列表，原进程随即退出，不应判身份不符。
@@ -272,10 +273,11 @@ class DurableMplusWorkerTests(unittest.TestCase):
         claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
         def exiting_empty(_process):
             release.touch()
+            # 先确认真实退出，再模拟退出中的空身份；超时边界另由确定性测试覆盖。
+            proc.wait(timeout=5)
             return []
         with mock.patch.object(psutil.Process, "cmdline", exiting_empty):
             self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
-        proc.wait(timeout=5)
 
     def test_live_guardian_with_other_identity_is_rejected(self):
         # 负对照：同 PID 与创建时间但命令不是原 guardian，且进程仍活，必须拒绝。
