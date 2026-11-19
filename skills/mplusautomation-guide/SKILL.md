@@ -238,6 +238,18 @@ do not execute the estimation steps below merely to close an editorial issue.
    measurement scales and trajectory shapes as separate estimates when their
    actual inputs are independent. Use [parallel-models.md](references/parallel-models.md)
    for durable queue workers, resource admission, and manuscript merge gates.
+   Queue expansion uses `resource_policy.autoscale_mode`, which defaults to
+   `candidate_measured`. `legacy_compatible` applies only when configured
+   explicitly; its memory-percentage shortcut does not satisfy the measured
+   byte-headroom expansion contract. The mode selects an expansion rule only:
+   ordinary `Queue.claim` still applies its byte-budget checks and, with a
+   shared `host_reservation_path`, calls the legacy `HostReservations.acquire()`,
+   not `acquire_measured()`. The measured API is not connected to the
+   PowerShell worker pools. Installing updated files does not change a running
+   queue's configuration or reload code its owner has already loaded. None of
+   this enables strict host admission or establishes native Windows acceptance;
+   see "Explicit autoscale modes" and "Separate measured host API" in
+   [parallel-models.md](references/parallel-models.md).
    When a run takes unexpectedly long, use
    [performance-diagnosis.md](references/performance-diagnosis.md) and the
    read-only [queue_diagnostics.py](scripts/queue_diagnostics.py) before raising
