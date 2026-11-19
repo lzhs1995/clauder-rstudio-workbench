@@ -346,6 +346,9 @@ class Queue:
             config = self.root / "config.json"
             settings = json.loads(config.read_text(encoding="utf-8-sig")) if config.exists() else {}
             self.policy = {**DEFAULT_POLICY, **settings.get("resource_policy", {})}
+            self.autoscale_mode = self.policy.get("autoscale_mode", "candidate_measured")
+            if type(self.autoscale_mode) is not str or self.autoscale_mode not in ("legacy_compatible", "candidate_measured"):
+                raise ValueError("resource_policy.autoscale_mode must be legacy_compatible or candidate_measured")
             self.windows_memory_profile = settings.get("windows_memory_profile")
             if self.windows_memory_profile:
                 profile = Path(self.windows_memory_profile)
@@ -391,6 +394,11 @@ class Queue:
                 if not isinstance(names, list) or any(not isinstance(n, str) or Path(n).name != n or not n.lower().endswith('.out') for n in names):
                     raise ValueError("Invalid historical-success output names")
                 self.success_names = {n.lower() for n in names}
+            # 模式登记/切换仅清除旧健康累计；其余队列与任务状态保持原合同。
+            previous_mode = self.db.execute("SELECT value FROM settings WHERE key='autoscale_mode'").fetchone()
+            if previous_mode is None or json.loads(previous_mode[0]) != self.autoscale_mode:
+                self.set("healthy", 0)
+            self.set("autoscale_mode", self.autoscale_mode)
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
@@ -401,6 +409,10 @@ class Queue:
     def transaction(self):
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # 在原tick写锁内核模式；旧owner不能在新模式登记后混入旧算法样本。
+            expected_mode = getattr(self, "_tick_expected_mode", None)
+            if expected_mode is not None and self.get("autoscale_mode") != expected_mode:
+                raise ValueError("Autoscale mode changed; reopen the original queue before tick")
             yield
             self.db.execute("COMMIT")
         except BaseException:
@@ -414,6 +426,8 @@ class Queue:
         self.db.execute("INSERT OR REPLACE INTO settings VALUES(?,?)", (key, json.dumps(value)))
 
     def event(self, kind, payload):
+        if kind == "resources":
+            payload = dict(payload, autoscale_mode=self.autoscale_mode)
         self.db.execute("INSERT INTO events(at,kind,payload) VALUES(?,?,?)", (utc(), kind, json.dumps(payload)))
 
     def enqueue(self, payload, imported=False):
@@ -795,6 +809,16 @@ class Queue:
             return result
 
     def tick(self, snapshot=None):
+        # 默认采用候选实测扩槽；兼容模式只接受显式配置。
+        self._tick_expected_mode = self.autoscale_mode
+        try:
+            if self.autoscale_mode == "legacy_compatible":
+                return self._tick_legacy_compatible(snapshot)
+            return self._tick_candidate_measured(snapshot)
+        finally:
+            del self._tick_expected_mode
+
+    def _tick_legacy_compatible(self, snapshot=None):
         snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
         with self.transaction():
             if snapshot["at"] - self.get("last_sample") < 30:
@@ -817,6 +841,52 @@ class Queue:
             self.set("last_sample", snapshot["at"])
             self.set("resources", snapshot)
             self.event("resources", dict(**snapshot, healthy=healthy, limit=limit))
+
+    def _tick_candidate_measured(self, snapshot=None):
+        snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
+        with self.transaction():
+            limit = self.get("limit")
+            # 陈旧或未来采样不累计健康次数，也不污染下次采样时间。
+            if not 0 <= time.time() - snapshot["at"] <= self.profile_max_age_sec:
+                self.set("healthy", 0)
+                self.event("resources", dict(**snapshot, healthy=0, limit=limit,
+                                             scale_up_reason="resource_sample_time_unverified"))
+                return
+            if snapshot["at"] - self.get("last_sample") < 30:
+                return
+            # 按 claim 的顺序找下一项真正需要估计且前置条件已满足的模型。
+            active = self.db.execute("SELECT payload,worker FROM tasks WHERE status='running'").fetchall()
+            running = self.running_for_admission(active)
+            rows = list(self.db.execute("SELECT * FROM tasks WHERE status='pending'"))
+            waiting_producers = self.waiting_producer_tasks()
+            rows.sort(key=lambda r: (0 if r["id"] in waiting_producers else 1, json.loads(r["payload"]).get("dispatch_priority", json.loads(r["payload"]).get("priority", 10)), -json.loads(r["payload"]).get("estimated_seconds", 0), r["created"]))
+            candidate = None
+            for row in rows:
+                payload = json.loads(row["payload"])
+                if payload.get("reuse_task"):
+                    continue
+                if self.success_names is not None and Path(payload["output"]).name.lower() not in self.success_names:
+                    continue
+                if self.dependencies_ready(payload)[0]:
+                    candidate = payload
+                    break
+            # 扩容只调整本队列槽位；真正领取仍须经过 claim 的原子宿主机预约。
+            reason = "no_ready_tasks" if candidate is None else admission_reason(
+                snapshot, running, candidate, min(limit + 1, self.get("cap")), self.policy)
+            if reason is None and snapshot["cpu_percent"] >= self.policy["cpu_resume_percent"]:
+                reason = "cpu_resume_hold"
+            good = reason is None
+            healthy = self.get("healthy") + 1 if good else 0
+            if healthy >= 5 and limit < self.get("cap"):
+                limit += 1
+                healthy = 0
+            self.set("healthy", healthy)
+            self.set("limit", limit)
+            self.set("last_sample", snapshot["at"])
+            self.set("resources", snapshot)
+            self.event("resources", dict(**snapshot, healthy=healthy, limit=limit,
+                                         scale_up_task=candidate["id"] if candidate else None,
+                                         scale_up_reason=reason))
 
     def state(self, full=True):
         tasks = [dict(r) for r in self.db.execute("SELECT * FROM tasks" + ("" if full else " WHERE status='running'") + " ORDER BY created,id")]

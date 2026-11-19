@@ -45,8 +45,11 @@ class ByteAutoscaleTest(unittest.TestCase):
     def _queue(self, name: str, settings: dict | None = None):
         root = self.tmp / name
         root.mkdir(parents=True, exist_ok=True)
-        if settings is not None:
-            (root / "config.json").write_text(json.dumps(settings), encoding="utf-8")
+        # #110旧算法断言保留；显式选择legacy以免依赖新的默认值。
+        settings = dict(settings or {})
+        settings["resource_policy"] = {**settings.get("resource_policy", {}),
+                                       "autoscale_mode": "legacy_compatible"}
+        (root / "config.json").write_text(json.dumps(settings), encoding="utf-8")
         q = MODULE.Queue(root)
         self.queues.append(q)
         return q
