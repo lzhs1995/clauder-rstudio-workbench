@@ -1,0 +1,98 @@
+{
+  "acceptance_date": "2026-11-15",
+  "status": "PASS_SYNTHETIC_SUPPORTED_SCOPE",
+  "execution_chain": "Windows RStudio -> ClaudeR -> MplusAutomation -> Mplus.exe",
+  "engine": "Mplus VERSION 9",
+  "R": "4.5.2",
+  "MplusAutomation": "1.2",
+  "ClaudeR": "0.14.1.9003",
+  "total_models_run": 23,
+  "families_covered": [
+    "OTHER_GROWTH",
+    "MED",
+    "MODMED",
+    "PP_LGCM",
+    "LPA_LCA",
+    "LTA",
+    "MS_LTA"
+  ],
+  "suites": {
+    "other_growth": {
+      "status": "PASS",
+      "models": 5,
+      "checks": {
+        "all_models_pass": true,
+        "renamed_reordered_identical_estimates": true,
+        "changed_values_change_estimates": true,
+        "quadratic_has_q_factor": true,
+        "piecewise_has_two_slopes": true
+      },
+      "compared_items_ab": 25,
+      "max_abs_diff_ab": 0
+    },
+    "ch5_med_modmed": {
+      "status": "PASS",
+      "models": 4,
+      "bootstrap_draws": 1000,
+      "checks_passed": 16
+    },
+    "pp_lgcm": {
+      "status": "PASS",
+      "models": 7,
+      "statuses": {
+        "linear_linear_orig": "PASS",
+        "linear_linear_renamed": "PASS",
+        "quadratic_linear_orig": "PASS",
+        "quadratic_linear_renamed": "PASS",
+        "piecewise_quadratic_orig": "PASS",
+        "piecewise_quadratic_renamed": "PASS",
+        "linear_linear_changed": "PASS"
+      },
+      "compared_items": {
+        "linear_linear": 116,
+        "quadratic_linear": 142,
+        "piecewise_quadratic": 168
+      },
+      "max_abs_diff_ab": {
+        "linear_linear": 0,
+        "quadratic_linear": 0,
+        "piecewise_quadratic": 0
+      },
+      "changed_values_detected": true
+    },
+    "ch7_mixture_and_step3": {
+      "status": "PASS",
+      "models": 7,
+      "statuses": {
+        "SYN_LPA": "PASS",
+        "SYN_LCA": "PASS",
+        "SYN_MIXED": "PASS",
+        "SYN_LTA4_MI_STEP1": "PASS",
+        "SYN_MSLTA4_MI": "PASS",
+        "SYN_LTA4_STEP3": "PASS",
+        "SYN_MSLTA4_STEP3": "PASS"
+      },
+      "fresh_step1_to_step3_verified": true
+    }
+  },
+  "code_sha256": {
+    "scripts/ch5_mediation_moderation.R": "4ed909c580431e9ed6dc09e5e59b93276c351a212ba4776e0d89204d15c1f8d4",
+    "scripts/ch5_synthetic_data.R": "b834f1d4c2bec3f8c170f0c9481ac122646bec4b2e67fa29a1ba1dfaa24389a3",
+    "scripts/ch7_mixture_syntax.R": "09176745df1d0854659c3c3b6d5051cafbae7839e914ea3c4a24eff49e26103e",
+    "scripts/ch7_mixture_tools.R": "630da9b714ed7772c2d92931e741dba358cb8ad962fa680e88562730bbbc138b",
+    "scripts/ch7_native_fixture_20261111.R": "50ac81c28a865580f864552abfbc3e3248a286f11b4b092f26300c630362c52b",
+    "scripts/ch7_source_entry_20261111.R": "f2fa87235d89bc9aeedd2a38d21fd0224521b0716cacf243ddaacc9a6c4b0945",
+    "scripts/ch7_step_chain_20261111.R": "ad558db8594f5a78f25cb182b984d7909061061c8c8737c70926e50cb194a0de",
+    "scripts/growth_time_basis.R": "c3a33106b8e36f7502a4083525e77a12e01cd8195fe6a860e3b7dc6d5b4351a5",
+    "scripts/model_mapping.R": "d8ad946e8f43b4fb2ee85268466c5ccb4e7e86e593576efb9dce79857da3d569",
+    "scripts/mplus_workflow.R": "4ba7e0d846f37da1fded5f115fc57300ae371aa4bd719c1dd5b9f5d25b806f9e",
+    "scripts/test_ch5_native_synthetic_20261105.R": "ebadc6a4052c080d5625d814b2c215240f5d0f59603c240ca01c5131c88875e3",
+    "scripts/test_other_growth_native_20261105.R": "c66381bf6db70118adffad3d7306637f2ed707611f9e24966edd5f9913c201ec",
+    "scripts/test_pp_lgcm_compile_20261108.R": "3274274f7953570e2ed1a7ff76109eff97e1e35b835f60ccad78eaa3091474e1"
+  },
+  "limits": [
+    "Synthetic engine acceptance only; real-data swaps are tracked separately in assets/real_data_receipts/",
+    "PP_LGCM synthetic suite covers fixed-time parallel covariance growth via parallel_growth_model_syntax(), not full MI latent-product dissertation models",
+    "Chapter 7 synthetic suite covers continuous/binary invariant K=2 LPA, LCA, mixed LPA, measurement LTA Step-1, MS-LTA, and fresh Step-1 -> Step-3 logit propagation"
+  ]
+}

@@ -13,7 +13,7 @@ The exact source commit and critical hashes are recorded in
 [runtime-compatibility.json](runtime-compatibility.json). A version declaration
 is not proof that a current client has loaded that pair.
 
-Fresh installations on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Scientific qualification uses the version recorded with each run.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
 Start with the **[0.7.0 upgrade guide](docs/UPGRADE_0.7.0.md)** or
 **[繁體中文升級指南](docs/UPGRADE_0.7.0.zh-TW.md)**. The candidate adds an isolated
@@ -34,6 +34,23 @@ The maintained Chinese architecture and operations manual is
 [ClaudeR 架构说明与 clauder-rstudio-workbench 使用指南](docs/ClaudeR_架构说明与clauder-rstudio-workbench使用指南.md).
 It supersedes the Windows-first development diary while preserving a
 [sanitized origin summary](docs/history/2026-05-windows-origin.md).
+
+## Demo
+
+[![Demo thumbnail. Click to watch the 33-second overview on YouTube](docs/assets/demo/thumbnail.png)](https://youtu.be/KRqlsSRlL88)
+
+| Video | Length | Content |
+|---|---|---|
+| [Short overview](https://youtu.be/KRqlsSRlL88) | 33 s | Codex connects to a named RStudio session, audits the data, builds a table asynchronously and passes independent validation. |
+| [Full walkthrough: connect, audit, tables and validation](https://youtu.be/1LlXHFMx1-Q) | about 3 min | The same run step by step: session discovery, input hash and audit, the table specification, the background job, the three-line Table 1 rendered from the generated DOCX, and the six validation checks. |
+
+Both videos are silent, with burned-in Traditional Chinese and English subtitles.
+Subtitle files: overview [繁中](docs/assets/demo/hero.zh-TW.srt) · [English](docs/assets/demo/hero.en.srt);
+walkthrough [繁中](docs/assets/demo/walkthrough.zh-TW.srt) · [English](docs/assets/demo/walkthrough.en.srt).
+
+The demo uses 1,200 fixed-seed synthetic records, an isolated RStudio demo session and real
+Codex MCP calls; the table comes from the `comparegroups-guide` skill. The footage is edited
+for pacing and intercut with explanation cards; it is not an uninterrupted recording.
 
 ## Skills in This Collection
 

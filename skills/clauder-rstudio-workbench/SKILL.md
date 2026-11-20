@@ -10,7 +10,7 @@ description: Use when an agent needs to connect to a live RStudio session throug
 This collection contains four skills. Its candidate runtime pair is ClaudeR R
 `0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
 `runtime-compatibility.json`; complete macOS/Windows qualification is **PENDING**.
-Fresh installations on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Scientific qualification uses the version recorded with each run.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
 See the [English upgrade guide](../../docs/UPGRADE_0.7.0.md) or
 [繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) in the complete source checkout.

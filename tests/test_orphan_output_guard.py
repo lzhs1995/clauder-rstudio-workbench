@@ -182,14 +182,22 @@ class OrphanGuardTests(unittest.TestCase):
         import psutil
         self.marker.update(pid=os.getpid(), created=psutil.Process().create_time() - 100)
         dump(self.dst / "ENGINE_STARTED.json", self.marker)
-        # Keep synthetic outputs inside the recorded original budget even when
-        # the full test suite has been running longer than that budget.
-        finished = self.marker["created"] + 1
+        # 合成输出相对原引擎启动固定为一秒，不随当前测试进程已运行时长漂移。
+        output_time = self.marker["created"] + 1
         for name in guard.OUTPUTS:
-            os.utime(self.dst / name, (finished, finished))
+            os.utime(self.dst / name, (output_time, output_time))
         result = self.assess()
         self.assertEqual(result["decision"], "ADOPTABLE_SAVED_OUTPUTS", result)
         self.assertIn("reused", result["process"]["reason"])
+        self.assertEqual(result["engine_calls"], 0)
+        self.assertFalse(result["new_engine_authorized"])
+
+    def test_pid_reuse_after_long_test_session(self):
+        import psutil
+        # 模拟测试进程已运行十分钟；保留真实当前 PID，只替换其观察到的出生时间。
+        with patch.object(psutil.Process, "create_time", return_value=time.time() - 600), \
+                patch.object(psutil.Process, "wait", side_effect=AssertionError("Reused PID must not be waited on")):
+            self.test_pid_reuse_does_not_target_current_process()
 
     def test_output_must_terminate_normally(self):
         (self.dst / "model.out").write_bytes(b"Mplus VERSION 9\n*** ERROR\n")

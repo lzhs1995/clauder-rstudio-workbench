@@ -4,10 +4,12 @@
 
 本候選版配對為 workbench **0.7.0**、ClaudeR R **0.16.6.9001**、MCP bridge
 **0.16.6.post1**。實際來源提交與關鍵檔案 SHA 位於
-[runtime-compatibility.json](../runtime-compatibility.json)。來源納入上游開發提交 `3b56327`，並保留本地會話探索、程序歸屬、非同步輸出與進度保護；不能因舊
+[runtime-compatibility.json](../runtime-compatibility.json)，固定 ClaudeR 提交
+`3684427090d644ab37b04ec10b05d38a6e57ae70`。來源納入上游開發提交
+`3b56327`，並保留本地會話探索、程序歸屬、非同步輸出與進度保護；不能因舊
 bridge 還能啟動，就把它當成本次升級成功，也不能以未固定的 PyPI 套件替代。
 
-macOS 與 Windows 的隔離安裝均已驗證兩個啟動器，並實際列出 42 個 MCP 工具，包含 `wake_on_message` 與 `get_async_result(wait_s=0)`。科學復現依各次紀錄的版本驗收。
+先前候選版的 macOS 與 Windows 隔離安裝回執已驗證兩個啟動器，並實際列出 42 個 MCP 工具，包含 `wake_on_message` 與 `get_async_result(wait_s=0)`。這些回執保留各自記錄的來源身分，不證明本次合併候選已完成驗收或現役客戶端已載入。科學復現依各次紀錄的版本驗收。
 
 四項技能都保留：[workbench](../skills/clauder-rstudio-workbench/SKILL.md)、
 [compareGroups](../skills/comparegroups-guide/SKILL.md)、

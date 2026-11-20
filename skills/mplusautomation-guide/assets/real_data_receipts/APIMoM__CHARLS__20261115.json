@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "family": "APIMoM",
+  "dataset": "CHARLS",
+  "route": "apim_v2_config",
+  "generated_taipei": "2026-11-15T15:14:42+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "89baa52c49ffce00966f8e73a55e7efd58b5a9690035aaa593826fd72f3bf9c0",
+  "code_sha256": {
+    "scripts/workflow.R": "cb43b9cf003bdacf4f12e854a8970fd1caa425883f8662ad5ddaeb2c770ed569",
+    "scripts/apim_v2_config.R": "23fef5a63cc04d85e1c47541c09f04916266a05f422b7cad09761613e82017ac",
+    "scripts/apim_v2_data_adapter.R": "85e2c1bfcebfff079376fd2e36f03099ef86d715032051fce27838beb983c472",
+    "scripts/apim_v2_models.R": "0bb86a06a35f5ee843f740fd41f283f0113e3216783efb132f4bcd78f13dd5f3",
+    "scripts/apim_v2_runtime.R": "f276c9e76313c7118cb01365aba6d0bb7284be5f68a2c468b6e6637a6ed8b04a",
+    "scripts/results.R": "40d9d8f5375ebc5db2838078a4402c309498a923b5dd4739ef0c032940d4e63d"
+  },
+  "output_sha256": {
+    "apimom_model.inp": "4856a2918d632288abc408314f8ca4897b780ae63bcdabfc608f36be198b3ed0",
+    "apimom_model.out": "b45a11d7412979cd1e810973c03d3952ff2a6c023b5a9d069f3ad2df55e0efad",
+    "apimom_results.dat": "448f5a18d0b7ace6577bec0972273d1f6f1b03ab79ed49be349e17b9af0eb4be",
+    "apimom_precision_parameters.csv": "40d71ff397748b0afabc11af44e5f1caceca7c91e97de8cfe64b19149ce02be2",
+    "apimom_effects.csv": "b0f94313391cdea7363d8d003137176023363b639ec7b5962972cf9b9d26751a",
+    "apimom_parse_validation.json": "df8255027456a4fa96562c4aad7d60c4d5d8ca96025a2d4a2297fa3663034787",
+    "apimom_output_binding.json": "6023d201942af268052d60828b59cd4497d8c43fd2a0c81837cb82265e34b155",
+    "moderated_preparation_receipt.json": "71a91b47471f0fea58a1fd81f087d102a9239461e29d183095e74c61382550e9",
+    "manifest.csv": "f73186539b6d5403117bb4db87c777c7a420150438946ed2294f6ce7f71d0c70",
+    "validation.json": "ff3f73eb40c0ba889f78341520b6b50a614499b3447b14d18f2426a7fbecfed6",
+    "independent_native_validation.json": "205b866d466755c29d8a9e356c86fa76c6a013d96bd865c31141dd12013df147"
+  },
+  "rows": 7371,
+  "columns": 11,
+  "column_names": [
+    "couple_wave_id",
+    "community_id",
+    "member1_id",
+    "member2_id",
+    "member1_age",
+    "member2_age",
+    "member1_adl",
+    "member2_adl",
+    "member1_cesd10",
+    "member2_cesd10",
+    "couple_rural"
+  ],
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 94,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-apimom-swap-8796-20261115"
+}

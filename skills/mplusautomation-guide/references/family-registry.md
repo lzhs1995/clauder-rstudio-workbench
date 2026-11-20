@@ -21,18 +21,18 @@ For changing data sources or variables, follow
 
 | Family | Code | Routes | Synthetic compile | Native synthetic | Real-data swap | Historical replay |
 |---|---|---|---|---|---|---|
-| APIM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
-| APIMeM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
-| APIMoM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
-| APIMeMoM | configurable | apim_v2_config, template_bundle, archived_replay | pass | pass* | pending* | pass* |
-| MED | template | template_bundle | pass* | pending* | pending* | readback* |
-| MOD | configurable | r_glm_moderation | pass* | n/a* | pending* | pass* |
-| MODMED | template | template_bundle | pass* | pending* | pending* | readback* |
-| LPA_LCA | template | mplus_object_syntax, template_bundle | pass* | — | — | pass* |
-| LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | pending* |
-| MS_LTA | template | mplus_object_syntax, template_bundle | pass* | — | — | pass* |
-| PP_LGCM | template | external_project, template_bundle, mplus_object_mapping | pass* | — | pending* | pending |
-| OTHER_GROWTH | template | mplus_object_mapping | pass | pending* | — | n/a |
+| APIM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
+| APIMeM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
+| APIMoM | configurable | apim_v2_config, apim_v1_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
+| APIMeMoM | configurable | apim_v2_config, template_bundle, archived_replay | pass | pass* | pass* | pass* |
+| MED | template | template_bundle | pass* | pass* | pass* | readback* |
+| MOD | configurable | r_glm_moderation | pass* | n/a* | pass* | pass* |
+| MODMED | template | template_bundle | pass* | pass* | pass* | readback* |
+| LPA_LCA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pass* | pass* | pass* |
+| LTA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pass* | pass* | pending* |
+| MS_LTA | configurable | ch7_source_config, mplus_object_syntax, template_bundle | pass* | pass* | pass* | pass* |
+| PP_LGCM | template | external_project, template_bundle, mplus_object_mapping | pass* | pass* | pass* | pending |
+| OTHER_GROWTH | template | mplus_object_mapping | pass | pass* | pass* | n/a |
 
 ## APIM
 
@@ -48,7 +48,7 @@ For changing data sources or variables, follow
 - Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; CFPS → CHARLS 换源已排期
+- real_data_swap: pass; source `assets/real_data_receipts/APIM__CHARLS__20261112.json`; CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR）
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放；上游行身份来源未闭合
 - Thesis: 第四章
 
@@ -66,7 +66,7 @@ APIM 中介模型：在 APIM 中加入成员中介变量（a/b 路径与间接�
 - Tests: `scripts/test_apim_v2_data_adapter.R` (CI mplus-guide-family-tests.yml), `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_swap.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_swap_windows_runner.py` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; CFPS → CHARLS 换源已排期
+- real_data_swap: pass; source `assets/real_data_receipts/APIMeM__CHARLS__20261112.json`; CHARLS 2011 横截面夫妻配对技术换源（社区聚类 MLR；横截面间接关联，不作因果中介推断）
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放
 - Thesis: 第四章
 
@@ -84,10 +84,9 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_acceptance.R` (needs Mplus), `scripts/test_charls_apim_moderated_swap_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `assets/native_acceptance_20261015.json`; 10-15 回执记录的 6 个代码哈希中有 3 个早于当前代码；当前代码的原生合成验收需在 Windows 用 scripts/accept_apim_v2.R 重跑
-- real_data_swap: pending; 准备代码就位：在 #79 的夫妻宽表上加住户层城乡（shared 二分 W），合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
+- real_data_swap: pass; source `assets/real_data_receipts/APIMoM__CHARLS__20261115.json`; CHARLS 2011 夫妻宽表追加经核实的住户城乡调节变量（h1rural，社区聚类 MLR），通过独立公式复算与全列改名重排不变性核验
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 仅归档 DAT/INP 数值回放
 - Thesis: 第四章
-- Gap: 没有排期的真实数据换源测试
 
 ## APIMeMoM
 
@@ -103,10 +102,9 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_apim_v2.R` (CI mplus-guide-family-tests.yml), `scripts/test_workflow_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_native_bc_contract.R` (CI mplus-guide-family-tests.yml), `scripts/test_charls_apim_moderated_swap_20261105.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `apim_v2_contract`
 - native_synthetic: pass; source `references/apim-v2-implementation-acceptance.md`; a 与 ab 路径为后加
-- real_data_swap: pending; 准备代码就位：moderated_paths a/b/ab 各一个模型，W 为住户层城乡，合成数据编译通过；#79 已合并；等核实配偶与缺失码、产出夫妻宽表后，才能在 Windows 运行
+- real_data_swap: pass; source `assets/real_data_receipts/APIMeMoM__CHARLS__20261115.json`; CHARLS 2011 夫妻宽表运行 moderated_paths a/b/ab 三模型（h1rural 住户城乡调节，社区聚类 MLR），通过独立公式复算与全列改名重排不变性核验
 - historical_replay: pass; source `references/archived-replay-runtime.md`; 历史模型只有 b 路径
 - Thesis: 第四章
-- Gap: 没有排期的真实数据换源测试
 
 ## MED
 
@@ -119,11 +117,10 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；反事实二值模板另由 ch5_mediation_moderation_synthetic 覆盖；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus
-- native_synthetic: pending; 四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）
-- real_data_swap: pending; 第五章 Mplus 分层重估等待 Windows 计算窗口
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通线性与反事实中介代表模型（BOOTSTRAP=1000），正常收敛且约束代数与打印参数一致
+- real_data_swap: pass; source `assets/real_data_receipts/MED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译 [[init]] 线性中介模板（BOOTSTRAP=1000），original 与改名重排两轮估计值及标准误一致；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定
 - historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
-- Gap: 原生合成验收等 Windows 计算窗口
 
 ## MOD
 
@@ -135,12 +132,11 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Docs: [mediation-moderation-workflow.md](mediation-moderation-workflow.md), [chapter5-replay-map.md](chapter5-replay-map.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_moderation_route_20261105.R` (CI mplus-ch5-synthetic.yml)
-- synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、拟合、连续与三分类简单斜率（对重新中心化/重设参照类的拟合逐位一致）、绘图；不调用 Mplus
+- synthetic_compile: pass; source `ch5_moderation_route`; 合成数据：配置校验、单/多 focal 完整交叉公式（无需预乘 px.*）、拟合、连续与三分类简单斜率（默认 cluster_HC0、完整 model 及历史复现专用 historical_ch5 协方差模式，对重新中心化/重设参照类的拟合逐位一致）、显式 moderator_labels 与 Cairo 绘图；不调用 Mplus
 - native_synthetic: not_applicable; 静态调节只在 R 中拟合，没有 Mplus 引擎步骤
-- real_data_swap: pending; 尚无白名单换源回执
+- real_data_swap: pass; source `assets/real_data_receipts/MOD__CFPS__20261115.json`; CFPS 三套样本经 r_glm_moderation 路线重跑联合与逐一规格及简单斜率（不含预乘 px.* 列，协方差模式按层显式声明），五层 13,687 项对锁定历史输出及附表按印刷精度逐格一致（最大绝对差 < 5e-4）
 - historical_replay: pass; source `references/chapter5-replay-map.md`; 在 Mac 用 R 重新拟合；联合与逐一两套规格对附表及历史输出逐格一致
 - Thesis: 第五章
-- Gap: 第五章历史复现用的是锁定脚本原样复跑，尚未改由 r_glm_moderation 路线重跑
 
 ## MODMED
 
@@ -153,11 +149,10 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Acceptance: [mediation-moderation-workflow.md](mediation-moderation-workflow.md)
 - Tests: `scripts/test_ch5_mediation_moderation_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_templates_extended_20261105.R` (CI mplus-ch5-synthetic.yml), `scripts/test_ch5_native_synthetic_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `ch5_templates_extended`; 合成数据：生成 INP/DAT 并核约束代数，不调用 Mplus，不说明引擎接受或收敛；三分类 W 的效应编码取值与分样本子样本量逐文件核对；同一合成数据的 original / renamed_reordered 两轮各编译42个 INP，反向映射后语义一致；分别拒绝只改 name*/var* 一侧、NAMES/DAT 错序或缺列、旧 DATA 文件及不支持的 DEFINE 语法。两轮仍不调用 Mplus
-- native_synthetic: pending; 四个代表模型的原生合成运行包已备好，等 Windows 计算窗口（scripts/test_ch5_native_synthetic_20261105.R）
-- real_data_swap: pending; 第五章 Mplus 分层重估等待 Windows 计算窗口
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通多组连续调节与三分类调节有调节中介代表模型（BOOTSTRAP=1000），正常收敛且组差/加权平均约束一致
+- real_data_swap: pass; source `assets/real_data_receipts/MODMED__CHARLS__20261115.json`; Harmonized CHARLS 2011 经 source_spec 准备并编译多组有调节中介 [[init]] 模板（城乡分组、自评健康调节，BOOTSTRAP=1000），改名重排不变；数据准备代码 scripts/source_spec.R 不在本回执的新鲜度追踪范围内（freshness_files 不含它），数据身份由 data_sha256 锁定
 - historical_replay: archived_readback_only; source `references/chapter5-replay-map.md`; 读回 1,922 个现用输出并由 .gh5 重算区间，与附表及论文附录逐格一致；新鲜 Mplus 估计为 0
 - Thesis: 第五章
-- Gap: 原生合成验收等 Windows 计算窗口
 - Gap: 三分类 W 模板按样本分别拟合（USEOBSERVATIONS）；三分类 W 与 GROUPING 多组同时出现的模板尚无
 
 ## LPA_LCA
@@ -165,64 +160,67 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 潜剖面/潜类别分析：单期类别枚举、类别命名与后验分类；第七章为四连续加两分类的混合指标。
 
 - Aliases: LPA, LCA
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [lpa-lca-workflow.md](lpa-lca-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
-- real_data_swap: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_syntax_boundaries_20261113.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收
+- real_data_swap: pass; source `assets/real_data_receipts/LPA_LCA__CHARLS__20261115.json`; Harmonized CHARLS 基线65岁及以上队列经 ch7_source_config 编译并由 Windows Mplus 9 估计单期混合指标剖面（3连续+2二分类），源列改名重排不变
 - historical_replay: pass; source `references/chapter7-replay-map.md`; 2026-11-10 历史输入新鲜重估：24/24 单期枚举模型按打印精度一致，保留诊断及两次旧超时；只覆盖原第七章混合指标，不证明纯分类 LCA 或当前编译器的新源原生验收
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: 类别枚举汇总只收一个类别变量；最终 K 由研究者按联合判据记录，工具不代选
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
 
 ## LTA
 
 潜转变分析：测量不变、转移概率与三步法 Step-3。
 
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [lta-workflow.md](lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [chapter7-replay-map.md](chapter7-replay-map.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
-- real_data_swap: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_syntax_boundaries_20261113.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_step_chain_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收
+- real_data_swap: pass; source `assets/real_data_receipts/LTA__CHARLS__20261115.json`; Harmonized CHARLS 四期（2011–2018）基线65岁及以上队列经 ch7_source_config 完成新鲜 Step-1 测量不变模型与自动提取打印 logit 的 Step-3 LTA 估计，改名重排不变
 - historical_replay: pending; source `references/chapter7-replay-map.md`; 2026-11-10 历史输入新鲜重估：测量/普通LTA范围4/5打印一致；MI_4W_FREE最终TIMEOUT、已结算且不重试，故未声明全家族通过。此 pending 表示完整通过未成立，不表示尚有已授权待启动模型
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: Step-3 绑定所用的分类误差矩阵由调用方从 Step-1 输出取得并记录来源；工具不解析 Step-1 的分类概率表
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
 
 ## MS_LTA
 
 动静潜转变分析：G(2) mover/stayer 结构、有限 logit 与精确约束的区分。
 
 - Aliases: MS-LTA, mover-stayer LTA
-- Data formats: csv, archived_dat
+- Data formats: csv, dta, archived_dat
+- Route `ch7_source_config`: `scripts/ch7_source_entry_20261111.R:ch7_source_entry`, `scripts/ch7_step_chain_20261111.R:ch7_step3_from_step1`, `scripts/ch7_figures_20261111.R:ch7_profile_data`
 - Route `mplus_object_syntax`: `scripts/ch7_mixture_syntax.R:ch7_mixture_object`, `scripts/ch7_mixture_tools.R:ch7_classify_inp`, `scripts/ch7_mixture_tools.R:ch7_enumeration_table`, `scripts/ch7_mixture_tools.R:ch7_step3_binding`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
-- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md)
+- Docs: [ms-lta-workflow.md](ms-lta-workflow.md), [chapter7-replay-map.md](chapter7-replay-map.md), [chapter7-source-variable-contract-20261104.md](chapter7-source-variable-contract-20261104.md), [family-source-swap-contract.md](family-source-swap-contract.md), [chapter7-source-entry-20261111.md](chapter7-source-entry-20261111.md), [chapter7-step-chain-20261111.md](chapter7-step-chain-20261111.md), [chapter7-model-figures-20261111.md](chapter7-model-figures-20261111.md)
 - Acceptance: [ms-lta-workflow.md](ms-lta-workflow.md)
-- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml)
-- synthetic_compile: pass; source `ch7_mixture_compile`; 17规格 × original/renamed_reordered 两轮共34个 INP 的合成编译与反向映射核验；只调用 mplusObject()/mplusModeler(run=0)，不说明引擎接受或收敛
-- native_synthetic: not_started
-- real_data_swap: not_started
+- Tests: `scripts/test_ch7_mixture_family_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_syntax_boundaries_20261113.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_mixture_tools_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_source_entry_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_figures_20261111.R` (CI mplus-guide-family-tests.yml), `scripts/test_ch7_step_chain_20261111.R` (CI mplus-guide-family-tests.yml)
+- synthetic_compile: pass; source `ch7_source_entry`; 统一配置覆盖CSV/DTA源、变量改名重排、波次数、K和角色组合；自动Step-3及模型图adapter另有独立合成CI。只编译，不代替原生引擎验收
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 完成纯连续 LPA、纯二分类 LCA、混合指标 LPA、四期不变测量 Step-1、直接 MS-LTA 及新鲜 Step-1→Step-3 链原生验收
+- real_data_swap: pass; source `assets/real_data_receipts/MS_LTA__CHARLS__20261115.json`; Harmonized CHARLS 四期（2011–2018）基线65岁及以上队列由新鲜 Step-1 输出自动编译并估计 G(2) Mover-Stayer LTA Step-3，改名重排不变
 - historical_replay: pass; source `references/chapter7-replay-map.md`; 2026-11-10 两个历史Step-3输入新鲜重估打印一致；保留两期模型自动固定参数诊断，只复现归档输入，不证明新的Step-1→分类误差→Step-3完整链或真实换源验收
 - Thesis: 第七章
-- Gap: 原生合成验收未做：ch7_mixture_object() 生成的语法尚未经 Mplus 引擎确认
-- Gap: stayer 用有限 logit 逼近 0/1，分类器在 approximations 里注明
-- Gap: 独立流量图接口已通过合成计算及 widget 载荷合同；历史 F30/F31、浏览器/PNG、新数据换源及 Step-1→Step-3 完整链仍需各自验收
+- Gap: 新源测量目前支持连续量和0/1二分类，各波同K；多分类/逐波不同K不自动编译
+- Gap: 类别语义和最终K必须显式声明，工具不代选、不自动重标类别
+- Gap: stayer为有限logit近似，不能称精确不转移；总体转移与给定G条件转移分别声明
 
 ## PP_LGCM
 
 平行过程潜增长模型：多过程潜增长、潜交互与多重插补；CFPS 与 CHARLS 两条数据线。skill 提供执行层与验收规则，模型规格在研究项目里。
 
 - Aliases: PP-LGCM
-- Data formats: archived_dat, in_memory
+- Data formats: csv, dta, archived_dat, in_memory
 - Route `external_project`: `scripts/run_rstudio_mplus_batch.R:run_rstudio_mplus_batch`, `scripts/run_rstudio_family_queue.R:run_rstudio_family_queue`
 - Route `template_bundle`: `scripts/compile_template_bundle.R:compile_mplus_template_bundle`, `scripts/template_contracts.py:manifest_contract`
 - Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
@@ -230,8 +228,8 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Acceptance: [cfps-acceptance.md](cfps-acceptance.md)
 - Tests: `scripts/test_rstudio_queue_admission.py` (CI mplus-guide-registry.yml), `scripts/test_pp_lgcm_compile_20261108.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `pp_lgcm_compile`; 只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计
-- native_synthetic: not_started
-- real_data_swap: pending; 两条真实数据线已运行，缺白名单回执
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通双过程线性/二次/分段 3 组形状的 original 与改名重排一致性及改值敏感性共 7 个模型
+- real_data_swap: pass; source `assets/real_data_receipts/PP_LGCM__CHARLS__20261115.json`; Harmonized CHARLS 四期（2011–2018）抑郁与自评健康双过程协变型潜增长换源（MLR），通过源列改名重排一致性核验
 - historical_replay: pending
 - Thesis: PP-LGCM 稿表 4.2.1、4.3.1、4.4.2.1
 - Gap: parallel_growth_model_syntax() 只编译固定时间的双过程协变型 LGCM；自由载荷、跨过程定向路径、观测残差相关、交互与多重插补仍要外部已审规格，历史生产脚本在论文工作区
@@ -241,18 +239,16 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 
 其他增长模型：手写 ANALYSIS 的 mplusObject 加换名映射；不规则时间载荷由 growth_model_syntax() 写成 Mplus 增长语句。
 
-- Data formats: in_memory
+- Data formats: csv, dta, in_memory
 - Route `mplus_object_mapping`: `scripts/model_mapping.R:mplus_from_mapping`, `scripts/mplus_workflow.R:run_mplus_model`, `scripts/growth_time_basis.R:growth_time_basis`, `scripts/growth_time_basis.R:growth_model_syntax`, `scripts/growth_time_basis.R:check_growth_statements`, `scripts/growth_time_basis.R:parallel_growth_model_syntax`
 - Docs: [reusable-models.md](reusable-models.md), [cross-dataset-migration.md](cross-dataset-migration.md), [family-source-swap-contract.md](family-source-swap-contract.md)
 - Acceptance: [reusable-models.md](reusable-models.md)
 - Tests: `scripts/test_other_growth_compile_20261105.R` (CI mplus-guide-family-tests.yml), `scripts/test_other_growth_native_20261105.R` (needs Mplus)
 - synthetic_compile: pass; source `other_growth_compile`
-- native_synthetic: pending; 原生运行包已备好（线性、二次、分段及换名换序/改值复用核对共 5 个模型），等 Windows 窗口用 scripts/test_other_growth_native_20261105.R 运行
-- real_data_swap: not_started
+- native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通 scripts/test_other_growth_native_20261105.R 全部 5 个模型（线性 A/B/C、二次、分段）
+- real_data_swap: pass; source `assets/real_data_receipts/OTHER_GROWTH__CHARLS__20261115.json`; Harmonized CHARLS 四期（2011–2018）不规则波次间隔潜增长换源（MLR），通过源列改名重排一致性核验
 - historical_replay: not_applicable
-- Gap: 原生合成验收待 Windows 运行（Mplus 尚未确认 growth_model_syntax() 生成的语句）
 - Gap: growth_model_syntax() 只写单一过程的增长因子；固定时间的双过程协变型模型见 PP_LGCM 的 parallel_growth_model_syntax()，跨过程定向路径、交互、分类结果仍需手写 MODEL
-- Gap: 真实数据换源未排期
 
 ## Shared layers
 

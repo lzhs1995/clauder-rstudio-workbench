@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "family": "APIMeMoM",
+  "dataset": "CHARLS",
+  "route": "apim_v2_config",
+  "generated_taipei": "2026-11-15T15:14:42+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "89baa52c49ffce00966f8e73a55e7efd58b5a9690035aaa593826fd72f3bf9c0",
+  "code_sha256": {
+    "scripts/apim_v2_config.R": "23fef5a63cc04d85e1c47541c09f04916266a05f422b7cad09761613e82017ac",
+    "scripts/apim_v2_data_adapter.R": "85e2c1bfcebfff079376fd2e36f03099ef86d715032051fce27838beb983c472",
+    "scripts/apim_v2_models.R": "0bb86a06a35f5ee843f740fd41f283f0113e3216783efb132f4bcd78f13dd5f3",
+    "scripts/apim_v2_runtime.R": "f276c9e76313c7118cb01365aba6d0bb7284be5f68a2c468b6e6637a6ed8b04a",
+    "scripts/results.R": "40d9d8f5375ebc5db2838078a4402c309498a923b5dd4739ef0c032940d4e63d"
+  },
+  "output_sha256": {
+    "apimemom_a_model.inp": "bd5be551360d8da60a8a301e2095d29fbc3387e3ef35acd4900a19d0160715b2",
+    "apimemom_a_model.out": "95ebf051a62571e036b5807be07eb649f9dcedadfaa829a390f4a57c0070e819",
+    "apimemom_a_results.dat": "27a9f3f0f842d2808549bb2647c8de3134664632ca81eb9ee7b99bf89928ab7e",
+    "apimemom_a_precision_parameters.csv": "b889ae7f5f50ccbd243acae0f41d487edfca97383e9e7bdfef0af5bbc9d20f2c",
+    "apimemom_a_effects.csv": "a767d43ff2402378acd4b11464a9d042d58a77901c4d41f5cdb9d226e944aafd",
+    "apimemom_a_parse_validation.json": "3c474e7c275584fa8e85ef5b8c4feb7fa7c23bf76c2c806ea0ede46f72941b7f",
+    "apimemom_a_output_binding.json": "1156314444b7b47096a8f1eb9e2970abaf4019a3bd392d7b431ff1e58b63b0df",
+    "apimemom_b_model.inp": "644e52b8371298ebb633c6b00554a88a5367cd4531f0109cf4e7453f6e684989",
+    "apimemom_b_model.out": "a03876b3a4e0049184ef86a3a80a3f84636bddfcf22cb756b396485962b95e0b",
+    "apimemom_b_results.dat": "59666cb28c0f573839c3b6828430012b30594f3be36cc6f4954435ba09682772",
+    "apimemom_b_precision_parameters.csv": "6c6d3d784d986e67d1ba6ed8def82deededea253017f7746f10c753c60bf0c87",
+    "apimemom_b_effects.csv": "848a8ea2ccb5e4c84d51f0e5b00e6827397e426bb580e0e350859acbe565fa52",
+    "apimemom_b_parse_validation.json": "335bed8f348beaa46864943a3fedc498d35c2cc7756a914af69137f989be2d5a",
+    "apimemom_b_output_binding.json": "ead39bfcc140c032643e8f66177d3851dcd4a9c785cfca3694fe96442f2acb74",
+    "apimemom_ab_model.inp": "42e221e9f8baccb6bdeed43706f8057dde454670d307b63f7912240b0b321720",
+    "apimemom_ab_model.out": "864fa7ec67dd4a56b09f3f91edc3e50b9b897075d9196014f2e0a1e05d2c0a1b",
+    "apimemom_ab_results.dat": "37e12447e491be0961ffe70ce6f473e5acc605fea80a50499792c737fda013b0",
+    "apimemom_ab_precision_parameters.csv": "71df7845a02e3a9cf32acb306e17df0f3686037b017efd5592a9f37f873aa1fb",
+    "apimemom_ab_effects.csv": "98bb8b3018f0e5c662e45f204e875922785e903a185fb045c7f38b696e031c01",
+    "apimemom_ab_parse_validation.json": "ac7afb34127b553c86896e664a529cc343fb151cf9d81ee95fd0fca94fe20fa3",
+    "apimemom_ab_output_binding.json": "25b46c592b4ba4f3b027cfad85c27c0c2c563e7fa23394ed5899e4978a4ac5ca",
+    "moderated_preparation_receipt.json": "71a91b47471f0fea58a1fd81f087d102a9239461e29d183095e74c61382550e9",
+    "manifest.csv": "f73186539b6d5403117bb4db87c777c7a420150438946ed2294f6ce7f71d0c70",
+    "validation.json": "ff3f73eb40c0ba889f78341520b6b50a614499b3447b14d18f2426a7fbecfed6",
+    "independent_native_validation.json": "205b866d466755c29d8a9e356c86fa76c6a013d96bd865c31141dd12013df147"
+  },
+  "rows": 7371,
+  "columns": 11,
+  "column_names": [
+    "couple_wave_id",
+    "community_id",
+    "member1_id",
+    "member2_id",
+    "member1_age",
+    "member2_age",
+    "member1_adl",
+    "member2_adl",
+    "member1_cesd10",
+    "member2_cesd10",
+    "couple_rural"
+  ],
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 884,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-apimemom-swap-8796-20261115"
+}

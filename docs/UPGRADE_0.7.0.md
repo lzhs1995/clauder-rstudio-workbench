@@ -4,12 +4,13 @@
 
 The candidate pairs workbench **0.7.0**, ClaudeR R **0.16.6.9001** and bridge
 **0.16.6.post1**. Read [runtime-compatibility.json](../runtime-compatibility.json)
-for the exact ClaudeR commit and critical-file hashes. The source incorporates
+for the pinned ClaudeR commit `3684427090d644ab37b04ec10b05d38a6e57ae70`
+and critical-file hashes. The source incorporates
 upstream development commit `3b56327` and the maintained discovery, ownership,
 async-output and progress protections. Do not substitute an old reduced bridge
 or an unpinned PyPI package merely because its command still starts.
 
-Fresh installations on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Scientific qualification uses the version recorded with each run.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
 All four skills remain available: [workbench](../skills/clauder-rstudio-workbench/SKILL.md),
 [compareGroups](../skills/comparegroups-guide/SKILL.md),

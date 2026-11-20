@@ -236,6 +236,31 @@ def admission_reason(snapshot, running, candidate, limit, policy=None):
     return None
 
 
+def scale_up_memory_ok(snapshot, reserved_gib, policy=None):
+    """Return whether memory allows the queue to add one parallel slot.
+
+    The percentage rule is kept for compatibility, but it is not the only
+    route: a 16 GiB Windows host running editors and browsers can stay above
+    85% for hours while still having several GiB available.  In that case the
+    slot is added when the same byte headroom used by ``admission_reason`` can
+    cover the running reservations plus one more ``scale_up_step_gib``.
+    """
+    policy = {**DEFAULT_POLICY, **(policy or {})}
+    # 未验真的宿主机快照（WSL 视图、过期或损坏的 profile）不计入健康样本，百分比路径也不例外。
+    if snapshot.get("host_memory_unverified"):
+        return False
+    step = float(policy.get("scale_up_step_gib", 0.5))
+    # 声明了提交余量时，两条路径都先核页面文件/提交余量。
+    commit_reserve = policy.get("commit_reserve_gib")
+    if commit_reserve is not None:
+        headroom = snapshot.get("free_virtual_gib")
+        if headroom is None or headroom - reserved_gib - step < commit_reserve:
+            return False
+    if snapshot["memory_percent"] < policy["memory_resume_percent"]:
+        return True
+    return snapshot["available_gib"] - reserved_gib - step >= policy["reserve_gib"]
+
+
 def inspect_output(path, savedata_contract=None):
     path = Path(path)
     if not path.exists():
@@ -321,6 +346,9 @@ class Queue:
             config = self.root / "config.json"
             settings = json.loads(config.read_text(encoding="utf-8-sig")) if config.exists() else {}
             self.policy = {**DEFAULT_POLICY, **settings.get("resource_policy", {})}
+            self.autoscale_mode = self.policy.get("autoscale_mode", "candidate_measured")
+            if type(self.autoscale_mode) is not str or self.autoscale_mode not in ("legacy_compatible", "candidate_measured"):
+                raise ValueError("resource_policy.autoscale_mode must be legacy_compatible or candidate_measured")
             self.windows_memory_profile = settings.get("windows_memory_profile")
             if self.windows_memory_profile:
                 profile = Path(self.windows_memory_profile)
@@ -354,16 +382,11 @@ class Queue:
                     raise ValueError("initial_parallel_limit must be between 1 and parallel_cap")
                 self.set("cap", cap)
                 self.set("limit", initial)
-            self.db.execute("COMMIT")
-        except BaseException:
-            self.db.execute("ROLLBACK")
-            self.db.close()
-            raise
-        # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
-        self.success_policy = settings.get("historical_success_policy")
-        self.success_names = None
-        if self.success_policy is not None:
-            try:
+            # 可选范围门控也在提交前校验；失败不留下默认值，修正后仍按首次建库处理。
+            # 同名历史成功输出只表示候选资格，不证明数值复现。
+            self.success_policy = settings.get("historical_success_policy")
+            self.success_names = None
+            if self.success_policy is not None:
                 manifest = Path(self.success_policy["manifest"])
                 if sha256(manifest) != self.success_policy["sha256"]:
                     raise ValueError("Historical-success manifest changed")
@@ -371,14 +394,25 @@ class Queue:
                 if not isinstance(names, list) or any(not isinstance(n, str) or Path(n).name != n or not n.lower().endswith('.out') for n in names):
                     raise ValueError("Invalid historical-success output names")
                 self.success_names = {n.lower() for n in names}
-            except BaseException:
-                self.db.close()
-                raise
+            # 模式登记/切换仅清除旧健康累计；其余队列与任务状态保持原合同。
+            previous_mode = self.db.execute("SELECT value FROM settings WHERE key='autoscale_mode'").fetchone()
+            if previous_mode is None or json.loads(previous_mode[0]) != self.autoscale_mode:
+                self.set("healthy", 0)
+            self.set("autoscale_mode", self.autoscale_mode)
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            self.db.close()
+            raise
 
     @contextlib.contextmanager
     def transaction(self):
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # 在原tick写锁内核模式；旧owner不能在新模式登记后混入旧算法样本。
+            expected_mode = getattr(self, "_tick_expected_mode", None)
+            if expected_mode is not None and self.get("autoscale_mode") != expected_mode:
+                raise ValueError("Autoscale mode changed; reopen the original queue before tick")
             yield
             self.db.execute("COMMIT")
         except BaseException:
@@ -392,6 +426,8 @@ class Queue:
         self.db.execute("INSERT OR REPLACE INTO settings VALUES(?,?)", (key, json.dumps(value)))
 
     def event(self, kind, payload):
+        if kind == "resources":
+            payload = dict(payload, autoscale_mode=self.autoscale_mode)
         self.db.execute("INSERT INTO events(at,kind,payload) VALUES(?,?,?)", (utc(), kind, json.dumps(payload)))
 
     def enqueue(self, payload, imported=False):
@@ -773,11 +809,45 @@ class Queue:
             return result
 
     def tick(self, snapshot=None):
+        # 默认采用候选实测扩槽；兼容模式只接受显式配置。
+        self._tick_expected_mode = self.autoscale_mode
+        try:
+            if self.autoscale_mode == "legacy_compatible":
+                return self._tick_legacy_compatible(snapshot)
+            return self._tick_candidate_measured(snapshot)
+        finally:
+            del self._tick_expected_mode
+
+    def _tick_legacy_compatible(self, snapshot=None):
+        snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
+        with self.transaction():
+            if snapshot["at"] - self.get("last_sample") < 30:
+                return
+            # 扩槽与准入同口径：内存按扣除在跑预留后的字节余量判断，百分比只作兼容快捷路径。
+            reserved = sum(float(json.loads(r[0]).get("memory_gib", 0.5))
+                           for r in self.db.execute("SELECT payload FROM tasks WHERE status='running'"))
+            good = (scale_up_memory_ok(snapshot, reserved, self.policy)
+                    and not snapshot.get("host_cpu_unverified")
+                    and not snapshot.get("host_disk_unverified")
+                    and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"]
+                    and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"])
+            healthy = self.get("healthy") + 1 if good else 0
+            limit = self.get("limit")
+            if healthy >= 5 and limit < self.get("cap"):
+                limit += 1
+                healthy = 0
+            self.set("healthy", healthy)
+            self.set("limit", limit)
+            self.set("last_sample", snapshot["at"])
+            self.set("resources", snapshot)
+            self.event("resources", dict(**snapshot, healthy=healthy, limit=limit))
+
+    def _tick_candidate_measured(self, snapshot=None):
         snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
         with self.transaction():
             limit = self.get("limit")
             # 陈旧或未来采样不累计健康次数，也不污染下次采样时间。
-            if not -5 <= time.time() - snapshot["at"] <= self.profile_max_age_sec:
+            if not 0 <= time.time() - snapshot["at"] <= self.profile_max_age_sec:
                 self.set("healthy", 0)
                 self.event("resources", dict(**snapshot, healthy=0, limit=limit,
                                              scale_up_reason="resource_sample_time_unverified"))

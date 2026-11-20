@@ -17,6 +17,8 @@ MS-LTA（Mover–Stayer LTA）在普通 LTA 之上区分转移结构不同的高
 不计入 MS-LTA，有限 logit 的 stayer 约束在 `approximations` 里注明。
 分类器按 ON 路径恢复波次顺序，不依赖 CLASSES 声明顺序。stayer 目前只核显式完整的固定截距和斜率：每个相邻转移须距单位矩阵不超过 `stayer_tolerance`（默认 1e-3），容差与最大差写入近似说明；无法核实的约束归入 OTHER_MIXTURE。
 
+Mplus 9 语法边界：在 `MODEL g:`（`%g#1%`、`%g#2%`）内写下游潜类别截距方括号（如 `[c2#1]` 或 `[c2#1@-10]`）会触发引擎报错 `Variable cannot be mentioned in this section: C2#1`。经实机验证的等价写法是在 `%OVERALL%` 中声明 stayer 参考组的固定截距 `[c_t#k@-10];` 与 mover 组的自由截距偏移 `c1 ON g; ... cT ON g;`，而在 `%g#1%` 与 `%g#2%` 中仅保留相邻波次的 `ON` 转移斜率（mover 自由 `c_t ON c_{t-1};`，stayer 固定对角 `+20`、非对角 `0`）。`ch7_mixture_syntax.R` 与 `ch7_classify_inp()` 均执行并核验这一约束，拒绝在 `MODEL g:` 内出现潜类别截距方括号的非法输入。
+
 ## 2. 估计与诊断
 
 MS-LTA 常见问题是 mover 转移单元稀疏和多项 logit 的完全分离。每次运行要分别记录：

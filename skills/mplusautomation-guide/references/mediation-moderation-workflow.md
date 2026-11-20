@@ -37,10 +37,51 @@ R 侧静态调节用聚类稳健协方差。两侧推断口径不同，表注必
 | `assets/ch5/moderated_mediation_cat_template.txt` | 三分类 W 效应编码（1,0）/（0,1）/（−1,−1），按子样本量加权平均 | 每个样本文件各自的子样本量常量 |
 
 静态调节的 R 路线在 `scripts/ch5_moderation_route.R`：`ch5_moderation_spec()` 校验配置（未知键、缺列、
-角色重叠、连续 W 必须给显式且有限的取值点、三分类 W 必须给完整类别顺序；输入列名不得与内部 modw_effect1 等效应编码列冲突），`ch5_fit_moderation_spec()` 拟合，
-`ch5_simple_slopes(m, level = 0.95)` 用含协方差项的 delta 法算简单斜率（logit 另给 OR）；`level` 必须显式给出，没有默认值，输出表带 `level` 列。`ch5_plot_simple_slopes()` 出图，y 轴标签写明置信水平（如 `95% CI`），并返回绘制数据。
+角色重叠、`focal` 必须为非空且无重复的列名字符向量、连续 W 必须给显式且有限的取值点、
+分类 W 必须给完整且无重复的 `level_order`；可选 `moderator_labels` 必须完整映射取值键；
+输入列名不得与内部 modw_effect1 等效应编码列冲突），`ch5_fit_moderation_spec()` 拟合，
+`ch5_simple_slopes(m, level, covariance = "cluster_HC0")` 用含协方差项的 delta 法算简单斜率（logit 另给 OR）；`level` 必须显式给出，没有默认值，输出表带 `level` 列。`ch5_plot_simple_slopes()` 出图，y 轴标签写明置信水平（如 `95% CI`），并返回绘制数据。
 合成合同核对：连续 W 的简单斜率等于把 W 平移到取值点后重拟合的主效应，三分类 W 的等于以该类为参照的处理编码重拟合，
 SE 逐位一致；去掉协方差项的 SE 会被判错。
+
+`focal` 支持一个列名或多个唯一列名。联合规格将每个焦点与连续 W 或全部分类效应码做完整交叉，
+不需要在路线外预乘其他资源的交互列。斜率按 `focal` 配置顺序逐个输出，同一焦点内部按
+`probes` / `level_order` 排序；新增 `focal` 列区分行，单焦点已有数值和类别值保持不变。
+
+```r
+spec <- list(outcome = "y", focal = c("x1", "x2", "x3"), moderator = "w",
+             moderator_type = "categorical", controls = "control",
+             family = "gaussian", cluster = "cluster", level_order = c(1, 3, 2),
+             moderator_labels = c("1" = "甲组", "3" = "乙组", "2" = "参照组"))
+m <- ch5_fit_moderation_spec(spec, data)
+slopes <- ch5_simple_slopes(m, level = 0.95)
+```
+
+`moderator_labels` 是可选命名字符向量，键必须完整对应 `as.character(probes)` 或
+`as.character(level_order)`，映射顺序不影响结果。只有显式传入才输出 `moderator_level`，
+支持中文，不猜类别含义。分类调节另输出 `moderator_code`：按 `m$wterms` 顺序排列的完整
+效应码向量，以逗号分隔字符串保存，便于 CSV 导出，例如三分类为 `1,0`、`0,1`、`-1,-1`。
+`moderator_code` 始终是字符向量；二分类为 `"1"` / `"-1"`，默认 CSV 类型推断会将其转为整数。
+保留字符型的读回合同为 `read.csv(file, colClasses = c(moderator_code = "character"))`，
+不在效应码中添加引号前缀或其他显示字符来改变原码。
+该字段表示数学编码；历史表中的 `Group 1` 等显示文字仍由调用方明确映射，不能当作效应码。
+多焦点图的横轴同时显示焦点和类别标签；中文 PDF 使用 Cairo，机器仍需安装含目标字形的字体。
+
+`ch5_simple_slopes(m, level, covariance = "cluster_HC0")` 默认继续使用拟合时的完整聚类 HC0
+协方差矩阵。`covariance = "model"` 使用 `stats::vcov(m$fit)` 的纯普通模型协方差。
+`covariance` 必须是单个非缺失字符值，精确等于这三种选项之一；前缀缩写和多值均报错。
+另一个显式取值 `covariance = "historical_ch5"` 仅用于复现第五章历史 `results_*.csv` 的 SE：
+分类调节使用完整普通协方差；连续调节保留普通交叉协方差，将选定参数的对角替换为聚类方差。
+连续 W 的历史方差为 `V_cluster[X,X] + w^2 * V_cluster[XW,XW] + 2*w*V_model[X,XW]`。
+每个 focal 按参数名分别对齐矩阵；输出的 `covariance` 列明确标记所选口径。
+缺矩阵、缺参数、非有限方差或负斜率方差均报错，绝不静默回退或把负值截断为零。
+
+历史混用源于锁定脚本读取不在模型框架中的 `fid`：返回 `NULL` 没有触发错误处理，随后退回
+普通 `vcov(model)`；连续分支又从聚类系数表取主效应和交互项的标准误。
+`historical_ch5` 原样保留这个历史 SE 缺陷，不能作为新的稳健推断口径；默认值和 `model` 均不受影响。
+三种选项的 CI 始终使用显式 `level` 对应的正态分位数。历史文件使用正态分位数舍入至三位小数后的固定临界值，
+需要逐字段复现历史 CI 时，应在调用方明确生成该展示列；协方差选项不悄悄改变区间规则。
+SE 复现不等于所有历史展示字段已复现，原缺陷及逐项对照证据保留在私有验收目录。
 
 这条路线只接收内存里的 `data.frame`，不读文件，也不认缺失码。文件读取和缺失码处理由调用方在上游完成：
 按[换源合同](family-source-swap-contract.md)第 2 节逐列声明缺失码并转成 `NA`，钉住源文件 SHA-256，再把数据框传给

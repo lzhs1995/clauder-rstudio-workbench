@@ -4,12 +4,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from clauder_workbench.fanout import run_fanout
 
 
-SAFE = {"memory": 60.0, "cpu": 30.0, "disk": 100.0, "backlog": 0}
+GIB = 1024 ** 3
+SAFE = {"physical_available_bytes": 100 * GIB, "commit_available_bytes": 100 * GIB,
+        "logical_processors": 16, "output_free_bytes": 100 * GIB, "backlog": 0}
 
 
 class SyntheticFanout:
@@ -27,6 +30,11 @@ class SyntheticFanout:
         self.contract = {
             "task_key": "synthetic-hold",
             "artifacts": {"output_root": str(root)},
+            "resource_gate": {
+                "worker_mem_gib": 1, "worker_commit_gib": 1, "worker_processors": 1,
+                "worker_output_gib": 1, "reserve_mem_gib": 1, "reserve_commit_gib": 1,
+                "reserve_processors": 1, "reserve_output_gib": 2, "sample_max_age_sec": 60,
+            },
             "workers": [
                 {"id": f"w{i}", "code": f"w{i}",
                  "expected_state": f"state_w{i}.json",
@@ -36,9 +44,14 @@ class SyntheticFanout:
             ],
         }
 
-    def probe_memory(self):
+    def probe_resources(self):
         self.iteration += 1
-        return self.frames[min(self.iteration, len(self.frames) - 1)]["memory"]
+        return {
+            "sampled_at": time.time(), "host_verified": True,
+            "host_id": "synthetic-worker", "session_pid": 1234,
+            "output_root": str(self.root),
+            **self.frames[min(self.iteration, len(self.frames) - 1)],
+        }
 
     def probe(self, key):
         return self.frames[min(self.iteration, len(self.frames) - 1)][key]
@@ -59,8 +72,9 @@ class SyntheticFanout:
             (self.root / f"state_{wid}.json").write_text(json.dumps({"stage": "complete"}))
             (self.root / f"manifest_{wid}.csv").write_text("id,value\nsynthetic,1\n")
             (self.root / f"validation_{wid}.csv").write_text("id,ok\nsynthetic,TRUE\n")
-            return {"ok": True, "text": "mock complete"}
-        return {"ok": True, "text": "still running"}
+            return {"ok": True, "job_id": job_id, "status": "completed",
+                    "success": True, "text": "mock complete"}
+        return {"ok": True, "job_id": job_id, "status": "running", "text": "still running"}
 
     def run(self, **overrides):
         kwargs = {
@@ -69,9 +83,11 @@ class SyntheticFanout:
             "progress_callback": self.snapshots.append,
             "max_parallel": 3, "max_parallel_cap": 3,
             "auto_scale": True, "max_iterations": len(self.frames),
-            "mem_probe_fn": self.probe_memory,
-            "cpu_probe_fn": lambda: self.probe("cpu"),
-            "disk_probe_fn": lambda: self.probe("disk"),
+            "resource_probe_fn": self.probe_resources,
+            # 旧百分比与本机磁盘探针不能代替 worker 主机的字节采样。
+            "mem_probe_fn": lambda: None,
+            "cpu_probe_fn": lambda: None,
+            "disk_probe_fn": lambda: None,
             "upload_backlog_probe_fn": lambda: self.probe("backlog"),
             "memory_hold_percent": 85, "cpu_hold_percent": 90,
             "min_disk_free_gb_hold": 40, "upload_backlog_hold": 3,
@@ -82,25 +98,36 @@ class SyntheticFanout:
 
 
 class FanoutAdmissionHoldTests(unittest.TestCase):
+    @staticmethod
+    def admits(snapshot):
+        return snapshot["scale_event"]["resource_admission"]["available_slots"] > 0
+
     def test_each_known_hold_has_zero_submissions_with_zero_running(self):
-        for key, value in (("memory", 95), ("cpu", 95), ("disk", 5), ("backlog", 4)):
+        for key, value in (("physical_available_bytes", GIB),
+                           ("commit_available_bytes", GIB),
+                           ("logical_processors", 1),
+                           ("output_free_bytes", 5 * GIB), ("backlog", 4)):
             with self.subTest(metric=key), tempfile.TemporaryDirectory() as tmp:
                 fixture = SyntheticFanout(Path(tmp), [{**SAFE, key: value}] * 3)
                 result = fixture.run()
                 self.assertEqual(fixture.submits, [])
                 self.assertEqual(fixture.polls, [])
                 self.assertEqual(result["pending"], ["w1", "w2", "w3"])
-                self.assertTrue(all(e["action"] == "throttle" for e in result["scale_log"]))
-                self.assertTrue(all(not e["new_submissions_allowed"] for e in fixture.snapshots))
+                self.assertEqual(result["iterations"], 1)
+                self.assertTrue(all(e["action"] == "hold_resources" for e in result["scale_log"]))
+                self.assertTrue(all(not self.admits(e) for e in fixture.snapshots))
 
-    def test_memory_unknown_cannot_mask_known_cpu_disk_or_backlog_hold(self):
-        for key, value in (("cpu", 95), ("disk", 5), ("backlog", 4)):
+    def test_unknown_physical_cannot_mask_other_known_hold(self):
+        for key, value, reason in (("commit_available_bytes", GIB, "commit"),
+                                   ("output_free_bytes", 5 * GIB, "output"),
+                                   ("backlog", 4, "upload backlog")):
             with self.subTest(metric=key), tempfile.TemporaryDirectory() as tmp:
-                fixture = SyntheticFanout(Path(tmp), [{**SAFE, "memory": None, key: value}])
+                fixture = SyntheticFanout(Path(tmp), [{**SAFE, "physical_available_bytes": None, key: value}])
                 result = fixture.run()
                 self.assertEqual(fixture.submits, [])
-                self.assertEqual(result["scale_log"][0]["action"], "throttle")
-                self.assertIn("memory", result["scale_log"][0]["unknown_hold_metrics"])
+                admission = result["scale_log"][0]["resource_admission"]
+                self.assertTrue(any("physical" in item and "unknown" in item for item in admission["reasons"]))
+                self.assertTrue(any(reason in item for item in admission["reasons"]))
 
     def test_each_required_unknown_metric_holds_all_new_submissions(self):
         for key in SAFE:
@@ -109,30 +136,38 @@ class FanoutAdmissionHoldTests(unittest.TestCase):
                 result = fixture.run()
                 self.assertEqual(fixture.submits, [])
                 self.assertEqual(result["pending"], ["w1", "w2", "w3"])
-                self.assertTrue(all(not x["new_submissions_allowed"] for x in result["scale_log"]))
+                self.assertTrue(all(e["resource_admission"]["available_slots"] == 0 for e in result["scale_log"]))
 
-    def test_unconfigured_optional_metrics_do_not_block_admission(self):
+    def test_unconfigured_optional_and_legacy_diagnostic_metrics_do_not_block(self):
         with tempfile.TemporaryDirectory() as tmp:
-            fixture = SyntheticFanout(Path(tmp), [{**SAFE, "cpu": None, "disk": None, "backlog": None}])
+            fixture = SyntheticFanout(Path(tmp), [{**SAFE, "backlog": None}])
             fixture.complete_at = {"w1": 0, "w2": 0, "w3": 0}
-            result = fixture.run(cpu_hold_percent=None, min_disk_free_gb_hold=None, upload_backlog_hold=None)
+            result = fixture.run(cpu_hold_percent=None, min_disk_free_gb_hold=None,
+                                 upload_backlog_hold=None)
             self.assertTrue(result["ok"])
             self.assertEqual(len(fixture.submits), 3)
+            self.assertEqual(result["percentage_policy"], "diagnostic_only")
 
-    def test_recovery_refills_retained_slots_after_zero_running_hold(self):
+    def test_zero_running_hold_returns_then_recovery_can_submit_once(self):
         with tempfile.TemporaryDirectory() as tmp:
-            fixture = SyntheticFanout(Path(tmp), [{**SAFE, "disk": 5}, {**SAFE, "memory": None}, SAFE])
-            fixture.complete_at = {"w1": 2, "w2": 2, "w3": 2}
+            fixture = SyntheticFanout(Path(tmp), [{**SAFE, "output_free_bytes": 5 * GIB}, SAFE])
+            held = fixture.run()
+            self.assertFalse(held["ok"])
+            self.assertEqual(held["iterations"], 1)
+            self.assertEqual(fixture.submits, [])
+            self.assertEqual(held["still_running"], [])
+            # 原次零提交且已返回 HOLD，下一次有效采样可正常准入；没有未知原 job 被重投。
+            fixture.complete_at = {"w1": 1, "w2": 1, "w3": 1}
             result = fixture.run(healthy_samples_for_scale_up=5)
             self.assertTrue(result["ok"])
-            self.assertEqual(fixture.submits, [(2, "w1"), (2, "w2"), (2, "w3")])
+            self.assertEqual(fixture.submits, [(1, "w1"), (1, "w2"), (1, "w3")])
             self.assertEqual(result["max_parallel"], 3)
-            self.assertEqual([x["new_submissions_allowed"] for x in fixture.snapshots], [False, False, True])
+            self.assertEqual([self.admits(x) for x in fixture.snapshots], [False, True])
 
     def test_existing_jobs_drain_and_unknown_original_job_never_resubmits(self):
         with tempfile.TemporaryDirectory() as tmp:
-            fixture = SyntheticFanout(Path(tmp), [SAFE, {**SAFE, "memory": 95},
-                                                 {**SAFE, "memory": None, "disk": 5}, SAFE])
+            fixture = SyntheticFanout(Path(tmp), [SAFE, {**SAFE, "physical_available_bytes": GIB},
+                                                 {**SAFE, "physical_available_bytes": None, "output_free_bytes": 5 * GIB}, SAFE])
             fixture.complete_at = {"w1": 1, "w2": 3, "w3": 3}
             fixture.raise_at = {(1, "original-w2")}
             fixture.unknown_at = {(2, "original-w2")}
@@ -140,7 +175,7 @@ class FanoutAdmissionHoldTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertEqual(fixture.submits, [(0, "w1"), (0, "w2"), (3, "w3")])
             self.assertEqual(fixture.registrations, [("w1", "original-w1"), ("w2", "original-w2"), ("w3", "original-w3")])
-            self.assertEqual([x["new_submissions_allowed"] for x in fixture.snapshots], [True, False, False, True])
+            self.assertEqual([self.admits(x) for x in fixture.snapshots], [True, False, False, True])
             self.assertIn((1, "original-w1"), fixture.polls)
             self.assertIn((2, "original-w2"), fixture.polls)
             self.assertEqual(result["terminal_failures"], [])
@@ -149,7 +184,7 @@ class FanoutAdmissionHoldTests(unittest.TestCase):
 
     def test_hold_resets_expansion_streak_but_not_existing_job(self):
         with tempfile.TemporaryDirectory() as tmp:
-            fixture = SyntheticFanout(Path(tmp), [SAFE, {**SAFE, "disk": 5}, SAFE, SAFE], count=2)
+            fixture = SyntheticFanout(Path(tmp), [SAFE, {**SAFE, "output_free_bytes": 5 * GIB}, SAFE, SAFE], count=2)
             fixture.complete_at = {"w1": 3, "w2": 3}
             result = fixture.run(max_parallel=1, max_parallel_cap=2, healthy_samples_for_scale_up=2)
             self.assertTrue(result["ok"])

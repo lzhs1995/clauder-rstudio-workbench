@@ -9,13 +9,28 @@
 ClaudeR 提供 RStudio addin 與 MCP bridge；本專案整理安裝、執行、診斷和證據保存。統計計算仍由對應的 R 套件或 Mplus 執行，成功產生檔案不等於研究假設或因果識別已獲驗證。
 
 目前 **0.7.0 候選版**配對 ClaudeR R `0.16.6.9001` 與 MCP bridge
-`0.16.6.post1`，來源為上游開發提交 `3b56327`及維護中的相容性修補。
+`0.16.6.post1`，固定配套 ClaudeR 提交
+`3684427090d644ab37b04ec10b05d38a6e57ae70`，納入上游開發提交 `3b56327`
+及維護中的相容性修補。
 [runtime-compatibility.json](runtime-compatibility.json) 固定精確來源提交與關鍵檔案 SHA。
 完整 macOS／Windows 候選驗收及發布仍為 **PENDING**；舊版驗證不能代替本版實測。
-macOS 與 Windows 的隔離安裝均已驗證兩個啟動器，並實際列出 42 個 MCP 工具，包含 `wake_on_message` 與 `get_async_result(wait_s=0)`。科學復現依各次紀錄的版本驗收。
+先前候選版的 macOS 與 Windows 隔離安裝回執已驗證兩個啟動器，並實際列出 42 個 MCP 工具，包含 `wake_on_message` 與 `get_async_result(wait_s=0)`。這些回執保留各自記錄的來源身分，不證明本次合併候選已完成驗收或現役客戶端已載入。科學復現依各次紀錄的版本驗收。
 
 從[繁體中文升級指南](docs/UPGRADE_0.7.0.zh-TW.md)或[英文指南](docs/UPGRADE_0.7.0.md)
 進行隔離 `paired_release` 安裝。選取配對只更新記錄；客戶端設定、實際載入版本及原生呼叫另行核驗。
+
+## 示範影片
+
+[![示範縮圖。點擊在 YouTube 觀看 33 秒短片](docs/assets/demo/thumbnail.png)](https://youtu.be/KRqlsSRlL88)
+
+| 影片 | 長度 | 內容 |
+|---|---|---|
+| [先看這段短片](https://youtu.be/KRqlsSRlL88) | 33 秒 | Codex 連到具名 RStudio 會話，審計資料、以非同步方式出表，並通過獨立校驗。 |
+| [完整操作示範：連接、審計、出表與驗證](https://youtu.be/1LlXHFMx1-Q) | 約 3 分鐘 | 逐步呈現同一次執行：列出並連接會話、記錄輸入雜湊與審計、表格規格、背景工作、由新生成 DOCX 渲染的三線表 Table 1，以及六項校驗。 |
+
+兩段影片皆無配音，內嵌繁體中文與英文字幕。字幕檔：短片 [繁中](docs/assets/demo/hero.zh-TW.srt) · [English](docs/assets/demo/hero.en.srt)；完整示範 [繁中](docs/assets/demo/walkthrough.zh-TW.srt) · [English](docs/assets/demo/walkthrough.en.srt)。
+
+示範使用 1,200 筆固定種子的合成資料、獨立的 RStudio 演示會話與真實 Codex MCP 呼叫，表格由 `comparegroups-guide` 技能產生。影片經過剪輯以調整節奏，並穿插說明卡，並非連續錄影。
 
 ## 選擇技能
 

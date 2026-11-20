@@ -173,7 +173,8 @@ class QueueInitializationTests(unittest.TestCase):
         rows = self.concurrent_open(root)
         self.assertTrue(all(value == (3, 4, False) for value, _ in rows))
         self.assertTrue(all(settings == rows[0][1] for _, settings in rows))
-        self.assertEqual(len(rows[0][1]), 6)
+        self.assertEqual(len(rows[0][1]), 7)
+        self.assertEqual(json.loads(dict(rows[0][1])["autoscale_mode"]), "candidate_measured")
 
     def test_concurrent_default_first_init(self):
         rows = self.concurrent_open(self.folder())

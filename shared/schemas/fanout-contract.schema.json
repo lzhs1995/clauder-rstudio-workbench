@@ -13,7 +13,12 @@
     "max_parallel": {
       "type": "integer",
       "minimum": 1,
-      "description": "Default concurrency level if not overridden on the CLI."
+      "description": "Requested concurrency ceiling (starting ceiling with auto-scale), unless overridden on the CLI. Every new worker still requires byte, commit, thread and output-volume admission."
+    },
+    "session_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "RStudio session for this batch's resource probe and workers. The CLI session selection takes precedence; an unbound or unknown worker host cannot admit workers."
     },
     "requires_native_smoke": {
       "type": "boolean",
@@ -42,7 +47,7 @@
       "properties": {
         "output_root": {
           "type": "string",
-          "description": "Base dir for worker outputs. Relative worker paths resolve against this (relative output_root resolves against the contract file's directory). Use forward slashes."
+          "description": "Output directory readable by the Python file poller. Relative artifact paths resolve against this (relative output_root resolves against the contract file's directory). For another worker host, map these same durable outputs locally and declare resource_gate.worker_output_root on that host."
         },
         "max_age_h": {
           "type": "number",
@@ -52,17 +57,79 @@
     },
     "resource_gate": {
       "type": "object",
+      "description": "Worker-host byte admission. JSON numbers must be finite; booleans are not budgets. Reservations cover running workers in this batch only, without a host-wide or cross-queue lease.",
       "properties": {
+        "worker_mem_gib": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1,
+          "description": "Physical memory reservation per worker in GiB (2^30 bytes)."
+        },
+        "worker_commit_gib": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1,
+          "description": "Commit headroom reservation per worker in GiB. Unknown commit headroom holds admission."
+        },
+        "worker_processors": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Logical processor/thread budget reserved for each worker."
+        },
+        "worker_output_gib": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1,
+          "description": "Output-volume space reserved for each worker in GiB."
+        },
+        "reserve_mem_gib": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1,
+          "description": "Physical memory retained outside this batch's worker reservations, in GiB."
+        },
+        "reserve_commit_gib": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1,
+          "description": "Commit headroom retained outside this batch's worker reservations, in GiB."
+        },
+        "reserve_processors": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Logical processors retained outside this batch's worker reservations."
+        },
+        "reserve_output_gib": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2,
+          "description": "Free space retained on the worker's actual output volume, in GiB."
+        },
+        "sample_max_age_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 60,
+          "description": "Maximum age of a bound worker-host resource sample; stale samples hold admission."
+        },
+        "worker_output_root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute output directory on the actual R worker host. Required when the Python poller reads the outputs through a different host/path; it selects the volume sampled by R. Without it, artifacts.output_root is passed unchanged for resolution by R, never resolved on the Python host for admission."
+        },
         "memory_threshold": {
           "type": "number",
-          "description": "Memory percent ceiling for the advise/enforce concurrency decision."
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Legacy diagnostic value only. Memory percentage does not gate fanout plan/run admission."
         },
-        "memory_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100},
-        "memory_hold_percent": {"type": "number", "minimum": 0, "maximum": 100},
-        "cpu_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100},
-        "cpu_hold_percent": {"type": "number", "minimum": 0, "maximum": 100},
-        "min_disk_free_gb_scale_up": {"type": "number", "minimum": 0},
-        "min_disk_free_gb_hold": {"type": "number", "minimum": 0},
+        "memory_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100, "description": "Legacy diagnostic value only; does not gate fanout admission."},
+        "memory_hold_percent": {"type": "number", "minimum": 0, "maximum": 100, "description": "Legacy diagnostic value only; does not gate fanout admission."},
+        "cpu_scale_up_percent": {"type": "number", "minimum": 0, "maximum": 100, "description": "Legacy diagnostic value only; fanout enforces the logical processor/thread budget instead of a CPU usage percentage."},
+        "cpu_hold_percent": {"type": "number", "minimum": 0, "maximum": 100, "description": "Legacy diagnostic value only; fanout enforces the logical processor/thread budget instead of a CPU usage percentage."},
+        "min_disk_free_gb_scale_up": {"type": "number", "minimum": 0, "description": "Optional additional output-volume free-space hold, in GiB despite the legacy gb name; uses worker-host bytes."},
+        "min_disk_free_gb_hold": {"type": "number", "minimum": 0, "description": "Optional additional output-volume free-space hold, in GiB despite the legacy gb name; uses worker-host bytes."},
         "upload_backlog_dir": {"type": "string"},
         "upload_backlog_hold": {"type": "integer", "minimum": 1},
         "healthy_samples_for_scale_up": {"type": "integer", "minimum": 1}
@@ -112,7 +179,7 @@
           "id": {"type": "string", "description": "Unique worker id."},
           "code_file": {"type": "string", "description": "Path to the R worker file. Either code_file or code is required."},
           "code": {"type": "string", "description": "Inline R code. Either code_file or code is required."},
-          "session": {"type": "string", "description": "Optional RStudio session name to bind the worker to."},
+          "session": {"type": "string", "description": "Legacy session assertion; must match the effective batch session_name. A mismatch holds admission rather than routing this worker to a different RStudio session."},
           "env": {
             "type": "object",
             "description": "Environment variables passed to the worker. NEVER place credentials here; use the environment at run time.",

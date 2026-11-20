@@ -180,19 +180,22 @@ test_ch7_mixture_family <- function(output_dir, skill_root) {
       stopifnot(identical(center_vars,tolower(unname(mapping[roles[grepl('x',roles)]]))))
     }
     if(ms) {
+      overall <- segment(text,'%overall%','model g:')
       mover <- segment(text,'%g#1%','%g#2%')
       stayer <- segment(text,'%g#2%','model c1:')
       group_block<-segment(text,'model g:','model c1:')
       stopifnot(identical(regmatches(group_block,gregexpr('%g#[0-9]+%',group_block))[[1]],c('%g#1%','%g#2%')))
-      stopifnot(!grepl('@',mover,fixed=TRUE),
+      # Mplus 9 禁止在 MODEL g: 内写 [c_t#k]；基准截距须固定在 %OVERALL%，并配自由的 c1..c4 ON g
+      stopifnot(!grepl('[',group_block,fixed=TRUE),
+                !grepl('@',mover,fixed=TRUE),
+                all(vapply(paste0('c',1:4,' on g;'),grepl,logical(1),x=overall,fixed=TRUE)),
                 all(vapply(c('c2 on c1;','c3 on c2;','c4 on c3;'),grepl,logical(1),x=mover,fixed=TRUE)))
-      stopifnot(all(vapply(2:4,function(t) grepl(sprintf('[c%d#1 c%d#2];',t,t),mover,fixed=TRUE),logical(1))))
       for(t in 2:4) {
-        # 数值从实际语法读取；三起点各自的最大概率必须在对应对角。
+        # 截距从 %OVERALL% 实际语法读取，斜率从 %g#2% 读取；三起点各自的最大概率必须在对应对角。
         intercept <- vapply(1:2,function(j) {
-          rx<-sprintf('c%d#%d@(-?[0-9.]+)',t,j)
-          h<-regmatches(stayer,regexpr(rx,stayer,perl=TRUE))
-          if(!length(h)||!nzchar(h))stop('Missing stayer intercept')
+          rx<-sprintf('\\[[^]]*c%d#%d@(-?[0-9.]+)[^]]*\\];',t,j)
+          h<-regmatches(overall,regexpr(rx,overall,perl=TRUE))
+          if(!length(h)||!nzchar(h))stop('Missing stayer intercept in %OVERALL%')
           as.numeric(sub(rx,'\\1',h,perl=TRUE))
         },numeric(1))
         slopes <- matrix(0,2,2)
@@ -232,6 +235,7 @@ test_ch7_mixture_family <- function(output_dir, skill_root) {
           run=0L,check=FALSE,hashfilename=FALSE,writeData='always',quiet=TRUE,
           Mplus_command='FORBIDDEN_IN_SYNTHETIC_CI',killOnFail=FALSE)
       },finally=setwd(prior))
+      ch7_validate_input_width(file.path(folder, 'model.inp'))
       text <- paste(readLines(file.path(folder,'model.inp'),warn=FALSE),collapse='\n')
       data_name<-gsub('"','',statement(segment(tolower(text),'data:','variable:'),'file'),fixed=TRUE)
       stopifnot(data_name=='source.dat')
@@ -269,7 +273,9 @@ test_ch7_mixture_family <- function(output_dir, skill_root) {
   mutate_reject('latent_g_must_not_be_known','mslta_invariant','CLASSES = g(2)','KNOWNCLASS = g(t1b1=0 t1b1=1); CLASSES = g(2)')
   mutate_reject('missing_stayer_group','mslta_invariant','%g#2%','%g#3%')
   mutate_reject('stayer_slope_not_fixed','mslta_invariant','c1#1@20','c1#1*20')
-  mutate_reject('mover_intercept_not_free','mslta_invariant','[c2#1 c2#2];','[c2#1@0 c2#2@0];')
+  mutate_reject('stayer_intercept_not_fixed','mslta_invariant','c2#1@-10','c2#1*-10')
+  mutate_reject('mover_intercept_not_free','mslta_invariant','c2 ON g;','c2 ON g@0;')
+  mutate_reject('illegal_bracket_in_model_g','mslta_invariant','%g#1%\nc2 ON c1;','%g#1%\n[c2#1 c2#2];\nc2 ON c1;')
   mutate_reject('step3_initial_not_fixed','lta_step3','n1#1@','n1#1*')
   mutate_reject('step3_threshold_not_nominal','mslta_step3','n1#1@','n1$1@')
   mutate_reject('wrong_savedata_mode','lpa_t2_k3','SAVE = CPROBABILITIES','SAVE = FSCORES')

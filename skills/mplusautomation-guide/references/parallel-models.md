@@ -85,52 +85,187 @@ process slow because other processes are paging. Do not stop unrelated user
 applications without authorization.
 
 The queue's initial profile is intentionally conservative for a 16 GiB,
-16-logical-CPU workstation: start at one, cap at three, reserve 1.5 GiB physical
-memory, hold at 90% CPU, and reserve 10 GiB disk. Five healthy samples at least
-30 seconds apart add one slot, up to the existing cap. Each sample must pass
-the same byte-budget admission check as a claim for the next dependency-ready,
-non-reused, in-scope model in dispatch order, including the current running
-reservations, with CPU below 75%. Stale/future samples and unverified host
-resources do not qualify. A failed check resets the healthy count and preserves
-the existing limit; it does not stop running models. The sum of declared Mplus
-processors must stay within twelve. These are starting values, not universal
-Mac/Windows requirements; calibrate the profile to the host and representative
-model peaks before production use. APIM v2 retains its separate cap of one or
-two and its calibrated-start requirement.
+16-logical-CPU workstation: start at one, cap at three, reserve 1.5 GiB of
+physical memory, hold new claims at 90% CPU, and reserve 10 GiB disk. The sum
+of declared Mplus processors must stay within twelve. Five healthy samples at
+least 30 seconds apart add one slot, up to the stored cap. These are starting
+values, not universal Mac/Windows requirements; calibrate the profile to the
+host and representative model peaks before production use.
+
+### Explicit autoscale modes
+
+Select the expansion rule with `resource_policy.autoscale_mode` in the queue
+root's `config.json`:
+
+```json
+{
+  "resource_policy": {
+    "autoscale_mode": "candidate_measured"
+  }
+}
+```
+
+The accepted values are exactly `candidate_measured` and `legacy_compatible`.
+Omitting the field selects `candidate_measured`; `legacy_compatible` takes effect
+only when explicitly configured. `null`, non-string values,
+case changes, or surrounding whitespace are invalid. An APIM flag or a queue
+directory name does not select a mode. Both modes adjust the local slot limit;
+every eventual claim still passes its separate admission checks.
+
+`legacy_compatible` retains the percentage and byte-headroom expansion routes.
+A sample qualifies when CPU is below `cpu_resume_percent` (default 75%), disk
+meets `disk_reserve_gib`, and the host memory, CPU and disk measurements are
+verified. Memory qualifies when its percentage is below `memory_resume_percent`
+(default 85%), or when available physical memory minus running reservations
+and `scale_up_step_gib` (default 0.5 GiB) meets `reserve_gib`. If
+`commit_reserve_gib` is configured, free commit minus those reservations and
+the step must meet that reserve on both routes; missing commit data refuses
+the sample. This byte route allows expansion despite a high memory percentage
+when enough bytes remain. This mode does not require a ready model; it compares
+sample timestamps with the previous sample and adds no separate age check
+against the current clock. The resource provider's own validation still applies.
+The legacy percentage shortcut can qualify a sample even when physical byte
+headroom does not cover the reserve. It therefore does not satisfy the measured
+byte-headroom expansion contract and must not be used to establish that contract
+for a new batch.
+
+`candidate_measured` examines the next dependency-ready, non-reused, in-scope
+model in the same dispatch order as `claim`. It calls `admission_reason` for
+that candidate at the prospective slot limit, accounting for running budgets,
+physical memory, configured commit reserve, CPU, declared processors, disk and
+execution-class limits. CPU must also be below `cpu_resume_percent`. An empty
+ready set cannot produce a healthy sample. Sample age must be between zero
+and `windows_profile_max_age_sec` (default 300 seconds), inclusive: samples
+older than that limit or from any future time reset `healthy`
+without advancing `last_sample`. Other failed checks reset `healthy` and keep
+the existing limit. Samples less than 30 seconds after the prior accepted
+sample do not accumulate health. Memory percentage is diagnostic for this mode;
+it does not use the legacy percentage shortcut or `scale_up_step_gib`.
+
+Both modes record their actual `autoscale_mode` in `resources` events. A failed
+expansion check does not stop running models. `candidate_measured` names the
+queue's expansion rule; it does not select the separate strict host-reservation
+API described below.
+
+### Behavior migration
+
+The default expansion rule has changed from the former main implementation to
+`candidate_measured`. With no mode field, new Queue objects now require a ready
+candidate and physical byte headroom; configured commit headroom is checked
+separately. Empty ready sets, insufficient available bytes, and samples outside
+the age window above do not grow the limit. This matches the measured expansion
+rule already used by the managed workflow; it does not change model inputs,
+existing limits or the APIM calibration requirement.
+
+To preserve the old expansion behavior deliberately, set this explicit option
+in the queue's `config.json` before its original owner opens the queue:
+
+```json
+{
+  "resource_policy": {
+    "autoscale_mode": "legacy_compatible"
+  }
+}
+```
+
+This compatibility option keeps the old percentage shortcut and is not evidence
+that the measured byte-headroom expansion contract has been met. Ordinary claims
+still perform their own byte checks in either mode; an expansion sample is not
+permission to launch a model.
+
+Installing the new main package does not change a running queue's configuration
+or reload its already-loaded Python/R code. A running object retains its loaded
+implementation and selected mode. Reconcile the original owner's active work,
+configuration and code-loading boundary before adopting the new default; retain
+original task/job identities and do not replay a running estimate. On reopening,
+a configuration with no mode field selects `candidate_measured`, while an
+explicit legacy choice remains legacy. Health-history registration and the
+same-database old-object guard below apply only in implementations that contain
+them; they cannot impose those rules on an older client.
+
+### Initialization and health history
 
 A new ordinary queue may declare `parallel_cap` (an integer from one to
 `processor_budget`) and `initial_parallel_limit` (one to that cap) in
 `config.json` before its first database initialization. Omitted values keep
 the defaults of three and one. Existing ordinary queues retain their stored
-limits, even when their event table is empty; editing the configuration does
-not migrate a queue. The first-settings check, default values and configuration
-validation are committed in one SQLite write transaction. A failed declaration
-or malformed JSON rolls those settings back, so a corrected initialization
-can still apply the new-queue declaration. APIM v2 retains its existing
-one-or-two cap and calibrated-start rules. A declared slot count does not
-reserve host capacity or bypass the next-task and final-claim admission checks
-above; it does not select the separate measured host-reservation protocol.
+limits, even if their event table is empty; changing these declarations does
+not migrate the queue's limit or cap. APIM v2 retains its separate cap of one
+or two and requires calibration when declaring an initial limit above one.
+A declared slot count does not reserve host capacity.
 
-Override the numerical thresholds with `resource_policy` in the queue root's
-`config.json`: `reserve_gib`, `commit_reserve_gib`, `cpu_hold_percent`,
-`cpu_resume_percent`, `disk_reserve_gib`, and `processor_budget`. The legacy
-`memory_hold_percent` and `memory_resume_percent` fields remain accepted but do
-not gate admission or expansion; memory percentage is diagnostic. Commit
-headroom is checked separately when `commit_reserve_gib` is configured; a
-missing commit measurement then refuses admission. Admission subtracts all running tasks' declared memory
-reservations as well as the next task's budget. This deliberately conservative
-rule protects against simultaneous claims before Mplus has allocated its memory.
+The first-settings check, default values, configuration validation, optional
+`historical_success_policy` validation and autoscale-mode registration commit
+in one SQLite write transaction. A failed first initialization leaves settings
+empty, so fixing the configuration or historical manifest and retrying still
+applies the declared starting limit and cap. Concurrent initializers wait for
+that transaction and cannot return partially initialized settings. A failed
+validation of an existing queue rolls back the attempted mode change too.
+
+The database stores `settings.autoscale_mode`. First registration on an older
+database, or switching between modes, clears only the accumulated `healthy`
+count as part of mode registration. That mode-registration step preserves
+`limit`, `cap`, `last_sample`, the resource snapshot and task rows; the existing
+APIM initialization rules still apply independently. Reopening with the same
+mode preserves its healthy count. A previous mode's four healthy samples
+cannot be carried into the other mode to add a slot after just one sample.
+
+Before a tick writes, it acquires the queue's SQLite write lock and checks
+that the database mode still matches its Queue object's mode. If another
+instance registered a different mode, the old object's tick fails without
+changing settings or events. The original owner must reopen its Queue object
+with the intended configuration before ticking again. This check does not
+upgrade already-loaded older implementations or provide mode coordination for
+clients that do not implement it. It does not change claim semantics or stop
+an active estimate.
+
+### Claims and shared host reservations
+
+Set numerical thresholds under `resource_policy`: `reserve_gib`,
+`commit_reserve_gib`, `cpu_hold_percent`, `cpu_resume_percent`,
+`disk_reserve_gib`, and `processor_budget`. Ordinary claim admission uses byte
+headroom; `memory_hold_percent` is not a claim gate. `memory_resume_percent`
+and `scale_up_step_gib` affect only `legacy_compatible` expansion. When a commit
+reserve is configured, missing commit data refuses admission. Admission charges
+running tasks' declared memory reservations plus the next task's budget. This
+conservative rule covers simultaneous claims before Mplus has allocated memory.
+Observed-private-memory credit remains opt-in; private/commit bytes are not
+proof of physical resident bytes.
 
 Expansion does not reserve host capacity. Participating queues must share the
-existing `host_reservation_path`; the final claim then calls
+existing `host_reservation_path`; ordinary `Queue.claim` then calls the legacy
 `HostReservations.acquire()` inside that registry's SQLite write transaction.
-That separate atomic admission counts other participating queues and can still
-refuse a claim after a successful expansion sample. No new host scheduler is
-introduced. Unregistered tasks and input measurements taken before the registry
-transaction remain limitations of the existing host protocol; a tick result is
-not proof of full-host capacity or real process overlap. Observed-private-memory
-credit remains opt-in and unchanged by this expansion rule; private/commit bytes
-are not evidence of physical resident bytes.
+It counts other participating queues and can refuse a claim after a successful
+expansion sample. Without that configured registry, ordinary claims use their
+local queue checks. Unregistered tasks and input measurements taken before the
+registry transaction remain limitations of the legacy host protocol. A tick
+result is not proof of whole-host capacity or real process overlap.
+
+### Separate measured host API
+
+`scripts/apim_v2_io.py` also exposes
+`HostReservations.configure_measured_policy()` and
+`HostReservations.acquire_measured()`, backed by `scripts/host_measured.py` in
+the same reservation database. The host owner explicitly registers a policy
+with separate physical-memory, commit, processor and per-volume growth budgets,
+including reserves and unmanaged-workload growth. Registration requires an
+explicit verified-growth declaration and evidence hash; the API does not
+independently verify the evidence represented by that declaration.
+
+The measured acquire path takes the database write lock before its default
+Windows native sampler runs, then checks independent physical and commit
+headroom, processor capacity and output-volume growth. It accounts for existing
+reservations, including legacy rows; an unmapped legacy output budget or an
+unverified owner blocks admission. Unknown or orphaned reservations are kept,
+without automatic release. A duplicate reservation is not permission to launch
+another process, and the result does not itself authorize execution. Synthetic
+samplers and owner probes are test seams, not JSON or ordinary CLI inputs.
+
+Ordinary `Queue.claim` still calls `acquire()`, not `acquire_measured()`. These
+APIs are not connected to the PowerShell worker pools. Installing the files,
+selecting `candidate_measured`, or passing synthetic tests does not enable
+strict host admission for either path, control unrelated applications, or
+establish native Windows or licensed-model acceptance.
 
 When the queue runs under WSL on a Windows host, configure
 `windows_memory_profile` in `config.json` to a fresh JSON snapshot produced by

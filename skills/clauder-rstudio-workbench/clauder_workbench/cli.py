@@ -45,13 +45,14 @@ from .fanout import (
     load_fanout_contract,
     merge_gate,
     plan_fanout,
+    worker_output_root_of,
     poll_once,
     run_fanout,
 )
 from .worker_lint import lint_worker_file
 from .inflight import archive_inflight, list_inflight, load_inflight, write_inflight
 from .mcp_client import EXPECTED_R_STUDIO_TOOLS, call_tool, extract_job_id, list_tools, preflight_smoke, submit_async
-from .resource import decide_resource_gate, upload_backlog_count
+from .resource import decide_resource_gate, upload_backlog_count, FanoutResourceProbe
 from .soak_monitor import build_monitor_config, monitor_status, run_soak_monitor
 from .transport import (
     classify_transport,
@@ -1556,7 +1557,18 @@ def cmd_fanout_plan(args: argparse.Namespace) -> int:
             extra={"contract": str(args.contract)},
         )
         return emit(doc)
-    plan = plan_fanout(contract, advise_parallel=not args.no_advise)
+    session_name = getattr(args, "session_name", "") or contract.get("session_name") or ""
+    plan = plan_fanout(contract, advise_parallel=False)
+    if plan["ok"] and not args.no_advise:
+        rg = contract.get("resource_gate") or {}
+        probe = FanoutResourceProbe(session_name, worker_output_root_of(contract),
+                                   sample_max_age_sec=rg.get("sample_max_age_sec", 60))
+        conflicts = [w.get("id") for w in contract.get("workers", [])
+                     if isinstance(w, dict) and w.get("session") and w["session"] != session_name]
+        plan = plan_fanout(contract, resource_probe_fn=probe.sample if not conflicts else None)
+        if conflicts:
+            plan["advice_reason"] = "worker session differs from selected batch session; HOLD"
+    resource_hold = not args.no_advise and not plan.get("admission_ok")
     submit_codes = {}
     for worker in contract.get("workers") or []:
         if isinstance(worker, dict) and worker.get("id"):
@@ -1564,10 +1576,11 @@ def cmd_fanout_plan(args: argparse.Namespace) -> int:
                 submit_codes[worker["id"]] = build_submit_code(worker)
             except Exception as exc:
                 submit_codes[worker["id"]] = f"<error: {exc}>"
-    exit_code = WARN if plan["ok"] and native_deferred else PASS if plan["ok"] else CONTRACT_FAILED
-    decision = "WARN_NATIVE_DEFERRED" if plan["ok"] and native_deferred else "PASS" if plan["ok"] else "CONTRACT_FAILED"
+    exit_code = CONTRACT_FAILED if not plan["ok"] else BLOCK if resource_hold else WARN if native_deferred else PASS
+    decision = "CONTRACT_FAILED" if not plan["ok"] else "HOLD" if resource_hold else "WARN_NATIVE_DEFERRED" if native_deferred else "PASS"
     reasons = native_reasons + (plan["problems"] or [
-        f"{plan['worker_count']} workers planned; recommended start parallel={plan['recommended_max_parallel']} ({plan['advice_reason']})"
+        f"{plan['worker_count']} workers planned; requested/advised={plan['recommended_max_parallel']}; "
+        f"admitted={plan['admitted_parallel']} ({plan['advice_reason']})"
     ])
     doc = build_evidence(
         "fanout_plan",
@@ -1625,21 +1638,33 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         )
         return emit(doc)
 
+    validation = plan_fanout(contract, advise_parallel=False)
+    if not validation["ok"]:
+        return emit(build_evidence("fanout_run", "CONTRACT_FAILED", reasons=validation["problems"],
+                                   task_key=task_key, transport_class="BLOCKED", exit_code=CONTRACT_FAILED,
+                                   extra={"contract": str(args.contract)}))
     session_name = args.session_name or contract.get("session_name") or ""
     poll_interval = float(args.poll_interval_sec or contract.get("poll_interval_sec") or 30.0)
     job_timeout = float(args.job_timeout_min or contract.get("job_timeout_min") or 180.0)
+    rg = contract.get("resource_gate") or {}
+    probe = FanoutResourceProbe(session_name, worker_output_root_of(contract), timeout=args.submit_timeout,
+                               sample_max_age_sec=rg.get("sample_max_age_sec", 60))
+    conflicts = [w.get("id") for w in contract.get("workers", [])
+                 if isinstance(w, dict) and w.get("session") and w["session"] != session_name]
+    resource_probe_fn = probe.sample if not conflicts else lambda: {
+        "host_verified": False, "reason": "worker session differs from selected batch session; HOLD"}
     if args.dry_run:
-        plan = plan_fanout(contract, advise_parallel=True)
-        dry_ok = bool(plan["ok"])
+        plan = plan_fanout(contract, advise_parallel=True, resource_probe_fn=resource_probe_fn)
+        dry_ok = bool(plan["ok"] and plan.get("admission_ok"))
         doc = build_evidence(
             "fanout_run",
-            "WARN_NATIVE_DEFERRED" if dry_ok and native_deferred else "PASS" if dry_ok else "CONTRACT_FAILED",
-            reasons=native_reasons + ["dry-run: contract validated, no jobs submitted"] + (plan["problems"] or []),
+            "WARN_NATIVE_DEFERRED" if dry_ok and native_deferred else "PASS" if dry_ok else "HOLD" if plan["ok"] else "CONTRACT_FAILED",
+            reasons=native_reasons + ["dry-run: no jobs submitted", plan["advice_reason"]] + (plan["problems"] or []),
             parent_evidence_ids=[doc.get("evidence_id") for doc in parent_docs if doc.get("evidence_id")],
             task_key=task_key,
             transport_class="N/A",
             policy_violations=["NATIVE-SMOKE-DEFERRED"] if native_deferred else [],
-            exit_code=WARN if dry_ok and native_deferred else PASS if dry_ok else CONTRACT_FAILED,
+            exit_code=WARN if dry_ok and native_deferred else PASS if dry_ok else BLOCK if plan["ok"] else CONTRACT_FAILED,
             extra=plan | {
                 "dry_run": True,
                 "contract": str(args.contract),
@@ -1649,7 +1674,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         return emit(doc)
 
     def submit_fn(code: str) -> dict[str, Any]:
-        return submit_async(session_name, code, timeout=args.submit_timeout)
+        return probe.submit(code)
 
     def register_fn(worker_id: str, job_id: str) -> None:
         write_inflight(
@@ -1666,12 +1691,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         )
 
     def poll_fn(job_id: str) -> dict[str, Any]:
-        return call_tool(
-            "get_async_result",
-            {"job_id": job_id, "wait_s": 0},
-            timeout=args.submit_timeout,
-            retries=0,
-        )
+        return probe.poll(job_id)
 
     artifacts = contract.get("artifacts") or {}
     output_root = Path(str(artifacts.get("output_root") or Path(args.contract).resolve().parent)).expanduser()
@@ -1746,6 +1766,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
         upload_backlog_hold=args.upload_backlog_hold,
         healthy_samples_for_scale_up=args.healthy_samples_for_scale_up,
         progress_callback=progress_callback,
+        resource_probe_fn=resource_probe_fn,
     )
     for wid in result.get("done", []):
         archive_inflight(f"{task_key}:{wid}", "worker complete")
@@ -2088,8 +2109,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow MCP stdio computation planning before native-wrapper smoke. "
              "Evidence is marked NATIVE-SMOKE-DEFERRED and formal completion remains blocked.",
     )
+    p.add_argument("--session-name", default="", help="Target RStudio session; overrides contract.session_name for read-only resource sampling.")
     p.add_argument("--no-advise", action="store_true",
-                   help="Skip memory-based parallelism advice; only validate the contract.")
+                   help="Skip target resource probing and advice; only validate the contract (no admission).")
 
     p = sub.add_parser("fanout-run")
     p.add_argument("--contract", required=True)
@@ -2113,20 +2135,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--submit-timeout", type=float, default=60.0)
     p.add_argument("--max-iterations", type=int)
     p.add_argument("--auto-scale", action="store_true",
-                   help="Dynamic concurrency (best-practice §6): start at --max-parallel and raise "
-                        "concurrency by 1 each poll cycle while system memory stays below "
-                        "--memory-threshold and work remains; throttle (no new submissions) at/above it. "
-                        "Running jobs are never killed.")
+                   help="Start at --max-parallel and raise by one per healthy sample, within the cap. "
+                        "Every submission requires fresh target physical/commit bytes, threads and output space. "
+                        "Unknown resources HOLD; running jobs are never killed.")
     p.add_argument("--memory-threshold", type=float, default=85.0,
-                   help="Memory %% ceiling for --auto-scale (default 85). At/above it, no new workers are submitted.")
+                   help="Legacy diagnostic value (default 85); fanout admission uses target bytes, not this percentage.")
     p.add_argument("--memory-scale-up-percent", type=float,
-                   help="Memory threshold below which a healthy sample may contribute to scale-up.")
+                   help="Legacy diagnostic value; does not gate fanout admission.")
     p.add_argument("--memory-hold-percent", type=float,
-                   help="Memory threshold at/above which new submissions are throttled.")
+                   help="Legacy diagnostic value; target byte budgets gate admission.")
     p.add_argument("--cpu-scale-up-percent", type=float,
-                   help="CPU threshold below which a healthy sample may contribute to scale-up.")
+                   help="Legacy diagnostic value; target processor/thread budgets gate admission.")
     p.add_argument("--cpu-hold-percent", type=float,
-                   help="CPU threshold at/above which new submissions are throttled.")
+                   help="Legacy diagnostic value; does not override target thread budgets.")
     p.add_argument("--min-disk-free-gb-scale-up", type=float,
                    help="Minimum free disk required for a healthy scale-up sample.")
     p.add_argument("--min-disk-free-gb-hold", type=float,

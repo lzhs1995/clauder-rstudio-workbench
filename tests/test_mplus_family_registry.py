@@ -38,7 +38,7 @@ def _good_receipt(family="APIM", code=None):
         "generated_taipei": "2026-11-05T01:00:00+08:00", "platform": {"os": "Windows", "r": "4.5.2", "mplus": "9"},
         "data_sha256": "a" * 64, "code_sha256": code or {"scripts/workflow.R": "b" * 64},
         "output_sha256": {"effects": "c" * 64}, "rows": 120, "columns": 2, "column_names": ["x1", "x2"],
-        "missing_by_column": {"x1": 3}, "comparisons": {"verdict": "PASS", "items": 40, "max_abs_diff": 0.0004},
+        "comparisons": {"verdict": "PASS", "items": 40, "max_abs_diff": 0.0004},
         "verdict": "PASS", "evidence_logical_name": "charls apim swap",
     }
 
@@ -165,10 +165,14 @@ class ReceiptWhitelistTests(unittest.TestCase):
         receipt["comparisons"]["ll"] = -1234.5
         self.assertTrue(registry.validate_receipt(receipt))
 
+    def test_missing_by_column_rejected(self):
+        # 规则 9 裁定（2026-11-18）：逐列缺失计数是样本量以外的描述统计，空对象也按白名单外的键拒收
+        for value in ({}, {"x1": 3}):
+            receipt = _good_receipt()
+            receipt["missing_by_column"] = value
+            self.assertTrue(any("outside the public whitelist" in e for e in registry.validate_receipt(receipt)), value)
+
     def test_noninteger_counts_rejected(self):
-        receipt = _good_receipt()
-        receipt["missing_by_column"] = {"x1": 0.25}
-        self.assertTrue(any("missing_by_column" in e for e in registry.validate_receipt(receipt)))
         receipt = _good_receipt()
         receipt["rows"] = 12.5
         self.assertTrue(any("rows" in e for e in registry.validate_receipt(receipt)))
@@ -208,7 +212,7 @@ class ReceiptWhitelistTests(unittest.TestCase):
         cases = {
             "evidence_logical_name": payload, "family": payload, "dataset": [payload], "route": payload,
             "generated_taipei": payload, "data_sha256": payload, "verdict": payload, "schema_version": payload,
-            "rows": payload, "columns": [2], "column_names": payload, "missing_by_column": {"x1": payload},
+            "rows": payload, "columns": [2], "column_names": payload,
             "platform": {"os": payload}, "comparisons": {"verdict": "PASS", "items": payload},
             "output_sha256": {"effects": payload}, "code_sha256": {"scripts/workflow.R": payload},
         }
@@ -231,9 +235,6 @@ class ReceiptWhitelistTests(unittest.TestCase):
             self.assertTrue(registry.validate_receipt(receipt), key)
         for mutate, text in [(lambda r: r.update(columns=3), "column_names has 2"),
                              (lambda r: r.update(column_names=["x1", "x1"]), "must not repeat"),
-                             (lambda r: r.update(missing_by_column={"z9": 1}), "not in column_names"),
-                             (lambda r: r.update(missing_by_column={"x1": 121}), "exceeds rows"),
-                             (lambda r: r.pop("column_names"), "missing_by_column requires column_names"),
                              (lambda r: r["comparisons"].update(max_abs_diff=float("nan")), "finite"),
                              (lambda r: r["comparisons"].update(max_abs_diff=-1), "finite"),
                              (lambda r: r["comparisons"].pop("verdict"), "comparisons must be an object")]:

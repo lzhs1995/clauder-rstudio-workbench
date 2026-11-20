@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "family": "LTA",
+  "dataset": "CHARLS",
+  "route": "ch7_source_config",
+  "generated_taipei": "2026-11-15T23:02:54+08:00",
+  "platform": {
+    "os": "Windows",
+    "r": "4.5.2",
+    "mplus": "Mplus VERSION 9"
+  },
+  "data_sha256": "1c46af88db7fe5c3a50b4a77930603a39de7f27c3a9af9a0d05b38f053605167",
+  "code_sha256": {
+    "scripts/ch7_mixture_syntax.R": "09176745df1d0854659c3c3b6d5051cafbae7839e914ea3c4a24eff49e26103e",
+    "scripts/ch7_mixture_tools.R": "630da9b714ed7772c2d92931e741dba358cb8ad962fa680e88562730bbbc138b",
+    "scripts/test_ch7_mixture_family_20261105.R": "8f22f4d68a00eb45b9a473c8a5544f96fb933b1ac6c63e68868a0076ec5e2438",
+    "scripts/ch7_source_entry_20261111.R": "f2fa87235d89bc9aeedd2a38d21fd0224521b0716cacf243ddaacc9a6c4b0945",
+    "scripts/ch7_step_chain_20261111.R": "ad558db8594f5a78f25cb182b984d7909061061c8c8737c70926e50cb194a0de",
+    "scripts/ch7_figures_20261111.R": "e95f0c6428b26d3c99cd88f400033abfd9d21371f21dbb7c17107921e46e5c45",
+    "scripts/test_ch7_source_entry_20261111.R": "86ae161fee79939284210786436cf06ac24cc18cfa7d14695a33b2a055cddeb8",
+    "scripts/test_ch7_step_chain_20261111.R": "55c9850f9564c9c40788148b3292d73ef6792bd7ee9ac9dd4acd295ad2e9f122",
+    "scripts/test_ch7_figures_20261111.R": "2d76dd7891c86081faf983d2993ed09d8506a6aa913da80f930d94a331ecaa28",
+    "scripts/test_ch7_syntax_boundaries_20261113.R": "1441d4abbb10a7a8d9f3bdcd505d2569f716119945950442c63dec0afcbb7669"
+  },
+  "output_sha256": {
+    "lta_step1_manifest.json": "dfe4d77d105be5e85405e52ee85407a5baa20838865e4c815983b9a1daf3df1c",
+    "lta_step1_model.inp": "890918e899b480c94385833dbf52fdf25dc89fcc59a697f73a59e3da537f8bae",
+    "lta_step1_model.out": "c8af329c1dbb59112308d62318eec4aeabffbc807a92e1d4ed4ad8eb7401b97e",
+    "lta_step1_posterior.dat": "6ada649d0041a381db172657154359f9572d51589b17d7e8253fdb12a811671a",
+    "lta_step3_manifest.json": "fd5da304e64643b7d94994cbf46075d4da50d4e29e5eb69452122e53b869a824",
+    "lta_step3_model.inp": "3fd673300abbeb337b7c3ac5c901d781c95b5ee62b2d5729dc2ec90d0f3ce745",
+    "lta_step3_model.out": "f620f3bf12c50f7b628ab56cbd2b3cb5723b40857b1c7d3c10a7cf19a95e506b",
+    "lta_step3_renamed_model.out": "03c8a7681f2dda453accc8d896e15ad2a1b6d1a680da52711645523bcfd6e454"
+  },
+  "rows": 4499,
+  "columns": 21,
+  "column_names": [
+    "row_id",
+    "r1cesd10",
+    "r1shlta",
+    "r1adlab_c",
+    "r1hibpe",
+    "r1arthre",
+    "r2cesd10",
+    "r2shlta",
+    "r2adlab_c",
+    "r2hibpe",
+    "r2arthre",
+    "r3cesd10",
+    "r3shlta",
+    "r3adlab_c",
+    "r3hibpe",
+    "r3arthre",
+    "r4cesd10",
+    "r4shlta",
+    "r4adlab_c",
+    "r4hibpe",
+    "r4arthre"
+  ],
+  "comparisons": {
+    "verdict": "PASS",
+    "items": 118,
+    "max_abs_diff": 0
+  },
+  "verdict": "PASS",
+  "evidence_logical_name": "coord-charls-lta-step3-swap-8796-20261115"
+}

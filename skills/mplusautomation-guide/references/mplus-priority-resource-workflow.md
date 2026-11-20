@@ -47,7 +47,7 @@ Windows Python调用 `scripts/mplus_priority_watch.py --owner-pid <已核实R_PI
 已读取2026-10-02在线来源：[ClaudeR README](https://github.com/IMNMV/ClaudeR)、[Workbench skill](https://github.com/lzhs1995/clauder-rstudio-workbench/blob/main/skills/clauder-rstudio-workbench/SKILL.md)、[MplusAutomation vignette](https://cran.r-project.org/web/packages/MplusAutomation/vignettes/vignette.html)。源码快照保存在本任务 `work/pp_lgcm_reconciliation_20261001/resource_sources_20261002/`。
 
 - ClaudeR的`execute_r_async`通过独立callr进程保持前台响应；正式模型使用durable_files模式，后台只读取必要输入，不复制整个`.GlobalEnv`或把完整十份MI回传前台。一个长作业只提交一次，轮询同一job；完成即释放该worker。异步不代表Mplus数值计算本身加速。
-- Workbench已有`fanout-plan`、`fanout-poll`、`merge-gate`和资源门槛，先复用这些能力。原生工具路径由agent提交并登记真实job；`fanout-run --auto-scale`属于独立MCP stdio模式，不能伪称原生调用。串行依赖的MI→得分→消费者不能一起fan-out。
+- Workbench已有`fanout-plan`、`fanout-poll`、`merge-gate`和资源门槛，先复用这些能力。fanout 新提交分别按实际 RStudio worker 主机的物理/commit 可用字节、线程及输出卷余量核准，并扣本批在跑预约；内存百分比仅诊断，目标资源未知或样本陈旧则 HOLD，不等于只能跑一个。原生工具路径由agent提交并登记真实job；`fanout-run --auto-scale`属于独立MCP stdio模式，不能伪称原生调用。串行依赖的MI→得分→消费者不能一起fan-out。
 - 开发版guide已有SQLite事务队列`mplus_queue.py`及`mplus_queue_worker.R`，包含用途/依赖优先级、CPU/内存/处理器预算、并发上限和暂停恢复。让参与同一批次的worker使用同一个队列root，避免每个会话各自判断“还有空闲”。未注册的外部Mplus仍须由主机监控计入；当前PP-LGCM的独立发布合同没有自动迁入该队列，不可宣称已统一接管所有会话。
 - MplusAutomation文档明确数值估计由Mplus完成；`createModels`负责输入生成，`runModels`负责执行，`readModels`负责读回。精确目标、`recursive=FALSE`、独立输出目录和日志可防止误跑整树；`replaceOutfile='never'`只能防覆盖，不能代替输入哈希及结果有效性验证。批量模板和缓存读回提高流程效率，不自动把一个模型并行化。
 - 保存完整输入/数据、随机起点/种子/积分设置后，才可在隔离性能副本比较PROCESSORS配置；资源设置不能擅自改变统计规格。已有计算阶段单核满载时，优先核对算法支持，再决定内部并行或独立模型并行，不能机械增加线程。

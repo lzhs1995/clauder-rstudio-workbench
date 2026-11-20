@@ -9,8 +9,10 @@ description: Use when running, reproducing or porting Mplus models from R with M
 
 This collection contains four skills. Its candidate runtime pair is ClaudeR R
 `0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
-`runtime-compatibility.json`; complete macOS/Windows qualification is **PENDING**.
-Fresh installations on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Scientific qualification uses the version recorded with each run.
+`runtime-compatibility.json` at ClaudeR commit
+`3684427090d644ab37b04ec10b05d38a6e57ae70`; complete macOS/Windows qualification
+is **PENDING**.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
 See the [English upgrade guide](../../docs/UPGRADE_0.7.0.md) or
 [繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) in the complete source checkout.
@@ -63,21 +65,28 @@ whitelisted real-data receipts. After editing `families.json`, run
 `python scripts/family_registry.py check` and then
 `python scripts/family_registry.py render`.
 
+For CSV or Stata `.dta` sources, `prepare_mplus_source(spec, output_dir)` in
+`scripts/source_spec.R` is the common `source_spec` entry: it writes an ordered
+DAT, `NAMES` and `DATA` fragment from explicit column mappings and per-column
+missing codes, and records source, code and output hashes. See
+[source_spec](references/source-spec.md). It does not read archived DAT or
+compile models, and its preparation receipt is not a real-data swap receipt.
+
 <!-- family-registry:start -->
 | Family | Code | Synthetic | Native | Real-data swap | Historical | Start here |
 |---|---|---|---|---|---|---|
-| APIM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMeM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| APIMeMoM | configurable | pass | pass* | pending* | pass* | [APIM.md](APIM.md) |
-| MED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MOD | configurable | pass* | n/a* | pending* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| MODMED | template | pass* | pending* | pending* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
-| LPA_LCA | template | pass* | — | — | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
-| LTA | template | pass* | — | — | pending* | [lta-workflow.md](references/lta-workflow.md) |
-| MS_LTA | template | pass* | — | — | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
-| PP_LGCM | template | pass* | — | pending* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
-| OTHER_GROWTH | template | pass | pending* | — | n/a | [reusable-models.md](references/reusable-models.md) |
+| APIM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| APIMeM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| APIMoM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| APIMeMoM | configurable | pass | pass* | pass* | pass* | [APIM.md](APIM.md) |
+| MED | template | pass* | pass* | pass* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MOD | configurable | pass* | n/a* | pass* | pass* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| MODMED | template | pass* | pass* | pass* | readback* | [mediation-moderation-workflow.md](references/mediation-moderation-workflow.md) |
+| LPA_LCA | configurable | pass* | pass* | pass* | pass* | [lpa-lca-workflow.md](references/lpa-lca-workflow.md) |
+| LTA | configurable | pass* | pass* | pass* | pending* | [lta-workflow.md](references/lta-workflow.md) |
+| MS_LTA | configurable | pass* | pass* | pass* | pass* | [ms-lta-workflow.md](references/ms-lta-workflow.md) |
+| PP_LGCM | template | pass* | pass* | pass* | pending | [pp-lgcm-worked-example.md](references/pp-lgcm-worked-example.md) |
+| OTHER_GROWTH | template | pass | pass* | pass* | n/a | [reusable-models.md](references/reusable-models.md) |
 
 `*`: the evidence has a stated limit; see [family-registry.md](references/family-registry.md).
 <!-- family-registry:end -->
@@ -139,14 +148,41 @@ disk, CPU and owned Mplus descendants. A second slot is enabled only after a
 native calibration receipt; high memory percentage alone does not create an
 indefinite wait when measured headroom satisfies the contract.
 
+Chapter 5 single-level mediation and moderation (MED, MOD, MODMED) follow the
+[mediation and moderation workflow](references/mediation-moderation-workflow.md).
+After changing template variables, run `ch5_check_template_lists()` on the
+filled template and `ch5_check_inp_columns()` on each generated `.inp` (see
+mediation-moderation-workflow.md §3). For the R static moderation route (`MOD`,
+`scripts/ch5_moderation_route.R`): `focal` accepts one or more unique column
+names and builds the full `focal × moderator` cross in the formula without
+pre-multiplied `px.*` columns; `ch5_simple_slopes(m, level, covariance = ...)`
+computes per-focal simple slopes with `"cluster_HC0"` by default, `"model"` for
+the full ordinary covariance matrix, and `"historical_ch5"` strictly for
+historical Chapter 5 reproduction (ordinary full covariance for categorical
+moderators, clustered diagonal paired with ordinary cross terms for continuous
+moderators — never use for new robust inference, never alter defaults or normal
+quantiles, and never fall back silently); `moderator_labels` requires a complete
+explicit caller mapping (`moderator_level` is omitted when unset), categorical
+`moderator_code` stores the full vector in effect-coding column order (keep
+display labels separate from mathematical coding), and extended non-ASCII PDF
+plots use Cairo.
+
 ## LPA/LCA, LTA and MS-LTA
 
-第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时使用 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，显式固定连续/分类指标、DEFINE、标准化和生产者；该文档是配置与验收合同，不是通用自动编译器入口。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
+第七章 LPA/LTA/MS-LTA 复现先读 [chapter7-replay-map.md](references/chapter7-replay-map.md)，按实际 INP 审计混合指标、生成入口、波次数和 Step-3 血缘。换数据源或变量时依照 [chapter7-source-variable-contract-20261104.md](references/chapter7-source-variable-contract-20261104.md)，再用 [统一配置入口](references/chapter7-source-entry-20261111.md) 显式编译 CSV/DTA 新源、变量映射、波次、K 和组合，或保持式回放归档输入。当前新源支持连续量与0/1二分类、各波同K；不自动选择类别、不推断标准化或阈值。归档重绘、新鲜估计、完整生产链和论文采纳分别标状态。
 `scripts/test_ch7_mixture_family_20261105.R` 用合成数据生成并核验 LPA/LCA、四波 LTA、MS-LTA 与 Step-3 的输入，只调用 `mplusObject()`/`mplusModeler(run=0)`，不启动 Mplus；它不说明引擎接受语法或模型收敛。
 
 For existing transition estimates, use the [explicit transition-flow contract](references/chapter7-transition-flow.md) and `scripts/ch7_transition_flow.R` to prepare nodes/links and a Sankey widget. Overall posterior-weighted flows and scaled mover-conditional flows are separate modes. This synthetic-tested interface does not close historical F30/F31 or real-data source swaps.
 
 For quadratic covariate contrasts, use the [explicit log-scale curve contract](references/chapter7-quadratic-curves.md) and `scripts/ch7_quadratic_curves.R`. The interface retains named coefficients, full cross covariance, the outcome/reference contrast and the declared interval rule; it does not reinterpret a log-ratio derivative as a probability effect or certify a source/model from numeric inputs.
+
+Use the [automatic Step-1→Step-3 chain](references/chapter7-step-chain-20261111.md)
+to extract printed classification logits and bind savedata by ID. The
+[model-object figure adapters](references/chapter7-model-figures-20261111.md)
+cover profiles, proportions, conditional matrices and LL/BIC enumeration while
+delegating flows and curves to the existing functions above. These offline
+contracts and [native acceptance](references/chapter7-native-acceptance-20261111.md)
+have separate states; a compiled input is not a successful Mplus estimate.
 
 ## Parallel-process growth (PP-LGCM)
 
@@ -155,8 +191,13 @@ For a two-process covariance LGCM with fixed time scores, use
 `variables` and `model` to `mplus_from_mapping()`. See
 [PP-LGCM source and variable mapping](references/pp-lgcm-source-variable-mapping.md)
 for process roles, time coding and covariate subsets. The synthetic fixture
-proves column rename/reorder compilation only; native execution and advanced
-production PP-LGCM specifications require separate evidence.
+proves column rename/reorder compilation only. Native execution is recorded
+separately: the `pp_lgcm` suite in `assets/native_acceptance_20261115.json` and
+the real-data receipt listed in the PP_LGCM section of
+[family-registry.md](references/family-registry.md). That native suite covers
+fixed-time parallel covariance growth via `parallel_growth_model_syntax()`, not
+full MI latent-product dissertation models; advanced production PP-LGCM
+specifications still require separate evidence.
 
 ## Mac 控制 Windows
 
@@ -202,6 +243,18 @@ do not execute the estimation steps below merely to close an editorial issue.
    measurement scales and trajectory shapes as separate estimates when their
    actual inputs are independent. Use [parallel-models.md](references/parallel-models.md)
    for durable queue workers, resource admission, and manuscript merge gates.
+   Queue expansion uses `resource_policy.autoscale_mode`, which defaults to
+   `candidate_measured`. `legacy_compatible` applies only when configured
+   explicitly; its memory-percentage shortcut does not satisfy the measured
+   byte-headroom expansion contract. The mode selects an expansion rule only:
+   ordinary `Queue.claim` still applies its byte-budget checks and, with a
+   shared `host_reservation_path`, calls the legacy `HostReservations.acquire()`,
+   not `acquire_measured()`. The measured API is not connected to the
+   PowerShell worker pools. Installing updated files does not change a running
+   queue's configuration or reload code its owner has already loaded. None of
+   this enables strict host admission or establishes native Windows acceptance;
+   see "Explicit autoscale modes" and "Separate measured host API" in
+   [parallel-models.md](references/parallel-models.md).
    When a run takes unexpectedly long, use
    [performance-diagnosis.md](references/performance-diagnosis.md) and the
    read-only [queue_diagnostics.py](scripts/queue_diagnostics.py) before raising
