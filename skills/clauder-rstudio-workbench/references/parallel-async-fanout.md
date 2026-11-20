@@ -225,6 +225,13 @@ less its reserve and running-worker thread reservations. These are batch-local
 reservations: other queues or agents have no shared lease with this scheduler.
 Do not describe this as host-wide or cross-queue reservation.
 
+Admission is separate from the target concurrency: a hold permits **zero new
+submissions**, including when no worker is running. The target slot count is
+retained so fresh safe readings can refill it. Existing jobs retain their
+original IDs and continue to be polled during a hold; transport errors do not
+resubmit them. The byte and configured backlog gates below still apply when
+another required resource dimension is unknown.
+
 Without an explicit `max_parallel`, `fanout-plan` recommends the minimum of
 worker count, three and the number of additional workers that fit. An explicit
 `max_parallel` remains visible as `recommended_max_parallel`; the separate
@@ -259,6 +266,16 @@ this change. Preserve its runtime and accepted contract, or explicitly revise
 the contract before starting a new batch. The standalone `resource-gate`
 command and monitor policies are separate interfaces; their percentage rules
 are not changed by this fanout admission update.
+
+For the existing Mac CMAverse chain, preserve its accepted runtime and frozen
+contract: start at 1, cap at 3, sample every 30 seconds, and require five
+consecutive samples with memory below 70%, CPU below 75%, disk above 200 GB,
+and upload backlog below 2 before adding one slot. Memory at/above 80%, CPU
+at/above 90%, disk below 150 GB, or backlog at/above 2 holds new admissions.
+These are that existing task's admission rules, not the current fanout byte
+policy or permission to migrate the task. Hard safety cancellation remains the
+monitor's separate responsibility. A new batch under the current harness must
+satisfy the worker-host byte checks, including the macOS commit limitation below.
 
 ### Bind sampling to the worker host
 

@@ -257,10 +257,13 @@ class DurableMplusWorkerTests(unittest.TestCase):
         claim = {"pid": proc.pid, "created": observed.create_time(), "exe": observed.exe(), "host": worker.host()}
         def exiting_error(_process):
             release.touch()
+            # 在身份读取期间确认原子进程已退出，避免把调度延迟计为进程存活。
+            self.assertEqual(proc.wait(timeout=10), 0)
             raise psutil.AccessDenied(proc.pid)
+
         with mock.patch.object(psutil.Process, "cmdline", exiting_error):
             self.assertFalse(worker.live_guardian(claim, self.work, self.members[0]))
-        proc.wait(timeout=5)
+        self.assertTrue(release.exists())
 
     def test_guardian_empty_identity_during_exit_is_reobserved(self):
         # 复现 CI 竞态：终态前一瞬 cmdline 读成空列表，原进程随即退出，不应判身份不符。

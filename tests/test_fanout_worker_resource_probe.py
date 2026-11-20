@@ -102,7 +102,7 @@ class WorkerResourceProbeTests(unittest.TestCase):
         self.assertEqual(sample["output_root"], "/resolved/output")
         self.assertEqual(sample["requested_output_root"], "/linked/output")
 
-    def test_poll_rebinds_original_selector_and_preserves_job_id(self):
+    def test_poll_rebinds_original_selector_and_checks_job_without_waiting(self):
         session = FakeSession()
         with self.patch_session(session):
             probe = FanoutResourceProbe("non-default-worker", "/worker/output")
@@ -112,7 +112,7 @@ class WorkerResourceProbeTests(unittest.TestCase):
         self.assertEqual(result["job_id"], "original_job")
         self.assertEqual([name for name, _ in session.calls],
                          ["connect_session", "execute_r", "connect_session", "execute_r", "get_async_result"])
-        self.assertEqual(session.calls[-1][1], {"job_id": "original_job"})
+        self.assertEqual(session.calls[-1][1], {"job_id": "original_job", "wait_s": 0})
         self.assertEqual(session.calls[-3][1], {"session_name": "non-default-worker"})
 
     def test_poll_identity_change_and_unknown_keep_original_job_without_call(self):

@@ -202,7 +202,7 @@ class HarnessUnitTests(unittest.TestCase):
         # evidence *format* version stays 0.2.4; package/release version is tracked
         # separately via producer_version (decoupled).
         self.assertEqual(doc["schema_version"], "0.2.4")
-        self.assertEqual(doc["producer_version"], "0.6.7")
+        self.assertEqual(doc["producer_version"], "0.7.0")
 
     def test_schema_file_is_packaged(self) -> None:
         schema = Path("skills/clauder-rstudio-workbench/schemas/evidence.schema.json")
@@ -651,10 +651,14 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertIn("WorkbenchBinDir", text)
         self.assertIn("clauder-workbench.cmd", text)
 
-    def test_readme_quickstart_uses_release_and_wrapper(self) -> None:
+    def test_readme_quickstart_uses_candidate_guide_and_historical_wrapper(self) -> None:
         text = Path("README.md").read_text(encoding="utf-8")
-        self.assertIn("`v0.6.7` release", text)
-        self.assertIn("releases/download/v0.6.7/", text)
+        self.assertIn("Quick Start for the 0.7.0 candidate", text)
+        self.assertIn("docs/UPGRADE_0.7.0.md", text)
+        self.assertIn("Historical 0.6.7 installation examples", text)
+        self.assertIn("**PENDING**", text)
+        self.assertNotIn("releases/download/v0.7.0/", text)
+        self.assertNotIn("--branch v0.7.0", text)
         self.assertIn("clauder-workbench.cmd", text)
         self.assertIn("./install.sh --clauder-dir", text)
         self.assertIn("-AddHarnessToPath", text)
@@ -667,11 +671,14 @@ class HarnessUnitTests(unittest.TestCase):
         self.assertNotIn("git checkout v0.3.4", text)
         self.assertNotIn("releases/download/v0.3.4/", text)
 
-    def test_workbench_skill_documents_collection_release(self) -> None:
+    def test_workbench_skill_documents_collection_candidate(self) -> None:
         text = Path("skills/clauder-rstudio-workbench/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("skill collection release `v0.6.7`", text)
+        self.assertIn("Workbench 0.7.0 runtime compatibility", text)
+        self.assertIn("`0.16.6.9001` / bridge `0.16.6.post1`", text)
+        self.assertIn("**PENDING**", text)
         self.assertIn("cmaverse-paired-mval", text)
         self.assertIn("comparegroups-guide", text)
+        self.assertIn("mplusautomation-guide", text)
         self.assertIn("`v0.2.4` is the minimum safe release", text)
         self.assertNotIn("This skill release `v0.2.4`", text)
 
