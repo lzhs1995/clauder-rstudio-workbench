@@ -7,19 +7,27 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 import psutil
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import durable_fixture_processes as fixture
 
 SCRIPT = Path(__file__).resolve().parents[1] / "skills/mplusautomation-guide/scripts/windows_awake_guard.py"
 
 
-def wait_json(path, process):
-    deadline = time.monotonic() + 15
+def wait_json(path, process, *, deadline=None):
+    if deadline is None:
+        deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            # Windows 读取允许删除共享；并发替换只在原期限内短暂重试。
+            return fixture.read_fixture_json(path, deadline=deadline)
+        except FileNotFoundError:
+            pass
         assert process.poll() is None, "guard ended before receipt"
-        time.sleep(0.05)
+        time.sleep(max(0, min(0.05, deadline - time.monotonic())))
     raise AssertionError("guard did not write receipt")
 
 
@@ -56,7 +64,7 @@ def real_windows_lifecycle(tmp_path, finish):
                 assert kernel.CloseHandle(handle)
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
-                fresh = wait_json(output / "heartbeat.json", guard)
+                fresh = wait_json(output / "heartbeat.json", guard, deadline=deadline)
                 if fresh["at"] != heartbeat["at"]:
                     break
                 time.sleep(0.05)
@@ -93,6 +101,73 @@ def rejects_stale_identity_before_power_request(tmp_path):
                              "--output", str(output)], capture_output=True, timeout=15)
     assert result.returncode != 0
     assert not output.exists()
+
+
+class AwakeReceiptReadTests(unittest.TestCase):
+    def test_transient_windows_read_denial_recovers_real_receipt(self):
+        denied = PermissionError(13, "synthetic sharing violation")
+        denied.winerror = 32
+        process = mock.Mock()
+        with mock.patch.object(fixture, "WINDOWS", True), \
+             mock.patch.object(fixture, "_shared_json_bytes",
+                               side_effect=[denied, b'{"at":"fresh"}']) as read, \
+             mock.patch.object(time, "sleep"):
+            self.assertEqual(wait_json(Path("heartbeat.json"), process), {"at": "fresh"})
+        self.assertEqual(read.call_count, 2)
+
+    def test_missing_receipt_waits_for_publication(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        with mock.patch.object(fixture, "WINDOWS", False), \
+             mock.patch.object(fixture, "_shared_json_bytes",
+                               side_effect=[FileNotFoundError(), b'{"at":"first"}']) as read, \
+             mock.patch.object(time, "sleep"):
+            self.assertEqual(wait_json(Path("heartbeat.json"), process), {"at": "first"})
+        self.assertEqual(read.call_count, 2)
+        process.poll.assert_called_once_with()
+
+    def test_caller_deadline_bounds_windows_sharing_retry(self):
+        clock = [5.0]
+        denied = PermissionError(13, "persistent sharing violation")
+        denied.winerror = 32
+
+        def advance(seconds):
+            clock[0] += seconds
+
+        with mock.patch.object(fixture, "WINDOWS", True), \
+             mock.patch.object(fixture, "_shared_json_bytes", side_effect=denied), \
+             mock.patch.object(time, "monotonic", side_effect=lambda: clock[0]), \
+             mock.patch.object(time, "sleep", side_effect=advance):
+            with self.assertRaises(PermissionError):
+                wait_json(Path("heartbeat.json"), mock.Mock(), deadline=5.05)
+        self.assertAlmostEqual(clock[0], 5.05)
+
+    def test_expired_deadline_does_not_start_a_new_read(self):
+        with mock.patch.object(time, "monotonic", return_value=5.0), \
+             mock.patch.object(fixture, "read_fixture_json") as read:
+            with self.assertRaisesRegex(AssertionError, "did not write receipt"):
+                wait_json(Path("heartbeat.json"), mock.Mock(), deadline=5.0)
+        read.assert_not_called()
+
+    def test_corrupt_json_and_nonretryable_read_errors_fail(self):
+        for error in (PermissionError(13, "denied"), OSError(28, "disk full")):
+            with self.subTest(error=error), \
+                 mock.patch.object(fixture, "WINDOWS", False), \
+                 mock.patch.object(fixture, "_shared_json_bytes", side_effect=error) as read:
+                with self.assertRaises(type(error)):
+                    wait_json(Path("heartbeat.json"), mock.Mock())
+                self.assertEqual(read.call_count, 1)
+        with mock.patch.object(fixture, "_shared_json_bytes", return_value=b'{bad') as read:
+            with self.assertRaises(json.JSONDecodeError):
+                wait_json(Path("heartbeat.json"), mock.Mock())
+        self.assertEqual(read.call_count, 1)
+
+    def test_guard_exit_before_publication_is_reported(self):
+        process = mock.Mock()
+        process.poll.return_value = 1
+        with mock.patch.object(fixture, "read_fixture_json", side_effect=FileNotFoundError()):
+            with self.assertRaisesRegex(AssertionError, "guard ended before receipt"):
+                wait_json(Path("heartbeat.json"), process)
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows power API")

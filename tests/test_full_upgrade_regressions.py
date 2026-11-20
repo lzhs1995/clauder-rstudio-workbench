@@ -298,6 +298,9 @@ $ClaudeRDir = $env:CLAUDER_TEST_SOURCE
 $DryRun = $false; $ConfigureCodex = $true
 $ConfigureClaudeCode = $false; $ConfigureCopilot = $false; $ConfigureWorkspaceMcp = $false
 $candidate = Join-Path $env:CLAUDER_TEST_BIN 'clauder-mcp.exe'
+# Windows TEMP 可含 RUNNER~1；入口回执使用 FileInfo.FullName 的规范路径。
+$expectedCandidate = $null
+if ($env:CLAUDER_TEST_MODE -ne 'missing') { $expectedCandidate = (Get-Item -LiteralPath $candidate).FullName }
 $caught = $null
 try { Install-ClaudeRMcpTool | Out-Null } catch { $caught = $_.Exception.Message }
 if ($env:CLAUDER_TEST_MODE -eq 'missing') {
@@ -309,10 +312,11 @@ if ($env:CLAUDER_TEST_MODE -ne 'present') {
     try { Write-ScopedMcpConfig 'codex' (Join-Path $env:CLAUDER_TEST_ROOT 'never-written.toml') } catch { $refused = $true }
     if (-not $refused -or $null -ne $script:configArgsSeen) { throw 'Stale default substituted for missing candidate' }
 } else {
-    if ((Get-ClaudeRMcpExe) -ne $candidate) { throw 'Verified entry was discarded after Out-Null' }
+    $actualCandidate = Get-ClaudeRMcpExe
+    if ($actualCandidate -ne $expectedCandidate) { throw "Verified entry was discarded after Out-Null: expected [$expectedCandidate], got [$actualCandidate]" }
     Write-ScopedMcpConfig 'codex' (Join-Path $env:CLAUDER_TEST_ROOT 'never-written.toml')
     $i = [Array]::IndexOf($script:configArgsSeen, '--command')
-    if ($i -lt 0 -or $script:configArgsSeen[$i + 1] -ne $candidate) { throw 'Config writer did not receive verified custom entry' }
+    if ($i -lt 0 -or $script:configArgsSeen[$i + 1] -ne $expectedCandidate) { throw 'Config writer did not receive verified custom entry' }
 }
 Write-Output ('FULL_UPGRADE_ENTRY_BINDING_OK_PS_' + $PSVersionTable.PSVersion.Major)
 '''
