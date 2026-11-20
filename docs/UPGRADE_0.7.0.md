@@ -4,7 +4,7 @@
 
 The candidate pairs workbench **0.7.0**, ClaudeR R **0.16.6.9001** and bridge
 **0.16.6.post1**. Read [runtime-compatibility.json](../runtime-compatibility.json)
-for the pinned ClaudeR commit `3684427090d644ab37b04ec10b05d38a6e57ae70`
+for the pinned ClaudeR commit `270efe5f600ce2b8366f22dc18a834bb2ab888b7`
 and critical-file hashes. The source incorporates
 upstream development commit `3b56327` and the maintained discovery, ownership,
 async-output and progress protections. Do not substitute an old reduced bridge

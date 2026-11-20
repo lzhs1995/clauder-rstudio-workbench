@@ -10,7 +10,7 @@ description: Use when running, reproducing or porting Mplus models from R with M
 This collection contains four skills. Its candidate runtime pair is ClaudeR R
 `0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
 `runtime-compatibility.json` at ClaudeR commit
-`3684427090d644ab37b04ec10b05d38a6e57ae70`; complete macOS/Windows qualification
+`270efe5f600ce2b8366f22dc18a834bb2ab888b7`; complete macOS/Windows qualification
 is **PENDING**.
 Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "workbench_version": "0.7.0",
   "clauder_repository": "https://github.com/lzhs1995/ClaudeR.git",
-  "clauder_ref": "3684427090d644ab37b04ec10b05d38a6e57ae70",
-  "clauder_commit": "3684427090d644ab37b04ec10b05d38a6e57ae70",
+  "clauder_ref": "270efe5f600ce2b8366f22dc18a834bb2ab888b7",
+  "clauder_commit": "270efe5f600ce2b8366f22dc18a834bb2ab888b7",
   "r_package_version": "0.16.6.9001",
   "mcp_bridge_version": "0.16.6.post1",
   "required_capabilities": [

@@ -10,7 +10,7 @@ ClaudeR 提供 RStudio addin 與 MCP bridge；本專案整理安裝、執行、�
 
 目前 **0.7.0 候選版**配對 ClaudeR R `0.16.6.9001` 與 MCP bridge
 `0.16.6.post1`，固定配套 ClaudeR 提交
-`3684427090d644ab37b04ec10b05d38a6e57ae70`，納入上游開發提交 `3b56327`
+`270efe5f600ce2b8366f22dc18a834bb2ab888b7`，納入上游開發提交 `3b56327`
 及維護中的相容性修補。
 [runtime-compatibility.json](runtime-compatibility.json) 固定精確來源提交與關鍵檔案 SHA。
 完整 macOS／Windows 候選驗收及發布仍為 **PENDING**；舊版驗證不能代替本版實測。

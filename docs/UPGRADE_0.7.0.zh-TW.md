@@ -5,7 +5,7 @@
 本候選版配對為 workbench **0.7.0**、ClaudeR R **0.16.6.9001**、MCP bridge
 **0.16.6.post1**。實際來源提交與關鍵檔案 SHA 位於
 [runtime-compatibility.json](../runtime-compatibility.json)，固定 ClaudeR 提交
-`3684427090d644ab37b04ec10b05d38a6e57ae70`。來源納入上游開發提交
+`270efe5f600ce2b8366f22dc18a834bb2ab888b7`。來源納入上游開發提交
 `3b56327`，並保留本地會話探索、程序歸屬、非同步輸出與進度保護；不能因舊
 bridge 還能啟動，就把它當成本次升級成功，也不能以未固定的 PyPI 套件替代。
 
