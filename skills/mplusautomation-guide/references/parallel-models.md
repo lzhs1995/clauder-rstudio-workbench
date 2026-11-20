@@ -85,19 +85,52 @@ process slow because other processes are paging. Do not stop unrelated user
 applications without authorization.
 
 The queue's initial profile is intentionally conservative for a 16 GiB,
-16-logical-CPU workstation: start at one, cap at three, reserve 1.5 GiB, admit
-below 90% predicted memory, hold at 90% CPU/memory, and reserve 10 GiB disk. Five
-healthy 30-second samples below 85% memory and 75% CPU add one slot. The sum of
-declared Mplus processors must stay within twelve. These are starting values,
-not universal Mac/Windows requirements; calibrate the profile to the host and
-representative model peaks before production use.
+16-logical-CPU workstation: start at one, cap at three, reserve 1.5 GiB physical
+memory, hold at 90% CPU, and reserve 10 GiB disk. Five healthy samples at least
+30 seconds apart add one slot, up to the existing cap. Each sample must pass
+the same byte-budget admission check as a claim for the next dependency-ready,
+non-reused, in-scope model in dispatch order, including the current running
+reservations, with CPU below 75%. Stale/future samples and unverified host
+resources do not qualify. A failed check resets the healthy count and preserves
+the existing limit; it does not stop running models. The sum of declared Mplus
+processors must stay within twelve. These are starting values, not universal
+Mac/Windows requirements; calibrate the profile to the host and representative
+model peaks before production use. APIM v2 retains its separate cap of one or
+two and its calibrated-start requirement.
+
+A new ordinary queue may declare `parallel_cap` (an integer from one to
+`processor_budget`) and `initial_parallel_limit` (one to that cap) in
+`config.json` before its first database initialization. Omitted values keep
+the defaults of three and one. Existing ordinary queues retain their stored
+limits, even when their event table is empty; editing the configuration does
+not migrate a queue. The first-settings check, default values and configuration
+validation are committed in one SQLite write transaction. A failed declaration
+or malformed JSON rolls those settings back, so a corrected initialization
+can still apply the new-queue declaration. APIM v2 retains its existing
+one-or-two cap and calibrated-start rules. A declared slot count does not
+reserve host capacity or bypass the next-task and final-claim admission checks
+above; it does not select the separate measured host-reservation protocol.
 
 Override the numerical thresholds with `resource_policy` in the queue root's
-`config.json`: `memory_hold_percent`, `memory_resume_percent`, `reserve_gib`,
-`cpu_hold_percent`, `cpu_resume_percent`, `disk_reserve_gib`, and
-`processor_budget`. Admission subtracts all running tasks' declared memory
+`config.json`: `reserve_gib`, `commit_reserve_gib`, `cpu_hold_percent`,
+`cpu_resume_percent`, `disk_reserve_gib`, and `processor_budget`. The legacy
+`memory_hold_percent` and `memory_resume_percent` fields remain accepted but do
+not gate admission or expansion; memory percentage is diagnostic. Commit
+headroom is checked separately when `commit_reserve_gib` is configured; a
+missing commit measurement then refuses admission. Admission subtracts all running tasks' declared memory
 reservations as well as the next task's budget. This deliberately conservative
 rule protects against simultaneous claims before Mplus has allocated its memory.
+
+Expansion does not reserve host capacity. Participating queues must share the
+existing `host_reservation_path`; the final claim then calls
+`HostReservations.acquire()` inside that registry's SQLite write transaction.
+That separate atomic admission counts other participating queues and can still
+refuse a claim after a successful expansion sample. No new host scheduler is
+introduced. Unregistered tasks and input measurements taken before the registry
+transaction remain limitations of the existing host protocol; a tick result is
+not proof of full-host capacity or real process overlap. Observed-private-memory
+credit remains opt-in and unchanged by this expansion rule; private/commit bytes
+are not evidence of physical resident bytes.
 
 When the queue runs under WSL on a Windows host, configure
 `windows_memory_profile` in `config.json` to a fresh JSON snapshot produced by

@@ -495,7 +495,7 @@ def run_fanout(
     mem_probe_fn: Callable[[], float | None] | None = None,
     cpu_probe_fn: Callable[[], float | None] | None = None,
     disk_probe_fn: Callable[[], float | None] | None = None,
-    upload_backlog_probe_fn: Callable[[], int] | None = None,
+    upload_backlog_probe_fn: Callable[[], int | None] | None = None,
     memory_scale_up_percent: float | None = None,
     memory_hold_percent: float | None = None,
     cpu_scale_up_percent: float | None = None,
@@ -518,9 +518,9 @@ def run_fanout(
     ``auto_scale=True`` 时实现源文档 §6 的动态并发：以 ``max_parallel`` 为**起始**并发，
     每个轮询周期前用 ``mem_probe_fn``（默认 ``memory_used_percent``）采样系统内存：
       - 内存 < ``memory_threshold`` 且仍有 pending 且当前并发 < 上限 → 并发 +1（扩）；
-      - 内存 >= ``memory_threshold`` → 不再提交新 worker（把并发回压到当前在跑数，等其排空）。
+      - 达到任一 hold 阈值或必需指标未知 → 本轮不提交新 worker，继续观察原 job。
     上限默认是 worker 总数（也可由 ``max_parallel_cap`` 收紧）。运行中的 job 不会被杀，
-    回压只阻止**新**提交。每次调整记入 ``scale_log``。
+    回压只阻止**新**提交，并保留目标并发；资源恢复后可补空槽。每次调整记入 ``scale_log``。
     """
     problems = _validate_contract(contract)
     if problems:
@@ -599,6 +599,7 @@ def run_fanout(
     iterations = 0
 
     while (pending or running) and not failed:
+        allow_submit = True
         if auto_scale:
             mem = mem_probe()
             cpu = cpu_probe()
@@ -610,22 +611,31 @@ def run_fanout(
                 (mem is not None and mem >= memory_hold_percent)
                 or (cpu_hold_percent is not None and cpu is not None and cpu >= cpu_hold_percent)
                 or (min_disk_free_gb_hold is not None and free_gb is not None and free_gb < min_disk_free_gb_hold)
-                or (upload_backlog_hold is not None and upload_backlog >= upload_backlog_hold)
+                or (upload_backlog_hold is not None and upload_backlog is not None and upload_backlog >= upload_backlog_hold)
             )
+            unknown_hold_metrics = [
+                name for name, missing in (
+                    ("memory", mem is None),
+                    ("cpu", cpu_hold_percent is not None and cpu is None),
+                    ("disk", min_disk_free_gb_hold is not None and free_gb is None),
+                    ("upload_backlog", upload_backlog_hold is not None and upload_backlog is None),
+                ) if missing
+            ]
             healthy = (
-                mem is not None and mem < memory_scale_up_percent
+                not hard_hold and not unknown_hold_metrics
+                and mem is not None and mem < memory_scale_up_percent
                 and (cpu_scale_up_percent is None or (cpu is not None and cpu < cpu_scale_up_percent))
                 and (min_disk_free_gb_scale_up is None or (free_gb is not None and free_gb >= min_disk_free_gb_scale_up))
-                and (upload_backlog_hold is None or upload_backlog < upload_backlog_hold)
+                and (upload_backlog_hold is None or (upload_backlog is not None and upload_backlog < upload_backlog_hold))
             )
             healthy_streak = healthy_streak + 1 if healthy else 0
-            if mem is None:
-                action = "hold_mem_unknown"
-            elif hard_hold:
-                # 回压：不再提交新 worker，等在跑的排空（不杀在跑 job）
-                if level > max(1, len(running)):
-                    level = max(1, len(running))
+            if hard_hold:
+                # 准入与目标并发分开：零运行时也不能偷跑一个；不取消原 job。
+                allow_submit = False
                 action = "throttle"
+            elif unknown_hold_metrics:
+                allow_submit = False
+                action = "hold_mem_unknown" if mem is None else "hold_resource_unknown"
             elif pending and level < cap and healthy_streak >= healthy_samples_for_scale_up:
                 level += 1
                 action = "scale_up"
@@ -651,10 +661,12 @@ def run_fanout(
                     "from_level": old_level,
                     "to_level": level,
                     "action": action,
+                    "new_submissions_allowed": allow_submit,
+                    "unknown_hold_metrics": unknown_hold_metrics,
                     "running": len(running),
                     "pending": len(pending),
                 })
-        while pending and len(running) < level and not failed:
+        while allow_submit and pending and len(running) < level and not failed:
             wid = pending.pop(0)
             worker = by_id[wid]
             code = build_submit_code(worker)
@@ -737,6 +749,7 @@ def run_fanout(
                     for worker_id, details in running.items()
                 ],
                 "max_parallel": level,
+                "new_submissions_allowed": allow_submit,
                 "scale_event": scale_log[-1] if scale_log else None,
             }
             try:

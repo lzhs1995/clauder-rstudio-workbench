@@ -1668,7 +1668,7 @@ def cmd_fanout_run(args: argparse.Namespace) -> int:
     def poll_fn(job_id: str) -> dict[str, Any]:
         return call_tool(
             "get_async_result",
-            {"job_id": job_id},
+            {"job_id": job_id, "wait_s": 0},
             timeout=args.submit_timeout,
             retries=0,
         )

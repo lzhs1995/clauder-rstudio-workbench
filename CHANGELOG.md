@@ -1,3 +1,31 @@
+## 0.7.0 — candidate, 2026-11-12
+
+- Target the complete upstream ClaudeR 0.16.5 line with the maintained R
+  0.16.5.9001 / bridge 0.16.4.post1 pair. Retain local discovery, process
+  ownership, progress and async-output protections; the pairing manifest pins
+  exact source identity. Full cross-platform qualification remains PENDING.
+- Add isolated `paired_release` stage/verify/activate/rollback. A candidate has
+  its own venv and R library; actual fresh-process probes check loaded versions,
+  locations and bridge hash. Selection updates only the paired record, never
+  a live client or healthy RStudio session. Rollback re-verifies the prior pair
+  and rejects unknown external changes through compare-and-swap checks.
+- Reject a failed Windows bridge install instead of reporting an old executable
+  as successful. Preserve native Windows executable entries; do not write batch
+  text into `.exe` files. Keep legacy installation distinct from pair rollback.
+- Bind Windows configuration and installation receipts to the verified
+  `uv tool dir --bin` entry, including custom tool-bin directories; a stale
+  default/PATH executable cannot replace the newly installed candidate.
+- Preserve UTF-8 BOM for PowerShell entry files containing non-ASCII text.
+  Windows PowerShell 5.1 on CP936 can otherwise absorb the following statement
+  into a comment without reporting a parse error. Native installer tests now
+  use `Parser.ParseFile`; parsing an explicitly UTF-8 string is a separate check.
+- Retain all four collection skills and add bilingual upgrade navigation.
+  Poll the same async job with `wait_s=0` for a bounded status check; do not
+  turn a long polling timeout into a duplicate job submission.
+- Preserve the six existing three-OS Python 3.10/3.12 CI jobs; add macOS and
+  Windows Python 3.14 and targeted PowerShell 5.1/7 installer failure tests.
+  Local fault-injection tests do not claim native Windows or scientific success.
+
 ## 0.6.7 — 2026-09-26
 
 Add compound result-key and value-map checks, preserve cached-postprocessing scope, and align collection metadata with the unchanged pinned ClaudeR runtime. Includes prior empirical workflow PR #20; later startup fixes remain intact.

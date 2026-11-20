@@ -52,11 +52,11 @@ model rather than rehashing a large RESULTS file for every parameter.
 ## Check large-denominator-df F tails across runtimes
 
 When a pooled D1 test has very small relative missing information, its denominator
-df can exceed 1e10. A saved-result replay on macOS with SciPy 1.16.3 produced
-`f.sf(0.293524755847745, 3, 11541765180.5765) = 0.8301128480529693`,
-whereas Windows R 4.5.2 `pf(..., lower.tail=FALSE)` returned
-`0.8301129735074473`. Preserve the failed numerical check; do not loosen its
-tolerance, change MI membership or rerun Mplus to fix a distribution routine.
+df can become very large. A saved-result replay found disagreement between
+SciPy `f.sf(...)` and R `pf(..., lower.tail=FALSE)` in that regime. Keep the
+actual statistic, degrees of freedom and probabilities in private receipts.
+Preserve the failed numerical check; do not loosen its tolerance, change MI
+membership or rerun Mplus to fix a distribution routine.
 
 For these finite positive inputs, the equivalent expression
 `betaincc(d1/2, d2/2, d1*F/(d2+d1*F))` matched R within 2e-15 across the
@@ -114,16 +114,7 @@ without changing any effect label. Recompute the full candidate equations before
 reusing a historical canonical-test column or BH/BY denominator. Freeze this
 post hoc audit rule before adjustment and use no fitted p-values to select it.
 
-In the unified Chapter 4 candidate, all 612 model identities and 35,268 effects
-were retained and 70,536 independent R substitutions verified the expansion.
-Literal within-model unique nulls became 26,664, versus 26,424 historically.
-The 240 membership changes occur in 60 child-moderator models: 160 reflect phase
-means that differ from zero on the common full-sample scale; 80 arise from a
-full-sample mean literal near 4.08e-17. Preserve these as different explanations.
-Do not call a floating residual a substantive scientific change, and do not
-silently merge mathematically different hypotheses using an arbitrary tolerance.
-Keep exact and any scientifically justified ideal-centering sensitivity separate;
-never change running INPs just to make a testing-family count convenient.
+Retain every declared model/effect identity when independently verifying the expansion and counting unique nulls. Distinguish phase means that differ from zero on a common full-sample scale from a floating-point residual in a full-sample centering literal. Keep actual sample means and membership changes in private receipts. Do not call a floating residual a substantive scientific change, and do not silently merge mathematically different hypotheses using an arbitrary tolerance. Keep exact and any scientifically justified ideal-centering sensitivity separate; never change running INPs just to make a testing-family count convenient.
 
 Where multiple model identities share one verified fitted likelihood, identical
 physical-parameter nulls can recur across identities. Restrict cross-identity
@@ -212,12 +203,7 @@ Normalizing either name to the same extracted substring before a join can create
 many-to-many records. Taking the first row then hides the mismatch. Check join
 cardinality and retain the original full parameter name for both point and CI.
 
-A verified Chapter 4 PA example displayed a VHI point at approximately +2SD
-with an HI interval at approximately +1SD, while its low point was LO at -1SD.
-The displayed high-minus-low difference consequently did not represent the
-declared TIE=HI−LO contrast. Neither a correct OUT parser nor a complete file
-inventory detects this: compare every table/plot row to one named effect and
-its probe expression. State the actual moderator values, not just H/L.
+For example, selecting a VHI point but an HI interval mixes different probes. The displayed high-minus-low difference then need not represent the declared TIE=HI−LO contrast. Neither a correct OUT parser nor a complete file inventory detects this: compare every table/plot row to one named effect and its probe expression. State the declared moderator values in private evidence, not just H/L.
 
 Word companion tables may use long or wide schemas, and different precision.
 Inspect headers; do not assume a `sample` column exists. Preserve cell location
@@ -277,48 +263,15 @@ the original type-7 calculation is a separate convention check. Likewise, a
 correct significance summary does not validate the parameters selected for its
 accompanying plot.
 
-The all-model replay compared type 3 and type 7 on the same actual GH5 draws:
-2 of 2,304 TIE classifications differed across 288 models. The 1,728 cells above
-are scoped **reproduced exports**, not the frozen manuscript's displayed cells.
-All match full-draw type 3; one differs from full-draw type 7. Exact source replay
-resolved that discrepancy: the PA code selects `V3:length(bcboot_data.df)` after
-a merge, combining a shifted starting column with a pre-merge numeric endpoint.
-It drops the final nine draws. All 576 PA symbols match this original slice:
-574 use 991 draws and two use 990. Full-draw type 7 changes one symbol. Its lower
-95% endpoint is approximately -0.00003098 under full-draw type 3, +0.00005314
-under full-draw type 7, and -0.00001541 under original-slice type 7. Reproducing
-the bug proves fidelity, not the correctness of the interval procedure. Select
-bootstrap columns by verified names/identities, assert draw counts before and
-after joins, and keep any corrected convention in a separate candidate.
+A replay comparing quantile conventions must distinguish reproduced exports from the frozen manuscript's displayed cells. The audited PA code selects `V3:length(bcboot_data.df)` after a merge, combining a shifted starting column with a pre-merge numeric endpoint and dropping trailing draws. Quantile type and draw-slice changes can affect interval endpoints and classifications; keep actual endpoints and affected research cells in private receipts. Reproducing the bug proves fidelity, not the correctness of the interval procedure. Select bootstrap columns by verified names/identities, assert draw counts before and after joins, and keep any corrected convention in a separate candidate.
 
-Read the frozen DOCX XML separately and bind document hash, table numbering,
-row, column and outcome. Here 12 manuscript tables display 1,044 effect cells;
-684 of the 1,728 candidate cells are absent, not nonsignificant. There are 40
-frozen-versus-reproduced symbol differences (39 sibling, one parental support).
-They span 25 historical models; 38 are compatible with printed historical CIs,
-but only 17 are decisive at printed precision. Compatibility does not identify
-the original producer or resolve an endpoint printed as zero. Preserve the
-document's real symbol dictionary and its 90%/95% distinction. This ledger uses
-zero-based `table-N`; frozen XML table numbering is N+1. Never apply that offset
-to another document without checking its inventory.
+Read the frozen DOCX XML separately and bind document hash, table numbering, row, column and outcome. Distinguish absent candidate cells from nonsignificant cells. Check frozen-versus-reproduced symbols against printed historical CIs and their precision; compatibility does not identify the original producer or resolve an endpoint printed as zero. Preserve the document's actual symbol dictionary and nominal confidence-level distinction. If a ledger uses zero-based `table-N` while XML table numbering is N+1, verify that offset against the document inventory before applying it.
 
 Evidence in `scientific_audit_20261002`: `validation/PA_draw_slice_reconciliation.json`,
 `validation/PA_original_function_all.csv`, `validation/frozen_summary_reconciliation.json`,
-and `ledger/frozen_summary_difference_sources.csv`. Subsequent exact original-function
-replay of the 25 historical GH5 files reproduced 38 of the 40 frozen symbols;
-all 38 belong to models previously classified as sample differences. An independent
-standard-library Python BC/linear-quantile replay agreed within 1.53e-16. This
-binds historical results to those symbols; it does not prove sample size alone
-caused every numerical change or release the historical estimates for reuse.
+and `ledger/frozen_summary_difference_sources.csv`. Exact original-function replay and an independent quantile calculation can bind historical results to displayed symbols; they do not prove that sample size alone caused a numerical change or release historical estimates for reuse.
 
-Two frozen cells remain inconsistent with the bound historical original rule:
-`table-15`, frozen row 27/column 3 (`edu-hw-sibg-clo_step1_fy`, `TIE1AAM2`) is
-90%-only in the manuscript but 95% under that historical rule; `table-20`, row
-12/column 7 (`edu-hw-dw1-eco_step1_sy`, `TIE0PAM1`) is 90%-only in the manuscript
-but nonsignificant under the historical rule. Retain them as table/source
-discrepancies, not sample-change explanations or licensed automatic manuscript
-edits. Evidence: `validation/frozen_historical_replay_checks.json` and
-`ledger/frozen_historical_source_disposition.csv` in the same audit root.
+For any frozen cell that remains inconsistent with the bound historical rule, retain the exact model/effect key and conflicting classification in private receipts. Treat it as a table/source discrepancy, not automatically as a sample-change explanation or permission to edit the manuscript. Evidence: `validation/frozen_historical_replay_checks.json` and `ledger/frozen_historical_source_disposition.csv` in the same audit root.
 
 Display-repair candidates must retain exact model/effect keys, matching point/SE/CI
 sources, original values, item scope, and an explicit non-release status. Verify

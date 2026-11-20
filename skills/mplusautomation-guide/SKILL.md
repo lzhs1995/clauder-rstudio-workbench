@@ -5,6 +5,26 @@ description: Use when running, reproducing or porting Mplus models from R with M
 
 # MplusAutomation Guide
 
+## Workbench 0.7.0 runtime compatibility
+
+This collection contains four skills. Its candidate runtime pair is ClaudeR R
+`0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
+`runtime-compatibility.json`; complete macOS/Windows qualification is **PENDING**.
+Fresh installations on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Scientific qualification uses the version recorded with each run.
+
+See the [English upgrade guide](../../docs/UPGRADE_0.7.0.md) or
+[繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) in the complete source checkout.
+If only this skill directory was installed, consult the same guide in its
+matching versioned source; do not assume a copied skill includes repository docs.
+
+`paired_release stage` installs an isolated candidate; `verify` probes new
+processes; `activate` only selects the pair record. Explicit client configuration
+and current native-call verification are separate. Keep the task's existing
+RStudio session, job IDs and scientific contract. For nonblocking polling of
+this bridge, use `get_async_result` with the original `job_id` and `wait_s=0`.
+Runtime upgrades do not rerun or revalidate domain models automatically.
+
+
 Status: v1-compatible guide with a Chapter 4 APIM v2 route. Windows execution,
 recovery, resource admission and manuscript reconciliation remain documented
 from the PP-LGCM workflow; the v2 route is independently accepted on native

@@ -52,6 +52,7 @@ EXPECTED_R_STUDIO_TOOLS = {
     "update_task_status",
     "verify_references",
     "wait_for_message",
+    "wake_on_message",
 }
 
 CORE_R_STUDIO_TOOLS = {"list_sessions", "connect_session", "execute_r", "execute_r_async", "get_async_result"}
@@ -241,7 +242,7 @@ async def _preflight_smoke_async(
 
         final_result: dict[str, Any] | None = None
         for attempt in range(1, async_poll_attempts + 1):
-            poll_result = _tool_result(await session.call_tool("get_async_result", {"job_id": job_id}), tool_name="get_async_result")
+            poll_result = _tool_result(await session.call_tool("get_async_result", {"job_id": job_id, "wait_s": 0}), tool_name="get_async_result")
             poll_result["attempt"] = attempt
             steps.append({"step": "get_async_result", **poll_result})
             final_result = poll_result

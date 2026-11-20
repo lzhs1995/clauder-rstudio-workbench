@@ -8,6 +8,15 @@
 
 ClaudeR 提供 RStudio addin 與 MCP bridge；本專案整理安裝、執行、診斷和證據保存。統計計算仍由對應的 R 套件或 Mplus 執行，成功產生檔案不等於研究假設或因果識別已獲驗證。
 
+目前 **0.7.0 候選版**配對 ClaudeR R `0.16.6.9001` 與 MCP bridge
+`0.16.6.post1`，來源為上游開發提交 `3b56327`及維護中的相容性修補。
+[runtime-compatibility.json](runtime-compatibility.json) 固定精確來源提交與關鍵檔案 SHA。
+完整 macOS／Windows 候選驗收及發布仍為 **PENDING**；舊版驗證不能代替本版實測。
+macOS 與 Windows 的隔離安裝均已驗證兩個啟動器，並實際列出 42 個 MCP 工具，包含 `wake_on_message` 與 `get_async_result(wait_s=0)`。科學復現依各次紀錄的版本驗收。
+
+從[繁體中文升級指南](docs/UPGRADE_0.7.0.zh-TW.md)或[英文指南](docs/UPGRADE_0.7.0.md)
+進行隔離 `paired_release` 安裝。選取配對只更新記錄；客戶端設定、實際載入版本及原生呼叫另行核驗。
+
 ## 選擇技能
 
 | 技能與實際入口 | 適用工作 | 主要界線 |
@@ -17,15 +26,15 @@ ClaudeR 提供 RStudio addin 與 MCP bridge；本專案整理安裝、執行、�
 | [cmaverse-paired-mval](skills/cmaverse-paired-mval/SKILL.md) | 成對 M=0/M=1 bootstrap、四分解、worker 合約與結果核驗 | 成對重抽樣的實作一致性不代表因果識別成立；新資料與規格須另行確認 |
 | [mplusautomation-guide](skills/mplusautomation-guide/SKILL.md) | 透過 MplusAutomation 驅動 Mplus 模型、批次執行、診斷與表格整理 | 須有相容且合法授權的 Mplus；模型家族的實作與驗證範圍以技能登錄表為準 |
 
-此表反映目前 `main` 原始碼。固定版 `v0.6.7` 包含前三個技能；`mplusautomation-guide` 是之後加入 `main` 的內容。需要第四個技能時，使用包含該目錄的已審查提交，不把舊版安裝視為已安裝全部新技能。
+此表反映目前 0.7.0 候選原始碼的四項技能。歷史固定版 `v0.6.7` 包含 workbench、CMAverse 與 compareGroups 三項；`mplusautomation-guide` 是後續加入的內容。使用已審查且包含四項技能的候選提交，不把舊版安裝視為已安裝全部新技能。
 
 ## 安裝與版本
 
-Windows 使用 `install.ps1`；macOS 和 Linux 使用 `install.sh`。準備 Git、R、RStudio、Python 與 uv；實際最低版本及選項見[英文安裝說明](README.md#quick-start)。Linux 的 RStudio／addin 仍須能在目標使用者的工作階段運行。
+Windows 使用 `install.ps1`；macOS 和 Linux 使用 `install.sh`。準備 Git、R、RStudio、Python 與 uv；本次隔離候選安裝的版本及選項見[0.7.0 升級指南](docs/UPGRADE_0.7.0.zh-TW.md)。Linux 的 RStudio／addin 仍須能在目標使用者的工作階段運行。
 
-配套版本由 [runtime-compatibility.json](runtime-compatibility.json) 指定。以下沿用固定版 `v0.6.7` 與 ClaudeR `v0.14.1.9002-lzhs.1`，不把任意上游最新版當成已驗證替代品。所有目的目錄必須尚不存在；保留已有研究會話和未提交工作樹。
+目前候選配套由 [runtime-compatibility.json](runtime-compatibility.json) 指定。以下僅保留歷史固定版 `v0.6.7` 與 ClaudeR `v0.14.1.9002-lzhs.1` 的安裝示例，**不會執行 0.7.0 升級**。候選指南不要求尚未發布的 tag 或下載連結。所有目的目錄必須尚不存在；保留已有研究會話和未提交工作樹。
 
-### macOS／Linux：固定版快速安裝
+### macOS／Linux：歷史 0.6.7 安裝
 
 ```bash
 git clone --branch v0.14.1.9002-lzhs.1 --single-branch https://github.com/lzhs1995/ClaudeR.git "$HOME/projects/ClaudeR-v0.14.1.9002-lzhs.1"
@@ -37,7 +46,7 @@ cd "$HOME/projects/clauder-rstudio-workbench-v0.6.7"
 
 可先在安裝命令末尾加上 `--dry-run` 檢查計畫。Claude Code 或 Copilot 的設定選項分別為 `--configure-claude`、`--configure-copilot`；只選需要設定的客戶端。
 
-### Windows PowerShell：固定版快速安裝
+### Windows PowerShell：歷史 0.6.7 安裝
 
 ```powershell
 git clone --branch v0.6.7 --single-branch https://github.com/lzhs1995/clauder-rstudio-workbench.git "$env:USERPROFILE\projects\clauder-rstudio-workbench-v0.6.7"

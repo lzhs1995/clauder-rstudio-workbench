@@ -259,6 +259,9 @@ class AutoScaleTests(unittest.TestCase):
             self.assertTrue(result["auto_scale"])
             # no scale_up entries when memory is always over threshold
             self.assertFalse(any(e["action"] == "scale_up" for e in result["scale_log"]))
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["submit_log"], [])
+            self.assertEqual(result["pending"], ["w1", "w2", "w3"])
 
     def test_unknown_memory_holds(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -277,8 +280,10 @@ class AutoScaleTests(unittest.TestCase):
                 mem_probe_fn=lambda: None,  # probe unavailable
                 poll_interval_sec=0, sleep_fn=lambda s: None, max_iterations=20,
             )
-            self.assertTrue(result["ok"])
-            # never scaled up because memory was unknown
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["submit_log"], [])
+            self.assertEqual(result["pending"], ["w1", "w2"])
+            # 内存未知时保留原待办，不能逐个启动而耗尽未知资源。
             self.assertFalse(any(e["action"] == "scale_up" for e in result["scale_log"]))
 
     def test_cap_respects_max_parallel_cap(self) -> None:

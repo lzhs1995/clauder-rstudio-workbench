@@ -161,6 +161,16 @@ workers and lets existing workers drain; it never kills an already-running job
 just to reduce concurrency. Each decision and the observed memory/CPU/disk/
 backlog values are written to `scale_log` in the run result/evidence.
 
+Admission is separate from the target concurrency: a hold permits **zero new
+submissions**, including when no worker is running. A known CPU, disk, or backlog
+hold still applies when the memory probe is unavailable. Unknown memory, or an
+unknown metric with a configured hold threshold, also holds new submissions.
+The target slot count is retained, so fresh safe readings can refill it; the
+configured healthy-sample rule still controls any expansion. Existing jobs keep
+their original ids and continue to be polled while admission is held. Transport
+errors do not resubmit those jobs. These probes are local admission checks, not
+an atomic host-wide reservation across independent agents or fan-out runs.
+
 For the Mac CMAverse chain, the frozen policy is: start at 1, cap at 3, sample
 every 30 seconds, and require five consecutive samples with memory below 70%,
 CPU below 75%, disk above 200 GB, and upload backlog below 2 before adding one

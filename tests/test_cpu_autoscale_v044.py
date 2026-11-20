@@ -114,8 +114,9 @@ class CpuAwareAutoScaleTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
                 max_iterations=20,
             )
-            self.assertTrue(result["ok"])
-            self.assertEqual(submitted, ["w1", "w2", "w3"])
+            self.assertFalse(result["ok"])
+            self.assertEqual(submitted, [])
+            self.assertEqual(result["pending"], ["w1", "w2", "w3"])
             self.assertTrue(any(event["action"] == "throttle" for event in result["scale_log"]))
             self.assertFalse(any(event["action"] == "scale_up" for event in result["scale_log"]))
 

@@ -182,6 +182,11 @@ class OrphanGuardTests(unittest.TestCase):
         import psutil
         self.marker.update(pid=os.getpid(), created=psutil.Process().create_time() - 100)
         dump(self.dst / "ENGINE_STARTED.json", self.marker)
+        # Keep synthetic outputs inside the recorded original budget even when
+        # the full test suite has been running longer than that budget.
+        finished = self.marker["created"] + 1
+        for name in guard.OUTPUTS:
+            os.utime(self.dst / name, (finished, finished))
         result = self.assess()
         self.assertEqual(result["decision"], "ADOPTABLE_SAVED_OUTPUTS", result)
         self.assertIn("reused", result["process"]["reason"])

@@ -311,31 +311,54 @@ class Queue:
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY, at TEXT, kind TEXT, payload TEXT);
         """)
-        for key, value in dict(enabled=False, limit=1, cap=3, healthy=0, last_sample=0, producers_done=False).items():
-            self.db.execute("INSERT OR IGNORE INTO settings VALUES(?,?)", (key, json.dumps(value)))
-        config = self.root / "config.json"
-        settings = json.loads(config.read_text(encoding="utf-8-sig")) if config.exists() else {}
-        self.policy = {**DEFAULT_POLICY, **settings.get("resource_policy", {})}
-        self.windows_memory_profile = settings.get("windows_memory_profile")
-        if self.windows_memory_profile:
-            profile = Path(self.windows_memory_profile)
-            if not profile.is_absolute():
-                profile = self.root / profile
-            self.windows_memory_profile = str(profile)
-        self.profile_max_age_sec = float(self.policy.get("windows_profile_max_age_sec", 300))
-        self.producer_state_files = settings.get("producer_state_files", [])
-        self.mplus_command = settings.get("mplus")
-        # 新APIM工作流可选择加入跨运行目录的宿主机预约；既有队列默认不变。
-        self.host_reservation_path = settings.get("host_reservation_path")
-        if settings.get("apim_v2") and not self.db.execute("SELECT 1 FROM events LIMIT 1").fetchone():
-            cap = int(settings.get("parallel_cap", 1))
-            if cap not in (1, 2):
-                raise ValueError("APIM v2 parallel_cap must be 1 or 2")
-            self.set("cap", cap)
-            initial = int(settings.get("initial_parallel_limit", 1))
-            if initial < 1 or initial > cap or (initial > 1 and not settings.get("calibrated")):
-                raise ValueError("Parallel start requires a measured calibration")
-            self.set("limit", initial)
+        # 首次建库判定、默认值写入与声明校验在同一事务内；任一步失败整体回滚，重试仍按首次建库处理。
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            # init/enable 只写 settings 不写 events，所以“首次建库”以 settings 表为空判定。
+            fresh_db = not self.db.execute("SELECT 1 FROM settings LIMIT 1").fetchone()
+            for key, value in dict(enabled=False, limit=1, cap=3, healthy=0, last_sample=0, producers_done=False).items():
+                self.db.execute("INSERT OR IGNORE INTO settings VALUES(?,?)", (key, json.dumps(value)))
+            config = self.root / "config.json"
+            settings = json.loads(config.read_text(encoding="utf-8-sig")) if config.exists() else {}
+            self.policy = {**DEFAULT_POLICY, **settings.get("resource_policy", {})}
+            self.windows_memory_profile = settings.get("windows_memory_profile")
+            if self.windows_memory_profile:
+                profile = Path(self.windows_memory_profile)
+                if not profile.is_absolute():
+                    profile = self.root / profile
+                self.windows_memory_profile = str(profile)
+            self.profile_max_age_sec = float(self.policy.get("windows_profile_max_age_sec", 300))
+            self.producer_state_files = settings.get("producer_state_files", [])
+            self.mplus_command = settings.get("mplus")
+            # 新APIM工作流可选择加入跨运行目录的宿主机预约；既有队列默认不变。
+            self.host_reservation_path = settings.get("host_reservation_path")
+            if settings.get("apim_v2") and not self.db.execute("SELECT 1 FROM events LIMIT 1").fetchone():
+                cap = int(settings.get("parallel_cap", 1))
+                if cap not in (1, 2):
+                    raise ValueError("APIM v2 parallel_cap must be 1 or 2")
+                self.set("cap", cap)
+                initial = int(settings.get("initial_parallel_limit", 1))
+                if initial < 1 or initial > cap or (initial > 1 and not settings.get("calibrated")):
+                    raise ValueError("Parallel start requires a measured calibration")
+                self.set("limit", initial)
+            elif (not settings.get("apim_v2") and fresh_db
+                  and ("parallel_cap" in settings or "initial_parallel_limit" in settings)):
+                # 普通队列可在首次建库时直接声明并发起点与上限；每次 claim 仍逐项核内存/提交/CPU/线程/磁盘。
+                cap = settings.get("parallel_cap", 3)
+                initial = settings.get("initial_parallel_limit", 1)
+                if any(isinstance(v, bool) or not isinstance(v, int) for v in (cap, initial)):
+                    raise ValueError("parallel_cap and initial_parallel_limit must be integers")
+                if cap < 1 or cap > int(self.policy["processor_budget"]):
+                    raise ValueError("parallel_cap must be between 1 and processor_budget")
+                if initial < 1 or initial > cap:
+                    raise ValueError("initial_parallel_limit must be between 1 and parallel_cap")
+                self.set("cap", cap)
+                self.set("limit", initial)
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            self.db.close()
+            raise
         # 可选范围门控：同名历史成功输出只表示候选资格，不证明数值复现。
         self.success_policy = settings.get("historical_success_policy")
         self.success_names = None
@@ -752,11 +775,38 @@ class Queue:
     def tick(self, snapshot=None):
         snapshot = snapshot or resource_snapshot(self.windows_memory_profile, self.profile_max_age_sec)
         with self.transaction():
+            limit = self.get("limit")
+            # 陈旧或未来采样不累计健康次数，也不污染下次采样时间。
+            if not -5 <= time.time() - snapshot["at"] <= self.profile_max_age_sec:
+                self.set("healthy", 0)
+                self.event("resources", dict(**snapshot, healthy=0, limit=limit,
+                                             scale_up_reason="resource_sample_time_unverified"))
+                return
             if snapshot["at"] - self.get("last_sample") < 30:
                 return
-            good = snapshot["memory_percent"] < self.policy["memory_resume_percent"] and snapshot["cpu_percent"] < self.policy["cpu_resume_percent"] and snapshot["disk_free_gib"] >= self.policy["disk_reserve_gib"]
+            # 按 claim 的顺序找下一项真正需要估计且前置条件已满足的模型。
+            active = self.db.execute("SELECT payload,worker FROM tasks WHERE status='running'").fetchall()
+            running = self.running_for_admission(active)
+            rows = list(self.db.execute("SELECT * FROM tasks WHERE status='pending'"))
+            waiting_producers = self.waiting_producer_tasks()
+            rows.sort(key=lambda r: (0 if r["id"] in waiting_producers else 1, json.loads(r["payload"]).get("dispatch_priority", json.loads(r["payload"]).get("priority", 10)), -json.loads(r["payload"]).get("estimated_seconds", 0), r["created"]))
+            candidate = None
+            for row in rows:
+                payload = json.loads(row["payload"])
+                if payload.get("reuse_task"):
+                    continue
+                if self.success_names is not None and Path(payload["output"]).name.lower() not in self.success_names:
+                    continue
+                if self.dependencies_ready(payload)[0]:
+                    candidate = payload
+                    break
+            # 扩容只调整本队列槽位；真正领取仍须经过 claim 的原子宿主机预约。
+            reason = "no_ready_tasks" if candidate is None else admission_reason(
+                snapshot, running, candidate, min(limit + 1, self.get("cap")), self.policy)
+            if reason is None and snapshot["cpu_percent"] >= self.policy["cpu_resume_percent"]:
+                reason = "cpu_resume_hold"
+            good = reason is None
             healthy = self.get("healthy") + 1 if good else 0
-            limit = self.get("limit")
             if healthy >= 5 and limit < self.get("cap"):
                 limit += 1
                 healthy = 0
@@ -764,7 +814,9 @@ class Queue:
             self.set("limit", limit)
             self.set("last_sample", snapshot["at"])
             self.set("resources", snapshot)
-            self.event("resources", dict(**snapshot, healthy=healthy, limit=limit))
+            self.event("resources", dict(**snapshot, healthy=healthy, limit=limit,
+                                         scale_up_task=candidate["id"] if candidate else None,
+                                         scale_up_reason=reason))
 
     def state(self, full=True):
         tasks = [dict(r) for r in self.db.execute("SELECT * FROM tasks" + ("" if full else " WHERE status='running'") + " ORDER BY created,id")]
