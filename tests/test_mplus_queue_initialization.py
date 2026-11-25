@@ -1,5 +1,6 @@
 """初始化合成回归；所有数据库由测试临时目录独占，不启动模型。"""
 from concurrent.futures import ThreadPoolExecutor
+import contextlib
 import importlib.util
 import json
 from pathlib import Path
@@ -71,7 +72,7 @@ class QueueInitializationTests(unittest.TestCase):
                 for _ in range(2):
                     with self.assertRaises(ValueError):
                         MODULE.Queue(root)
-                with sqlite3.connect(root / "queue.sqlite", timeout=1) as db:
+                with contextlib.closing(sqlite3.connect(root / "queue.sqlite", timeout=1)) as db:
                     db.execute("BEGIN IMMEDIATE")
                     self.assertEqual(db.execute("SELECT count(*) FROM settings").fetchone()[0], 0)
                     db.rollback()
@@ -85,7 +86,7 @@ class QueueInitializationTests(unittest.TestCase):
         for _ in range(2):
             with self.assertRaises(json.JSONDecodeError):
                 MODULE.Queue(root)
-        with sqlite3.connect(root / "queue.sqlite") as db:
+        with contextlib.closing(sqlite3.connect(root / "queue.sqlite")) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM settings").fetchone()[0], 0)
         (root / "config.json").write_text('{"parallel_cap": 4, "initial_parallel_limit": 2}')
         self.assertEqual(self.values(self.open(root)), (2, 4, False))
@@ -137,7 +138,7 @@ class QueueInitializationTests(unittest.TestCase):
                 root = self.folder(config)
                 with self.assertRaises(ValueError):
                     MODULE.Queue(root)
-                with sqlite3.connect(root / "queue.sqlite") as db:
+                with contextlib.closing(sqlite3.connect(root / "queue.sqlite")) as db:
                     self.assertEqual(db.execute("SELECT count(*) FROM settings").fetchone()[0], 0)
 
     def test_apim_legacy_event_boundary_is_preserved(self):
@@ -194,7 +195,7 @@ class QueueInitializationTests(unittest.TestCase):
                 return "UNEXPECTED_SUCCESS"
         with ThreadPoolExecutor(max_workers=4) as pool:
             self.assertEqual(list(pool.map(invalid, range(4))), ["INVALID"] * 4)
-        with sqlite3.connect(root / "queue.sqlite") as db:
+        with contextlib.closing(sqlite3.connect(root / "queue.sqlite")) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM settings").fetchone()[0], 0)
         (root / "config.json").write_text('{"parallel_cap": 4, "initial_parallel_limit": 2}')
         self.assertEqual(self.values(self.open(root)), (2, 4, False))
