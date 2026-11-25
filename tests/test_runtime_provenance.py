@@ -19,10 +19,10 @@ class ProvenanceTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.venv = self.root / 'pair/venv'
-        self.python = self.venv / 'bin/python'
+        self.python = self.venv / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
         self.python.parent.mkdir(parents=True)
         self.python.touch()
-        self.site = self.venv / 'lib/python3.12/site-packages'
+        self.site = self.venv / ('Lib/site-packages' if os.name == 'nt' else 'lib/python3.12/site-packages')
         self.pkg = self.site / 'clauder_mcp'
         self.pkg.mkdir(parents=True)
         self.source = self.root / 'source/clauder-mcp'
@@ -39,8 +39,11 @@ class ProvenanceTests(unittest.TestCase):
             rows.append(['clauder_mcp/' + name, 'sha256=' + base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).decode().rstrip('='), str(len(raw))])
         with self.dist.joinpath('RECORD').open('w') as f:
             csv.writer(f).writerows(rows)
-        self.launcher = self.root / 'clauder-mcp'
-        self.launcher.write_text(f'#!{self.python}\nfrom clauder_mcp import main\n')
+        self.launcher = self.python.with_name('clauder-mcp.exe') if os.name == 'nt' else self.root / 'clauder-mcp'
+        if os.name == 'nt':
+            self.launcher.write_bytes(b'MZfixture')
+        else:
+            self.launcher.write_text(f'#!{self.python}\nfrom clauder_mcp import main\n')
         self.register_dispatcher(self.launcher, self.dist, self.site)
         self.env = {'HOME': str(self.root), 'USERPROFILE': str(self.root), 'UV_CACHE_DIR': str(self.root / 'cache')}
         self.server = {'command': str(self.launcher), 'env': self.env, 'startup_timeout_sec': 180}
@@ -124,6 +127,8 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(self.inspect('claude')['reasons'], ['R_STUDIO_DISABLED_OR_INVALID'])
 
     def test_shell_override_selected_only_if_launcher_supports_it(self):
+        self.launcher = self.root / 'clauder-mcp'
+        self.server['command'] = str(self.launcher)
         self.launcher.write_text('#!/bin/sh\nset -eu\nPYTHON="${CLAUDER_WORKBENCH_MCP_PYTHON:-/missing/default/python}"\nexec "$PYTHON" -c \'from clauder_mcp import main; raise SystemExit(main())\' "$@"\n')
         self.env['CLAUDER_WORKBENCH_MCP_PYTHON'] = str(self.python)
         self.write_config('claude', self.paths['claude'])
@@ -213,8 +218,8 @@ class ProvenanceTests(unittest.TestCase):
             self.write_config('claude', self.paths['claude'])
             self.assertEqual(self.inspect('claude')['reasons'], ['EXPLICIT_ABSOLUTE_UV_CACHE_REQUIRED'])
 
-    def test_tampered_console_dispatcher_rejected(self):
-        self.launcher.write_text(self.launcher.read_text() + '# changed dispatcher\n')
+    def test_tampered_recorded_dispatcher_rejected(self):
+        self.launcher.write_bytes(self.launcher.read_bytes() + b'\n# changed dispatcher\n')
         self.assertEqual(self.inspect()['reasons'], ['BRIDGE_DISPATCHER_RECORD_MISMATCH'])
 
     def test_remote_source_url_is_not_local_provenance(self):
