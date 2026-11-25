@@ -56,9 +56,9 @@ failure.
 
 The original son terminal counted all calls as `A_members=21`; actual membership
 is 20 A plus one B. Use the frozen `primary_sequence` and member-source table.
-The three education families also inherited `dfcom=437` from the larger SD
-sample. Their actual community counts imply 431 (gender), 432 (oldest), and
-432 (son) under this project's communities-minus-one sensitivity convention.
+The three education families also inherited `dfcom=见本机证据 <r1d-sd-complete-data-df>` from the larger SD
+sample. Their actual community counts imply `见本机证据 <r1d-gender-communities-minus-one>` (gender), `见本机证据 <r1d-oldest-communities-minus-one>` (oldest), and
+`见本机证据 <r1d-son-communities-minus-one>` (son) under this project's communities-minus-one sensitivity convention.
 This convention is not an exact finite-sample robust-cluster correction.
 
 Recompute only derived finite-df sensitivity tables from the saved parameter

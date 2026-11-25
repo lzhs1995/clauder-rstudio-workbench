@@ -1257,7 +1257,7 @@
         },
         "real_data_swap": {
           "status": "pass",
-          "source": "assets/real_data_receipts/PP_LGCM__CHARLS__20261115.json",
+          "source": "assets/real_data_receipts/PP_LGCM__CHARLS__20261126.json",
           "note": "Harmonized CHARLS 四期（2011–2018）抑郁与自评健康双过程协变型潜增长换源（MLR），通过源列改名重排一致性核验"
         },
         "historical_replay": {

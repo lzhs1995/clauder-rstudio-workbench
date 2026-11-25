@@ -71,8 +71,8 @@ unclassified review items. An input-line truncation warning must not be silently
 cleared just because the displayed excerpt resembles a comment.
 
 In the source-corrected Chapter 4 inventory, all-template and manuscript counts
-differ: 72 versus 60 missing-X warnings. The screen found option-only warnings in
-445 of 781 existing outputs, including 352 manuscript dependencies. These are
+differ: `见本机证据 <r1d-scientific-inventory-all-template-missing-x-frequency>` versus `见本机证据 <r1d-scientific-inventory-manuscript-missing-x-frequency>` missing-X warnings. The screen found option-only warnings in
+`见本机证据 <r1d-scientific-inventory-option-warning-frequency>` of 781 existing outputs, including `见本机证据 <r1d-scientific-manuscript-option-warning-frequency>` manuscript dependencies. These are
 screen-specific counts, not scientific acceptance or a general property of Mplus.
 
 For lifecycle/domain comparisons, bind TYPE, ESTIMATOR, CLUSTER, USEOBSERVATIONS,
@@ -143,10 +143,10 @@ unresolved. Preserve source manuscripts and offer isolated replacements/wording.
 
 ## Verified case and limits (2026-10-02, Chapter 4)
 
-In one 612-output audit, all outputs ended, but only 540 had the normal-termination
-marker. The other 72 were mediation fits with identification/SE diagnostics even
+In one 612-output audit, all outputs ended, but only `见本机证据 <r1d-scientific-normal-termination-frequency>` had the normal-termination
+marker. The other `见本机证据 <r1d-scientific-mediation-identification-se-frequency>` were mediation fits with identification/SE diagnostics even
 though their estimates matched historical outputs at reported precision. Across
-all models, 360 had relevant derivative/SE diagnostics. These are case-specific
+all models, `见本机证据 <r1d-scientific-derivative-se-frequency>` had relevant derivative/SE diagnostics. These are case-specific
 counts, not general Mplus failure rates or proof that an upgrade caused the issue.
 
 Evidence relative to the dissertation R-analysis workspace:
@@ -176,9 +176,9 @@ Evidence relative to the dissertation R-analysis workspace:
   including implicit dependent variables. Removing unused variables is different
   from adding them as confounders; whether the original regression omitted needed
   controls remains a separate substantive question.
-- Count and classify warnings beyond MODINDICES. The full audit also found 168
-  TYPE=COMPLEX subpopulation warnings, 132 missing-X exclusions, and one run with
-  only 999 of 1,000 requested draws. Check `Number of bootstrap draws` followed by
+- Count and classify warnings beyond MODINDICES. The full audit also found `见本机证据 <r1d-scientific-subpopulation-warning-frequency>`
+  TYPE=COMPLEX subpopulation warnings, `见本机证据 <r1d-scientific-missing-x-exclusion-frequency>` missing-X exclusions, and `见本机证据 <r1d-scientific-incomplete-bootstrap-run-frequency>` run with
+  only `见本机证据 <r1d-scientific-completed-bootstrap-draws>` of 1,000 requested draws. Check `Number of bootstrap draws` followed by
   Requested/Completed; a failed header match means unchecked, not zero draws.
   A completed draw count does not establish the correct resampling unit.
 - The source CSV contained 22-digit concatenated couple/year IDs. Current DAT

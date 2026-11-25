@@ -229,7 +229,7 @@ APIM 调节模型：成对或共享的连续/二分/多分类调节变量与乘�
 - Tests: `scripts/test_rstudio_queue_admission.py` (CI mplus-guide-registry.yml), `scripts/test_pp_lgcm_compile_20261108.R` (CI mplus-guide-family-tests.yml)
 - synthetic_compile: pass; source `pp_lgcm_compile`; 只覆盖固定时间双过程协变型 LGCM 的换名、换序编译，不估计
 - native_synthetic: pass; source `assets/native_acceptance_20261115.json`; Windows RStudio + ClaudeR + Mplus 9 跑通双过程线性/二次/分段 3 组形状的 original 与改名重排一致性及改值敏感性共 7 个模型
-- real_data_swap: pass; source `assets/real_data_receipts/PP_LGCM__CHARLS__20261115.json`; Harmonized CHARLS 四期（2011–2018）抑郁与自评健康双过程协变型潜增长换源（MLR），通过源列改名重排一致性核验
+- real_data_swap: pass; source `assets/real_data_receipts/PP_LGCM__CHARLS__20261126.json`; Harmonized CHARLS 四期（2011–2018）抑郁与自评健康双过程协变型潜增长换源（MLR），通过源列改名重排一致性核验
 - historical_replay: pending
 - Thesis: PP-LGCM 稿表 4.2.1、4.3.1、4.4.2.1
 - Gap: parallel_growth_model_syntax() 只编译固定时间的双过程协变型 LGCM；自由载荷、跨过程定向路径、观测残差相关、交互与多重插补仍要外部已审规格，历史生产脚本在论文工作区
