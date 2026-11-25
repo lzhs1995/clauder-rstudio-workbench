@@ -191,7 +191,10 @@ def live_guardian(claim, work, member):
             try:
                 observed.wait(timeout=.2)
             except psutil.TimeoutExpired:
-                pass
+                # 超时只描述wait的观察；原实例可能已在返回调用者前退出。
+                # 和空身份分支一样重新核终态；仍活或仍不可读继续HOLD。
+                if process_finished(observed):
+                    return False
             else:
                 return False
         except psutil.NoSuchProcess:
