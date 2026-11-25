@@ -40,7 +40,7 @@ mover 专属矩阵；`G → C1` 是给定 G 的初始类别分布，不是时间
 
 ## 3. 第七章对应实现
 
-q1629 的实际语法含 `G(2)`、`G#1` movers 和 `G#2` stayers，且为两期（16a20）`c1(4) c3(4)`；这不是本次 replay 的全四波 MS-LTA，故按语法应归入 MS-LTA。不要把这三个潜变量的声明折算成一个平坦的“类别数”：readback summary 的聚合潜变量字段不能替代逐项语法分类。其 Step-3 归档输入在 N=7008 上完成新鲜复现，但四个 mover multinomial logits 被 Mplus 自动修复；这属于 `FRESH_EXACT_REPLAY_WITH_DIAGNOSTIC`，不是没有条件的 clean pass。
+q1629 的实际语法含 `G(2)`、`G#1` movers 和 `G#2` stayers，且为两期（16a20）`c1(4) c3(4)`；这不是本次 replay 的全四波 MS-LTA，故按语法应归入 MS-LTA。不要把这三个潜变量的声明折算成一个平坦的“类别数”：readback summary 的聚合潜变量字段不能替代逐项语法分类。其 Step-3 归档输入在 N=7008 上完成新鲜复现，但`见本机证据 <r1d-ms-lta-autorepaired-logit-frequency>` mover multinomial logits 被 Mplus 自动修复；这属于 `FRESH_EXACT_REPLAY_WITH_DIAGNOSTIC`，不是没有条件的 clean pass。
 
 2026-11-04 的归档核查另定位到四波
 `MS_lta_inv_3step_16_22_ref.cat.4_no_change.inp`：

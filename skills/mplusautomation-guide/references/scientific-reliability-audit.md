@@ -5,8 +5,8 @@
 Use character fid/cid/year keys to compare records across DAT files, after checking
 within-file uniqueness and source hashes. Distinct rows in stage partitions do
 not imply independent clusters. The Chapter 4 full samples partitioned 9,121 rows
-but shared 559 spouse clusters between stages; rank-observed samples partitioned
-4,423 rows with 262 shared clusters. Stage-difference SEs require their covariance
+but shared `见本机证据 <r1d-ch4-cross-stage-couple-overlap>` spouse clusters between stages; rank-observed samples partitioned
+4,423 rows with `见本机证据 <r1d-ch4-rank-cross-stage-cluster-overlap>` shared clusters. Stage-difference SEs require their covariance
 or a joint cluster procedure, not an independent-sample formula.
 
 All 612 candidate models and 279 main manuscript items were linked to six actual
@@ -71,8 +71,8 @@ unclassified review items. An input-line truncation warning must not be silently
 cleared just because the displayed excerpt resembles a comment.
 
 In the source-corrected Chapter 4 inventory, all-template and manuscript counts
-differ: 72 versus 60 missing-X warnings. The screen found option-only warnings in
-445 of 781 existing outputs, including 352 manuscript dependencies. These are
+differ: `见本机证据 <r1d-scientific-inventory-all-template-missing-x-frequency>` versus `见本机证据 <r1d-scientific-inventory-manuscript-missing-x-frequency>` missing-X warnings. The screen found option-only warnings in
+`见本机证据 <r1d-scientific-inventory-option-warning-frequency>` of 781 existing outputs, including `见本机证据 <r1d-scientific-manuscript-option-warning-frequency>` manuscript dependencies. These are
 screen-specific counts, not scientific acceptance or a general property of Mplus.
 
 For lifecycle/domain comparisons, bind TYPE, ESTIMATOR, CLUSTER, USEOBSERVATIONS,
@@ -80,15 +80,15 @@ SUBPOPULATION, WEIGHT and STRATIFICATION to the actual input. Distinguish exact
 cluster-key overlap before model exclusions from effective cluster counts. The
 corrected historical inventory contains 168 COMPLEX/MLR/FID manuscript models
 (8 direct, 160 moderation) without declared weights or stratification. Its stage
-DATs share 615 and 623 FID keys, not spouse-pair keys. All 168 Ns reconcile after
-missing-X exclusions; 128 cluster counts match the pre-exclusion frame. Investigate
-the remaining 40 through their effective samples, not by assuming data errors.
+DATs share `见本机证据 <r1d-ch4-stage-shared-fid-key-count-first>` and `见本机证据 <r1d-ch4-stage-shared-fid-key-count-second>` FID keys, not spouse-pair keys. All 168 Ns reconcile after
+missing-X exclusions; `见本机证据 <r1d-ch4-pre-exclusion-cluster-match-model-frequency>` cluster counts match the pre-exclusion frame. Investigate
+the remaining `见本机证据 <r1d-ch4-cluster-reconciliation-subset-frequency>` through their effective samples, not by assuming data errors.
 Separate domain variance, cross-domain covariance, and effect scale: stage-specific
 standardization also changes the comparison. Significant in one domain and not
 another is not a test of their difference. Undeclared survey weights limit claims
 of full survey-design inference, without alone invalidating a conditional estimand.
 
-The remaining 40 rank models were subsequently reconciled by applying their actual
+The remaining `见本机证据 <r1d-ch4-cluster-reconciliation-subset-frequency>` rank models were subsequently reconciled by applying their actual
 DEFINE assignments and missing predictor/interaction masks: all N, exclusion and
 FID counts match, with 664/1564 effective stage FIDs and 273 shared keys. Missing
 outcomes were absent in this check; do not generalize its complete-variable mask
@@ -143,10 +143,10 @@ unresolved. Preserve source manuscripts and offer isolated replacements/wording.
 
 ## Verified case and limits (2026-10-02, Chapter 4)
 
-In one 612-output audit, all outputs ended, but only 540 had the normal-termination
-marker. The other 72 were mediation fits with identification/SE diagnostics even
+In one 612-output audit, all outputs ended, but only `见本机证据 <r1d-scientific-normal-termination-frequency>` had the normal-termination
+marker. The other `见本机证据 <r1d-scientific-mediation-identification-se-frequency>` were mediation fits with identification/SE diagnostics even
 though their estimates matched historical outputs at reported precision. Across
-all models, 360 had relevant derivative/SE diagnostics. These are case-specific
+all models, `见本机证据 <r1d-scientific-derivative-se-frequency>` had relevant derivative/SE diagnostics. These are case-specific
 counts, not general Mplus failure rates or proof that an upgrade caused the issue.
 
 Evidence relative to the dissertation R-analysis workspace:
@@ -176,9 +176,9 @@ Evidence relative to the dissertation R-analysis workspace:
   including implicit dependent variables. Removing unused variables is different
   from adding them as confounders; whether the original regression omitted needed
   controls remains a separate substantive question.
-- Count and classify warnings beyond MODINDICES. The full audit also found 168
-  TYPE=COMPLEX subpopulation warnings, 132 missing-X exclusions, and one run with
-  only 999 of 1,000 requested draws. Check `Number of bootstrap draws` followed by
+- Count and classify warnings beyond MODINDICES. The full audit also found `见本机证据 <r1d-scientific-subpopulation-warning-frequency>`
+  TYPE=COMPLEX subpopulation warnings, `见本机证据 <r1d-scientific-missing-x-exclusion-frequency>` missing-X exclusions, and `见本机证据 <r1d-scientific-incomplete-bootstrap-run-frequency>` run with
+  only `见本机证据 <r1d-scientific-completed-bootstrap-draws>` of 1,000 requested draws. Check `Number of bootstrap draws` followed by
   Requested/Completed; a failed header match means unchecked, not zero draws.
   A completed draw count does not establish the correct resampling unit.
 - The source CSV contained 22-digit concatenated couple/year IDs. Current DAT
@@ -249,7 +249,7 @@ under `scientific_audit_20261002/validation/probe_validation_recovery.md` and th
 current/unified probe ledgers; neither candidate is a new Mplus fit or release.
 
 Count both data records and unique cluster IDs, including overlap between phase
-samples. Chapter 4 has 9,121 records from 4,073 couples; 559 couples occur in both
+samples. Chapter 4 has 9,121 records from 4,073 couples; `见本机证据 <r1d-ch4-cross-stage-couple-overlap>` couples occur in both
 phases. Year dummies do not remove within-couple dependence. Significance in one
 phase and not the other does not establish a phase difference. Ordinary bootstrap
 does not become cluster bootstrap because year indicators or dyadic equations

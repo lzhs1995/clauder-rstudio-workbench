@@ -50,7 +50,7 @@ larger models. Preserve the earlier failed/idle-only observations as failed scop
 Independent optimizer agreement does not erase a strict Mplus calibration
 exception. Keep the predeclared parameter/LL tolerances, retain each exception
 and add the independent outcome as a separate field. The first three new checks
-agreed within about 2.15e-6, 4.02e-6 and 4.04e-6; the fourth remained pending at
+agreed within about `见本机证据 <r1d-low-memory-comparison-a>`, `见本机证据 <r1d-low-memory-comparison-b>` and `见本机证据 <r1d-low-memory-comparison-c>`; the fourth remained pending at
 the initial memory-constrained checkpoint. Consult current receipts, not these
 historical counts, before deciding what to execute next.
 

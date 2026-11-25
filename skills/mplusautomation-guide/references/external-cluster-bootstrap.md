@@ -39,9 +39,9 @@ likelihood alone does not establish matching parameter identities or SEs.
 
 In the Chapter 4 pilot, `apimem_total_age-incc-clo_step1` had 9,121 records,
 4,073 couples and 110 free parameters. The R kernel differed from saved Mplus
-coefficients by at most 1.671e-5, with LL differing by -0.000228 from the
+coefficients by at most 1.671e-5, with LL differing by `见本机证据 <r1d-external-cluster-ll-difference-first>` from the
 three-decimal Mplus print. Independent lavaan BFGS gave maximum parameter
-difference 2.647e-7 and LL difference about 1.02e-10. Three whole-couple draws
+difference 2.647e-7 and LL difference about `见本机证据 <r1d-external-cluster-ll-difference-second>`. Three whole-couple draws
 (9,064, 9,197 and 9,124 rows) matched the independent solver within 2.586e-7.
 This is a one-model numerical validation, not a general replacement of Mplus.
 

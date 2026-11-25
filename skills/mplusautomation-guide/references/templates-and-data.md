@@ -60,8 +60,8 @@ are expected changes for later native template expansion, not a substitute for
 `createModels()` or evidence of successful estimation. Keep runnable inputs and
 data generation out of this review step.
 
-The 2328-candidate historical inventory has 781 existing outputs: 757 terminal
-results with screen flags and 24 errors; 1547 have no output. A screen flag can be
+The 2328-candidate historical inventory has 781 existing outputs: `见本机证据 <r1d-historical-terminal-output-frequency>` terminal
+results with screen flags and `见本机证据 <r1d-historical-error-output-frequency>` errors; 1547 have no output. A screen flag can be
 an ordinary input warning, so it does not establish statistical failure. Bind
 each existing output by hash and classify errors/ending/results/diagnostics before
 deciding what can be reused under the selected data/engine contract. The counts
