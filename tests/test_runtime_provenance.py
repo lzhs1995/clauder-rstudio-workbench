@@ -37,7 +37,7 @@ class ProvenanceTests(unittest.TestCase):
             (self.pkg / name).write_bytes(raw)
             (self.source / 'src/clauder_mcp' / name).write_bytes(raw)
             rows.append(['clauder_mcp/' + name, 'sha256=' + base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).decode().rstrip('='), str(len(raw))])
-        with self.dist.joinpath('RECORD').open('w') as f:
+        with self.dist.joinpath('RECORD').open('w', newline='') as f:
             csv.writer(f).writerows(rows)
         self.launcher = self.python.with_name('clauder-mcp.exe') if os.name == 'nt' else self.root / 'clauder-mcp'
         if os.name == 'nt':
@@ -68,7 +68,7 @@ class ProvenanceTests(unittest.TestCase):
     def register_dispatcher(self, dispatcher, dist, site):
         raw = dispatcher.read_bytes()
         digest = 'sha256=' + base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).decode().rstrip('=')
-        with (dist / 'RECORD').open('a') as f:
+        with (dist / 'RECORD').open('a', newline='') as f:
             csv.writer(f).writerow([os.path.relpath(dispatcher, site), digest, str(len(raw))])
 
     def inspect(self, client='codex'):
