@@ -31,8 +31,8 @@ cells:
 
 | output evidence | audit label | permitted use |
 | --- | --- | --- |
-| 31 files with ordinary Mplus warnings and no explicit non-normal termination | `COMPLETED_WITH_WARNINGS` | historical table-cell comparison after warning review; not a new scientific claim |
-| 19 files with an input-level `SAVEDATA`/auxiliary error but `MODEL RESULTS` and an ending timestamp | `INPUT_INSTRUCTION_ERROR_MODEL_RESULTS_PRESENT` | technical or historical numerical corroboration only; do not use missing factor scores/VCOV for downstream inference |
+| `见本机证据 <r1d-deferred-ordinary-warning-file-frequency>` files with ordinary Mplus warnings and no explicit non-normal termination | `COMPLETED_WITH_WARNINGS` | historical table-cell comparison after warning review; not a new scientific claim |
+| `见本机证据 <r1d-deferred-input-error-file-frequency>` files with an input-level `SAVEDATA`/auxiliary error but `MODEL RESULTS` and an ending timestamp | `INPUT_INSTRUCTION_ERROR_MODEL_RESULTS_PRESENT` | technical or historical numerical corroboration only; do not use missing factor scores/VCOV for downstream inference |
 | a file with an incomplete replication, ill-conditioned/non-positive Fisher information, or unavailable SE | `ESTIMATION_NONNORMAL` | retain as a technical limitation; do not select the successful imputation members |
 | missing output or no terminal evidence | `MISSING_OUTPUT` or `INCOMPLETE_OR_UNCLASSIFIED` | deferred until a new contract exists |
 
@@ -76,7 +76,7 @@ The source audit receipt is:
 The native ClaudeR/MplusAutomation spot-check receipt is
 `reports/cfps_deferred_recovery_queue_20261004/cfps_deferred_mplusautomation_readback_v1.md`.
 It demonstrates that `readModels()` can parse a non-normal file (134 parameter
-rows and 17 warning blocks) while preserving the separate MI completion and
+rows and `见本机证据 <r1d-deferred-warning-block-frequency>` warning blocks) while preserving the separate MI completion and
 standard-error validity gate.
 
 It records `new_mplus_submission=0` and `source_mutation=false`. The report is

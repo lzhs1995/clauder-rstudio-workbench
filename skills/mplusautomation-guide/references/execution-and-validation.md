@@ -77,7 +77,7 @@ five rejected attempts; completed outputs still require their own diagnostic
 review. Input rejection is not evidence that the scientific specification fails.
 
 The five order-only retries subsequently completed with normal markers, unchanged
-DAT hashes and matching parent sample sizes. Three retained the expected warning
+DAT hashes and matching parent sample sizes. `见本机证据 <r1d-order-retry-warning-model-frequency>` retained the expected warning
 that 4,698 records with missing exogenous variables were excluded (N=4,423).
 Do not turn a narrow diagnostic screen returning false into “no warnings.” Search
 explicit warning/error markers and diagnostic phrases, retaining adjacent lines;
