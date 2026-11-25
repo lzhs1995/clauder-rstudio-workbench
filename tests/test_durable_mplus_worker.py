@@ -559,15 +559,33 @@ class DurableMplusWorkerTests(unittest.TestCase):
         owner.binding["resource_contract"]["resource_wait_seconds"] = .05
         owner.binding["poll_seconds"] = .02
         intent["admission_deadline"] = time.time() - 1
-        with mock.patch.object(worker, "memory_state", return_value={"available_gib": 0, "commit_available_gib": 0}), \
-                mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
-                mock.patch.object(worker.psutil, "process_iter", return_value=[]):
-            with self.assertRaises(worker.Rejected):
+        # 只由准入等待推进时钟；真实原子写入和fsync不再竞争50毫秒测试窗口。
+        elapsed = [0.0]
+
+        def advance(seconds):
+            self.assertGreater(seconds, 0)
+            elapsed[0] += seconds
+
+        clock = mock.Mock(wraps=time)
+        clock.monotonic.side_effect = lambda: elapsed[0]
+        clock.sleep.side_effect = advance
+        with mock.patch.object(worker, "time", clock):
+            with mock.patch.object(worker, "memory_state", return_value={"available_gib": 0, "commit_available_gib": 0}), \
+                    mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
+                    mock.patch.object(worker.psutil, "process_iter", return_value=[]):
+                with self.assertRaisesRegex(worker.Rejected, "Resource admission window expired"):
+                    owner.admit(self.members[0], intent)
+            self.assertAlmostEqual(elapsed[0], .05)
+            with mock.patch.object(worker, "memory_state", return_value={"available_gib": 100, "commit_available_gib": 100}), \
+                    mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
+                    mock.patch.object(worker.psutil, "process_iter", return_value=[]):
                 owner.admit(self.members[0], intent)
-        with mock.patch.object(worker, "memory_state", return_value={"available_gib": 100, "commit_available_gib": 100}), \
-                mock.patch.object(worker.psutil, "cpu_percent", return_value=0), \
-                mock.patch.object(worker.psutil, "process_iter", return_value=[]):
-            owner.admit(self.members[0], intent)
+        receipts = [read(p) for p in (self.work / "attempts" / self.members[0]).glob("ADMISSION_*.RESULT.json")]
+        self.assertEqual(sorted(r["state"] for r in receipts), ["ADMITTED", "HOLD"])
+        for receipt in receipts:
+            self.assertEqual(receipt["attempt_id"], intent["attempt_id"])
+            self.assertFalse(receipt["engine_budget_changed"])
+            self.assertAlmostEqual(receipt["elapsed_seconds"], .05 if receipt["state"] == "HOLD" else 0)
         self.assertEqual((self.work / "attempts" / self.members[0] / "INTENT.json").read_bytes(), original)
         self.assertFalse((self.work / "attempts" / self.members[0] / "CLAIM.json").exists())
         self.assertEqual(owner.budget()["reserved_calls"], 1)
