@@ -214,6 +214,13 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
         "bare_mcp": bare_mcp,
     })
 
+    if persistent:
+        # connection-diagnose等旧调用者也沿实际配置核运行时，不把INFO声明当证明。
+        from .runtime_provenance import inspect_client
+        checked = inspect_client("codex", CODEX_CONFIG)
+        result.update(checked)
+        return result
+
     if bare_mcp:
         result["reasons"].append("r-studio MCP uses bare clauder-mcp without --from; this can pull an unpinned PyPI build and lose local fork features")
     elif not persistent:
@@ -264,77 +271,27 @@ def _check_codex_rstudio_mcp_config(install_info: dict[str, Any] | None = None) 
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    reasons: list[str] = []
-    warnings: list[str] = []
+    from .runtime_provenance import inspect_client, select_clients
     install_info, install_info_path = _load_install_info()
-    expected_clients = _expected_clients(args, install_info)
-    py_smoke = run_python_smoke()
-    if not PYTHON314 or not PYTHON314.exists():
-        warnings.append(f"preferred harness Python missing: {PYTHON314}; using {python_command()}")
-    if IS_WINDOWS and str(WINDOWS_STORE_PYTHON).lower() in current_python().lower():
-        reasons.append("current python appears to be WindowsApps redirector")
-    if not LOCAL_CLAUDER_BRIDGE.exists():
-        warnings.append(f"local patched ClaudeR bridge missing: {LOCAL_CLAUDER_BRIDGE}")
-    if not DISCOVERY_DIR.exists():
-        warnings.append(f"discovery directory missing: {DISCOVERY_DIR}")
-    codex_rstudio_mcp_info: dict[str, Any] = {}
-    if "codex" in expected_clients:
-        if not CODEX_CONFIG.exists():
-            warnings.append(f"Codex config missing: {CODEX_CONFIG}")
-        else:
-            codex_rstudio_mcp_info = _check_codex_rstudio_mcp_config(install_info)
-            reasons.extend(codex_rstudio_mcp_info.get("reasons", []))
-            warnings.extend(codex_rstudio_mcp_info.get("warnings", []))
-            if not codex_config_mentions_local_bridge() and not codex_rstudio_mcp_info.get("persistent_entry"):
-                warnings.append("Codex config does not mention local patched ClaudeR bridge")
-    if "claude" in expected_clients and not CLAUDE_JSON.exists():
-        warnings.append(f"Claude Code user config missing: {CLAUDE_JSON}")
-    if "copilot" in expected_clients and not COPILOT_CONFIG.exists():
-        warnings.append(f"Copilot MCP config missing: {COPILOT_CONFIG}")
-
-    # v0.2.4: 可选 TOML parse 自检，防止 install.ps1 写坏 .codex/config.toml 后无人发现
-    toml_parse_info: dict[str, Any] = {}
-    if getattr(args, "check_toml_parse", False) and "codex" in expected_clients:
-        toml_parse_info = _check_codex_toml_parseable()
-        if not toml_parse_info.get("ok", True):
-            reasons.append(
-                f"Codex config.toml parse failed: {toml_parse_info.get('error', 'unknown')}; "
-                f"see guide section 27.11 for recovery."
-            )
-
-    exit_code = BLOCK if reasons else WARN if warnings else PASS
-    decision = "BLOCK" if reasons else "WARN" if warnings else "PASS"
-    doc = build_evidence(
-        "doctor",
-        decision,
-        reasons=reasons + warnings or ["configuration checks passed"],
-        exit_code=exit_code,
-        extra={
-            "python314": str(PYTHON314),
-            "python_command": python_command(),
-            "current_python": current_python(),
-            "python_smoke": py_smoke,
-            "local_bridge": str(LOCAL_CLAUDER_BRIDGE),
-            "persistent_mcp": str(PERSISTENT_MCP),
-            "uv_cache_dir": str(UV_CACHE_DIR),
-            "home": str(HOME),
-            "platform": "windows" if IS_WINDOWS else sys.platform,
-            "discovery_dir": str(DISCOVERY_DIR),
-            "codex_config": str(CODEX_CONFIG),
-            "claude_json": str(CLAUDE_JSON),
-            "copilot_config": str(COPILOT_CONFIG),
-            "install_info_path": str(install_info_path) if install_info_path else "",
+    clients = select_clients(args.expect_client, install_info)
+    if args.config_file and len(clients) != 1:
+        return emit(build_evidence("doctor", "BLOCK", reasons=["EXPLICIT_CONFIG_REQUIRES_ONE_CLIENT"], exit_code=BLOCK))
+    checks = {client: inspect_client(client, args.config_file) for client in clients}
+    reasons = [client + ": " + reason for client, check in checks.items() for reason in check["reasons"]]
+    warnings = [client + ": " + reason for client, check in checks.items() for reason in check["warnings"]]
+    code = BLOCK if reasons else WARN if warnings else PASS
+    return emit(build_evidence("doctor", "BLOCK" if reasons else "WARN" if warnings else "PASS",
+        reasons=reasons + warnings or ["selected client configuration and installed bridge checks passed"],
+        exit_code=code, extra={
+            "expect_client": args.expect_client, "expected_clients": clients,
+            "client_checks": checks,
+            "install_info_path": str(install_info_path) if install_info_path else None,
             "install_info": install_info,
-            "expect_client": args.expect_client,
-            "expected_clients": expected_clients,
-            "discovery_sessions": discovery_sessions(),
-            "toml_parse_check": toml_parse_info,
-            "codex_rstudio_mcp_check": codex_rstudio_mcp_info,
-            "verification_scope": "configuration_and_discovery_only",
+            "install_info_scope": "source_or_legacy_install_declarations_only_not_runtime_proof",
+            "codex_rstudio_mcp_check": checks.get("codex", {}),
+            "verification_scope": "configuration_and_installed_bridge_files_only",
             "not_verified": ["bridge_execution", "live_r_execution", "agent_native_tools", "interactive_terminal"],
-        },
-    )
-    return emit(doc)
+        }))
 
 
 def cmd_connection_diagnose(args: argparse.Namespace) -> int:
@@ -1916,14 +1873,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("doctor")
     p.add_argument("--expect-client", choices=["auto", "codex", "claude", "copilot", "all"], default="auto")
+    p.add_argument("--config-file", type=Path, help="Read this client configuration file; never writes it")
     p.add_argument("--check-toml-parse", action="store_true",
                    help="Validate that Codex config.toml parses cleanly; BLOCK if it does not.")
 
     p = sub.add_parser(
         "session-bootstrap",
-        help="Global Codex SessionStart preflight; validates persistent ClaudeR/RStudio configuration",
+        help="Client-specific preflight; validates configured ClaudeR bridge files without claiming live loading",
     )
     p.add_argument("--client", choices=["codex", "claude", "copilot"], default="codex")
+    p.add_argument("--config-file", type=Path)
     p.add_argument("--no-fail-closed", action="store_true",
                    help="Always return zero (for informational hooks); native registration is still not claimed")
 
@@ -2188,7 +2147,7 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_doctor(args)
         if args.cmd == "session-bootstrap":
             from .session_bootstrap import run as run_session_bootstrap
-            return run_session_bootstrap(client=args.client, fail_closed=not args.no_fail_closed)
+            return run_session_bootstrap(client=args.client, fail_closed=not args.no_fail_closed, config_file=args.config_file)
         if args.cmd == "connection-diagnose":
             return cmd_connection_diagnose(args)
         if args.cmd == "ensure-ready":

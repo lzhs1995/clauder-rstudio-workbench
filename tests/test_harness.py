@@ -736,7 +736,7 @@ class HarnessUnitTests(unittest.TestCase):
             text.index("    Install-Skill", main_start),
         )
 
-    def test_codex_rstudio_mcp_check_accepts_persistent_lzhs_entry(self) -> None:
+    def test_codex_rstudio_mcp_check_rejects_source_declarations_without_runtime(self) -> None:
         from clauder_workbench import cli as cli_mod
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -754,9 +754,10 @@ class HarnessUnitTests(unittest.TestCase):
                     "clauder_mcp_install_mode": "uv_tool_from_local_lzhs_fork",
                     "clauder_mcp_source": str(bridge),
                 })
-        self.assertTrue(result["ok"], result)
+        self.assertFalse(result["ok"], result)
         self.assertTrue(result["persistent_entry"])
         self.assertEqual(result["startup_timeout_sec"], 180.0)
+        self.assertTrue(result["reasons"])
 
     def test_codex_rstudio_mcp_check_blocks_bare_upstream_risk(self) -> None:
         from clauder_workbench import cli as cli_mod
