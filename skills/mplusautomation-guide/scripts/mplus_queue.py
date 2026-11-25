@@ -322,23 +322,42 @@ def inspect_output(path, savedata_contract=None):
                 reasons=reasons, warnings=warnings, savedata_files=savedata_files, output=str(path), sha256=sha256(path))
 
 
+def _enable_wal(connection):
+    # 首次并发切换 journal_mode 时，SQLite 可能绕过 busy handler 立即返回 SQLITE_BUSY。
+    # 仅在此阶段自行计时，防止每次内置等待再次消耗 30 秒；成功后恢复连接原定等待。
+    connection.execute("PRAGMA busy_timeout=0")
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA busy_timeout=30000")
+            return
+        except sqlite3.OperationalError as exc:
+            code = getattr(exc, "sqlite_errorcode", None)
+            busy = (code & 0xff) == 5 if code is not None else str(exc) == "database is locked"
+            remaining = deadline - time.monotonic()
+            if not busy or remaining <= 0:
+                raise
+            time.sleep(min(.05, remaining))
+
+
 class Queue:
     def __init__(self, root):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.root / "queue.sqlite", timeout=30, isolation_level=None)
         self.db.row_factory = sqlite3.Row
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.executescript("""
+        try:
+            _enable_wal(self.db)
+            self.db.executescript("""
         CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, payload TEXT NOT NULL,
           status TEXT NOT NULL, worker TEXT, created TEXT, started TEXT, finished TEXT, result TEXT);
         CREATE TABLE IF NOT EXISTS workers(id TEXT PRIMARY KEY, pid INTEGER, created REAL, heartbeat REAL, task TEXT);
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY, at TEXT, kind TEXT, payload TEXT);
-        """)
-        # 首次建库判定、默认值写入与声明校验在同一事务内；任一步失败整体回滚，重试仍按首次建库处理。
-        self.db.execute("BEGIN IMMEDIATE")
-        try:
+            """)
+            # 首次建库判定、默认值写入与声明校验在同一事务内；任一步失败整体回滚，重试仍按首次建库处理。
+            self.db.execute("BEGIN IMMEDIATE")
             # init/enable 只写 settings 不写 events，所以“首次建库”以 settings 表为空判定。
             fresh_db = not self.db.execute("SELECT 1 FROM settings LIMIT 1").fetchone()
             for key, value in dict(enabled=False, limit=1, cap=3, healthy=0, last_sample=0, producers_done=False).items():
@@ -401,8 +420,11 @@ class Queue:
             self.set("autoscale_mode", self.autoscale_mode)
             self.db.execute("COMMIT")
         except BaseException:
-            self.db.execute("ROLLBACK")
-            self.db.close()
+            # WAL/DDL 失败时可能尚未开启事务；rollback() 保留原始错误并释放连接。
+            try:
+                self.db.rollback()
+            finally:
+                self.db.close()
             raise
 
     @contextlib.contextmanager
