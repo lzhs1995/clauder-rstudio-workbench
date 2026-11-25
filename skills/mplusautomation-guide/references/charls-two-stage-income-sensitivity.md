@@ -22,7 +22,7 @@ reuse as a new engine call or as 40 independent measurement-model fits.
 
 ## Separate engine completion from acceptable inference
 
-The batch had normal-termination text and nonempty scores, yet 66 outputs also
+The batch had normal-termination text and nonempty scores, yet `见本机证据 <r1d-charls-two-stage-input-error-output-frequency>` outputs also
 contained `1 ERROR(S) FOUND IN THE INPUT INSTRUCTIONS`. There was no accompanying
 detailed error explaining the count. The cause is unresolved: retain the full
 outputs and hold adoption rather than suppress the marker or infer a cause.

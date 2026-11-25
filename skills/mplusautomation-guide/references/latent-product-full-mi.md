@@ -109,7 +109,7 @@ is not that D1 test. M2's single registered coefficient uses scalar Rubin
 inference. Save the actual package version and function source/hash when
 independently reproducing the method, including its constraint-derivative
 convention. The verified M1 and M2 cases reported infinite complete-data df as
-primary and 437 complete-data df as sensitivity; retain the study's own declared
+primary and `见本机证据 <r1d-sd-complete-data-df>` complete-data df as sensitivity; retain the study's own declared
 df choice. The sensitivity's final pooled df need not equal its complete-data df.
 
 Do not pool a successful subset, average imputation p-values or fill missing

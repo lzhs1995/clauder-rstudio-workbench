@@ -92,7 +92,7 @@ Step-1→本次分类误差与 Step-3；两种证据分别标记。
 记录、520 条分类比例、288 个概率单元、18 个 PDF/PNG 图文件；31 项 LL/BIC/N
 独立文本核对、142 组类别和、72 组概率行和通过。该批状态是
 `PASS_ARCHIVED_READBACK_AND_REDRAW_ONLY`，新鲜 Mplus 估计数为 0，跨模型
-类别语义对齐仍待完成。原 64 组 warning 与解析器归入 errors 的 9 组诊断
+类别语义对齐仍待完成。原 `见本机证据 <r1d-ch7-archived-warning-group-frequency>` 组 warning 与解析器归入 errors 的 `见本机证据 <r1d-ch7-archived-error-group-frequency>` 组诊断
 均保留；这不撤销原 q1604/q1629 回执，也不把历史新鲜复现算成本次运行。
 
 ### 2026-11-10：历史输入的真实重估结算

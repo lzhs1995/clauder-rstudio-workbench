@@ -8,8 +8,8 @@
 ## 固定结果
 
 - 56/56 个 `.out` 可由 `MplusAutomation::readModels()` 读回，168 行交互参数。
-- 原始报告 p<.05 为 12 行、p<.10 为 21 行；BH 和 Bonferroni 仅作审计列，各有
-  5 行 p<.05。它们不是规格筛选或确认性推断依据。
+- 原始报告 p<.05 为 `见本机证据 <r1c-cfps-moderation-nominal-first-cutoff-count>` 行、p<.10 为 `见本机证据 <r1c-cfps-moderation-nominal-second-cutoff-count>` 行；BH 和 Bonferroni 仅作审计列，各有
+  `见本机证据 <r1c-cfps-moderation-adjusted-hit-count>` 行 p<.05。它们不是规格筛选或确认性推断依据。
 - 56 个文件没有可用的 `readModels()` 参数协方差对象，因此条件斜率差的正式 B2
   Wald 检验保持开放；不能以“一个组显著、另一个组不显著”替代组间检验。
 - 输入合同的 `XWITH`、`TYPE=COMPLEX`、`CLUSTER`、`MODEL CONSTRAINT` 已逐文件记录。

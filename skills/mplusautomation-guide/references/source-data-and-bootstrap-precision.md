@@ -149,9 +149,9 @@ Cluster-robust MLR with delta-method intervals is an independent sensitivity rou
 not clustered BC bootstrap. Verify both unchanged ML point estimates and the
 actual reported number of clusters after missing-X exclusions. The Chapter 4
 corrected-data examples returned 4,073 couple clusters (1,933 for sibling-complete
-rows), or 3,957 connected family/person components (1,921 sibling-complete).
+rows), or `见本机证据 <r1d-ch4-family-person-component-frequency>` connected family/person components (`见本机证据 <r1d-ch4-sibling-complete-component-frequency>` sibling-complete).
 All ten checks preserved point estimates, and the four mediation examples had
-target-SE median ratios around 1.19–1.21 versus unclustered ML; some unadjusted
+target-SE median ratios around `见本机证据 <r1c-source-bootstrap-target-se-median-ratio-range>` versus unclustered ML; some unadjusted
 Wald flags changed. This establishes dependence sensitivity in those examples,
 not restored CFPS population design, full-family correction, or main-text release.
 

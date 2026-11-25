@@ -4,8 +4,8 @@ This reference records the 2026-10-22 Windows run of a second CHARLS H4.2 branch
 
 ## Contract and result
 
-- Isolated root example: `C:/research/pp_lgcm_review/charls_latent_h42_oldest_edu_full_20261022` (substitute the local research root).
-- N=2397, communities=433, 20 A working-MI members plus one MI01 B start sensitivity.
+- Isolated root example: `<research-root>/<task-dir>` (substitute the local research root).
+- N=2397, communities=`见本机证据 <r1d-charls-oldest-community-count>`, 20 A working-MI members plus one MI01 B start sensitivity.
 - One Mplus process at a time; 21 real Mplus calls; all 20 A members had usable normal termination and complete readback.
 - Independent verification reconstructed 2,814 parameters, 21 contrasts, the full robust covariance transform, and Rubin pooling.
 - Keep the primary `SY:SXIZ` education-group estimate, interval, raw p-value and planned-family adjustment in the local study evidence, under the logical name `CHARLS_OLDEST_EDU_FULL_MI_PRIMARY_CONTRAST`. Bind that name to the exact pooling receipt and source hashes in the study manifest.

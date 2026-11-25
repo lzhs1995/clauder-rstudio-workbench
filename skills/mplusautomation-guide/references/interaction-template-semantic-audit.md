@@ -34,7 +34,7 @@ actual NAMES order, USEVARIABLES, KNOWNCLASS and normalized slot map together.
 
 The corrected parent then terminated normally, but an education-specific
 `mixed > 0` reader assertion failed: urban residence was constant within all
-432 communities. Preserve the original error receipt, verify the unchanged
+`见本机证据 <r1d-interaction-template-community-count>` communities. Preserve the original error receipt, verify the unchanged
 input/output hashes, fix the group-column lookup and reader assertion, and
 read back the existing parent output. The parent was not re-estimated.
 Four dependent pilot calls then completed the bounded five-call pilot.

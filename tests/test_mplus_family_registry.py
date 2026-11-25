@@ -334,11 +334,14 @@ class StrictGateCliTests(unittest.TestCase):
     """在临时副本里跑 `family_registry.py check --strict`：合法 PASS 回执通过，负例必须 rc=1。"""
     RECEIPT = "assets/real_data_receipts/APIM__CHARLS__20261105.json"
 
-    def run_case(self, mutate_receipt=None, workflow_text=None, strict=True):
+    def run_case(self, mutate_receipt=None, workflow_text=None, strict=True, mutate_tree=None):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             skill = repo / "skills" / "mplusautomation-guide"
-            shutil.copytree(registry.SKILL_ROOT, skill, ignore=shutil.ignore_patterns("__pycache__"))
+            # CLI 合同使用自己的合成回执，不复制历史真实验收的代码哈希。
+            shutil.copytree(registry.SKILL_ROOT, skill,
+                            ignore=shutil.ignore_patterns("__pycache__", "real_data_receipts"))
+            (skill / "assets" / "real_data_receipts").mkdir()
             shutil.copytree(ROOT / ".github" / "workflows", repo / ".github" / "workflows")
             reg = registry.load()
             for family in reg["families"].values():
@@ -352,11 +355,14 @@ class StrictGateCliTests(unittest.TestCase):
             if mutate_receipt:
                 mutate_receipt(receipt)
             (skill / self.RECEIPT).write_text(json.dumps(receipt), encoding="utf-8")
+            self.assertTrue((skill / self.RECEIPT).is_file())
             (skill / "families.json").write_text(json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             for path, text in registry.render_outputs(reg, skill).items():
                 path.write_text(text, encoding="utf-8", newline="\n")
             if workflow_text is not None:
                 (repo / ".github" / "workflows" / "mplus-guide-family-tests.yml").write_text(workflow_text, encoding="utf-8")
+            if mutate_tree:
+                mutate_tree(skill)
             command = [sys.executable, "-B", str(skill / "scripts" / "family_registry.py"), "check"] + (["--strict"] if strict else [])
             env = dict(os.environ, PYTHONIOENCODING="utf-8")
             return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", env=env)
@@ -366,9 +372,31 @@ class StrictGateCliTests(unittest.TestCase):
         self.assertIn(text, result.stdout)
 
     def test_valid_pass_receipt_passes_strict(self):
-        result = self.run_case()
+        def verify_synthetic_receipt(skill):
+            reg = json.loads((skill / "families.json").read_text(encoding="utf-8"))
+            errors, stale, by_family = registry.check_receipts(reg, skill)
+            self.assertEqual((errors, stale), ([], []))
+            self.assertEqual(by_family["APIM"], [Path(self.RECEIPT).name])
+        result = self.run_case(mutate_tree=verify_synthetic_receipt)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("0 errors, 0 warnings", result.stdout)
+
+    def test_missing_synthetic_receipt_rejected(self):
+        def remove_synthetic_receipt(skill):
+            (skill / self.RECEIPT).unlink()
+        self.assertRejected(self.run_case(mutate_tree=remove_synthetic_receipt),
+                            "without a fresh PASS real-data swap receipt: APIM")
+
+    def test_unreferenced_stale_receipt_rejected(self):
+        def add_unreferenced_stale_receipt(skill):
+            # evidence 仍指向新鲜回执；目录里另一份未引用的过期回执也必须被 strict 读取。
+            receipt = json.loads((skill / self.RECEIPT).read_text(encoding="utf-8"))
+            receipt["code_sha256"]["scripts/workflow.R"] = "0" * 64
+            extra = skill / "assets" / "real_data_receipts" / "APIM__CHARLS__20261106.json"
+            extra.write_text(json.dumps(receipt), encoding="utf-8")
+        result = self.run_case(mutate_tree=add_unreferenced_stale_receipt)
+        self.assertRejected(result, "APIM__CHARLS__20261106.json: scripts/workflow.R changed since this receipt")
+        self.assertNotIn("without a fresh PASS real-data swap receipt: APIM", result.stdout)
 
     def test_nested_estimate_and_id_rejected(self):
         payload = {"estimates": [0.31], "individual_id": "SYNTHETIC_TEST_ID"}
@@ -473,6 +501,52 @@ class PublicBoundaryScanTests(unittest.TestCase):
         self.assertTrue(boundary.scan_line("references/x.md", "value 0.12345"))
         self.assertEqual(boundary.scan_line("scripts/x.R", "tolerance <- 0.00050001"), [])
 
+    def test_findings_are_categories_without_source_values(self):
+        # 全为合成值；检测器不能把待审内容复制到公开日志。
+        for text, category in (("source " + LOCAL_PATH, "local_path"),
+                               ("beta=-7.654321", "estimate_like_value"),
+                               ("value 0.24681357", "precise_decimal")):
+            with self.subTest(category=category):
+                hits = boundary.scan_line("references/synthetic.md", text)
+                self.assertIn(category, hits)
+                self.assertTrue(all(hit in {"local_path", "estimate_like_value", "precise_decimal"}
+                                    for hit in hits))
+
+    def test_scientific_estimates_are_not_truncated_to_small_integers(self):
+        for text in ("beta=8e-7", "LL=-6E+4", "SE=.25e-2"):
+            with self.subTest(text=text):
+                self.assertIn("estimate_like_value", boundary.scan_line("references/synthetic.md", text))
+
+    def test_frequency_fractions_use_paragraph_context(self):
+        lines = ["Synthetic nominal p<.07 rows:", "variant A had 3/17;",
+                 "城乡为5/19。另一组为7/23。"]
+        findings = list(boundary.scan_document("references/synthetic.md", lines, {3}))
+        self.assertEqual(findings, [(3, "significance_frequency_fraction")] * 2)
+        # 语义在线后也生效，不能只看上一行。
+        self.assertIn((1, "significance_frequency_fraction"), list(boundary.scan_document(
+            "references/synthetic.md", ["A had 3/17 rows", "under the nominal cutoff."], {1})))
+
+    def test_scientific_normalized_values_can_wrap_across_lines(self):
+        cases = [(["Synthetic parameter difference was", "8e-7 of a reference SE."], 2),
+                 (["Synthetic difference was 8e-7", "of a reference SE."], 1),
+                 (["A standardized difference was", "-2.5E+3 in the synthetic example."], 2)]
+        for lines, number in cases:
+            with self.subTest(number=number):
+                self.assertIn((number, "normalized_scientific_value"),
+                              list(boundary.scan_document("references/synthetic.md", lines, {number})))
+
+    def test_context_does_not_cross_paragraph_or_section_boundaries(self):
+        for separator in ("", "# Other checks", "```text", "~~~text"):
+            with self.subTest(separator=separator):
+                lines = ["Nominal significance and reference SE", separator,
+                         "3/17 files compared; tolerance 8e-7."]
+                self.assertEqual(list(boundary.scan_document("references/synthetic.md", lines, {3})), [])
+        self.assertEqual(list(boundary.scan_document("references/synthetic.md",
+            ["3/17 comparisons passed; max_abs_diff 8e-7.", "N=47; source SHA retained."])), [])
+        self.assertEqual(list(boundary.scan_document("references/synthetic.md",
+            ["Nominal p<.07 counts: 见本机证据 <synthetic-count>;",
+             "normalized difference: 见本机证据 <synthetic-difference>."])), [])
+
     def test_quoted_and_special_file_names_are_parsed(self):
         # REVIEW-PR80-001 R4：git 默认把中文名写成 "b/\345..."；路径含空格时文件头末尾有制表符
         diff = ('diff --git "a/\\345\\205\\254.md" "b/\\345\\205\\254.md"\n--- /dev/null\n'
@@ -487,6 +561,40 @@ class PublicBoundaryScanTests(unittest.TestCase):
                 "+++ b/other.md\n+second\n@@ -5 +8 @@\n-old\n+new\n")
         self.assertEqual(list(boundary.parse_added_lines(diff)),
                          [("x.md", 1, "++ b/other.md"), ("x.md", 2, "second"), ("x.md", 8, "new")])
+
+    @unittest.skipUnless(shutil.which("git"), "git not available")
+    def test_cli_uses_unchanged_context_and_never_echoes_matched_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def git(*args):
+                subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                               cwd=tmp, check=True, capture_output=True)
+            git("init", "-q")
+            path = Path(tmp) / "synthetic.md"
+            # 非 LF 字符不应改变 git 的行号；末尾小数点也不能吞掉候选。
+            path.write_text("Synthetic\u2028heading\vmarker\fformfeed; nominal significance audit:\nOld explanation.\n\n"
+                            "Parameter difference relative to a reference SE:\nOld explanation.\n",
+                            encoding="utf-8")
+            git("add", "-A")
+            git("commit", "-q", "-m", "synthetic base")
+            path.write_text("Synthetic\u2028heading\vmarker\fformfeed; nominal significance audit:\nA had 3/17; B had 5/19.\n\n"
+                            "Parameter difference relative to a reference SE:\nObserved 8e-7.\n\n"
+                            "source " + LOCAL_PATH + "\nbeta=-7.654321\n", encoding="utf-8")
+            git("add", "-A")
+            git("commit", "-q", "-m", "synthetic candidate")
+            findings = list(boundary.scan_added_lines("HEAD~1", "HEAD", [], cwd=tmp))
+            self.assertEqual(findings.count(("synthetic.md", 2, "significance_frequency_fraction")), 2)
+            self.assertIn(("synthetic.md", 5, "normalized_scientific_value"), findings)
+            self.assertTrue(all(number not in {1, 4} for _, number, _ in findings))
+            self.assertEqual(list(boundary.scan_added_lines("HEAD~1", "HEAD", ["absent/"], cwd=tmp)), [])
+            for options in ([], ["--github"]):
+                result = subprocess.run([sys.executable, "-B", str(ROOT / ".github/scripts/public_boundary_scan.py"),
+                                         "HEAD~1", "HEAD", *options], cwd=tmp, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0)
+                for value in (LOCAL_PATH, "3/17", "5/19", "8e-7", "-7.654321"):
+                    self.assertNotIn(value, result.stdout + result.stderr)
+                self.assertIn("category=significance_frequency_fraction; matches=2", result.stdout)
+                self.assertIn("category=normalized_scientific_value; matches=1", result.stdout)
+                self.assertIn("warning only", result.stdout)
 
     @unittest.skipUnless(shutil.which("git"), "git not available")
     def test_unicode_file_names_scanned_in_a_real_repository(self):

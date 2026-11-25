@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""公开仓库边界扫描：只看 PR 新增行，找疑似估计值、本机路径与精确小数，只发警告。
+"""公开仓库边界扫描：用目标文件段落上下文检查 PR 新增行，只发警告。
 
+找疑似估计值、本机路径、频数与精确小数；只输出类别、位置和计数，不回显值。
 这是启发式检查：命中不一定违规，没命中也不保证合规；结论由人审确认。
 用法：python .github/scripts/public_boundary_scan.py <base> <head> [--path 前缀 ...] [--github]
 """
 from __future__ import annotations
 
 import argparse
+from collections import Counter, defaultdict
 import re
 import subprocess
 from pathlib import PurePosixPath
@@ -14,8 +16,18 @@ from pathlib import PurePosixPath
 PRIVATE_PATH = re.compile(r"/Users/[A-Za-z0-9_.-]+|[A-Za-z]:[\\/]+Users[\\/]|\\\\wsl(?:\.localhost)?\\|/home/(?!runner\b)[a-z0-9_-]+/")
 ESTIMATE_KEYS = (r"(?:LL|loglik\w*|log-likelihood|aBIC|BIC|AIC|SE|S\.E\.|CI|OR|beta|β|coef\w*|estimate[sd]?|"
                  r"entropy|Entropy|系数|标准误|置信区间|似然|类别比例|转移概率)")
-ESTIMATE = re.compile(r"(?<![A-Za-z])" + ESTIMATE_KEYS + r"(?![A-Za-z])[^\n\d]{0,12}?(-?\d+(?:\.\d+)?)")
+NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+ESTIMATE = re.compile(r"(?<![A-Za-z])" + ESTIMATE_KEYS + r"(?![A-Za-z])[^\n\d]{0,12}?(" + NUMBER + r")")
 PRECISE = re.compile(r"(?<![\w.])-?\d+\.\d{3,}(?![\w.]|e-)")
+FREQUENCY_FRACTION = re.compile(r"(?<![A-Za-z0-9_.])\d+\s*/\s*\d+(?![A-Za-z0-9_]|\.\d)")
+SCIENTIFIC = re.compile(r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d*)?|\.\d+)[eE][-+]?\d+(?![A-Za-z0-9_]|\.\d)")
+SIGNIFICANCE_CONTEXT = re.compile(
+    r"\b(?:nominal|significan(?:t|ce)|frequenc(?:y|ies))\b|显著|顯著|频数|頻數|"
+    r"(?<![A-Za-z])p\s*[<≤=]\s*" + NUMBER, re.IGNORECASE)
+NORMALIZED_CONTEXT = re.compile(
+    r"\breference\s+(?:S\.?E\.?\b|standard\s+errors?\b)|"
+    r"\b(?:normalized|standardized|relative)\s+(?:(?:parameter|covariance|SE)\s+)?(?:differences?|errors?)\b|"
+    r"标准化差|標準化差|归一化|歸一化|相对\s*(?:SE|标准误)|相對\s*(?:SE|標準誤)", re.IGNORECASE)
 SKIP_SUFFIX = {".png", ".pdf", ".rds", ".dta", ".zip", ".gz"}
 MAX_ANNOTATIONS = 20
 HUNK = re.compile(r"@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
@@ -24,15 +36,51 @@ ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, 
 
 
 def scan_line(path: str, text: str) -> list[str]:
-    hits = [f"local path {m.group(0)!r}" for m in PRIVATE_PATH.finditer(text)]
+    # 诊断不能把被检查的私有内容复制到 CI 日志。
+    hits = ["local_path" for _ in PRIVATE_PATH.finditer(text)]
     for m in ESTIMATE.finditer(text):
         # 三位以内的整数多为编号或计数，不报
         if not re.fullmatch(r"-?\d{1,3}", m.group(1)):
-            hits.append(f"estimate-like value {m.group(0)[:60]!r}")
-    if PurePosixPath(path).suffix == ".md":
+            hits.append("estimate_like_value")
+    if PurePosixPath(path).suffix.lower() == ".md":
         # 代码里的容差与阈值常有多位小数，只在文档里报
-        hits += [f"precise decimal {m.group(0)!r}" for m in PRECISE.finditer(text)]
+        hits += ["precise_decimal" for _ in PRECISE.finditer(text)]
     return hits
+
+
+def scan_document(path: str, lines: list[str], added_numbers: set[int] | None = None):
+    """段落中的上下文可来自未改行；只在指定新增行上报告候选。
+
+    added_numbers=None 供只读整文件审查复用。空行、标题及围栏划分段落，
+    不把前一段的检验阈值强加到下一段的普通比对计数上。
+    """
+    paragraph = []
+
+    def check(numbers):
+        context = "\n".join(lines[n - 1] for n in numbers)
+        markdown = PurePosixPath(path).suffix.lower() == ".md"
+        significance = markdown and SIGNIFICANCE_CONTEXT.search(context)
+        normalized = markdown and NORMALIZED_CONTEXT.search(context)
+        for number in numbers:
+            if added_numbers is not None and number not in added_numbers:
+                continue
+            text = lines[number - 1]
+            hits = scan_line(path, text)
+            if significance:
+                hits += ["significance_frequency_fraction" for _ in FREQUENCY_FRACTION.finditer(text)]
+            if normalized:
+                hits += ["normalized_scientific_value" for _ in SCIENTIFIC.finditer(text)]
+            yield from ((number, hit) for hit in hits)
+
+    for number, line in enumerate(lines, 1):
+        boundary = not line.strip() or re.match(r"\s*(?:#{1,6}\s|`{3,}|~{3,})", line)
+        if boundary:
+            yield from check(paragraph)
+            paragraph = []
+            yield from check([number])
+        else:
+            paragraph.append(number)
+    yield from check(paragraph)
 
 
 def unquote_git_path(raw: str) -> str | None:
@@ -103,6 +151,20 @@ def added_lines(base: str, head: str, prefixes: list[str], cwd=None):
     yield from parse_added_lines(diff.decode("utf-8", errors="replace"))
 
 
+def scan_added_lines(base: str, head: str, prefixes: list[str], cwd=None):
+    by_path = defaultdict(set)
+    for path, number, _ in added_lines(base, head, prefixes, cwd=cwd):
+        if PurePosixPath(path).suffix.lower() not in SKIP_SUFFIX:
+            by_path[path].add(number)
+    for path, numbers in by_path.items():
+        # 读目标 blob 的完整段落，避免 -U0 diff 丢掉未改的语义上下文。
+        command = ["git", "show", f"{head}:{path}"]
+        data = subprocess.run(command, capture_output=True, check=True, cwd=cwd).stdout
+        # git 行号只按 LF；splitlines 会额外拆 Unicode 分隔符/换页符，错报新增行。
+        lines = data.decode("utf-8", errors="replace").split("\n")
+        yield from ((path, number, hit) for number, hit in scan_document(path, lines, numbers))
+
+
 def _escape(value: str, prop: bool = False) -> str:
     value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     return value.replace(":", "%3A").replace(",", "%2C") if prop else value
@@ -115,18 +177,15 @@ def main(argv=None) -> int:
     parser.add_argument("--path", action="append", default=[], help="only scan these path prefixes")
     parser.add_argument("--github", action="store_true", help="emit GitHub warning annotations")
     args = parser.parse_args(argv)
-    findings = []
-    for path, number, text in added_lines(args.base, args.head, args.path):
-        if PurePosixPath(path).suffix.lower() in SKIP_SUFFIX:
-            continue
-        findings += [(path, number, hit) for hit in scan_line(path, text)]
-    for index, (path, number, hit) in enumerate(findings):
-        message = f"PROGRAM rule 9 candidate: {hit}; public files must not contain thesis estimates, IDs, local paths or descriptive statistics beyond counts"
+    findings = Counter(scan_added_lines(args.base, args.head, args.path))
+    for index, ((path, number, category), count) in enumerate(findings.items()):
+        message = (f"PROGRAM rule 9 candidate: category={category}; matches={count}; "
+                   "review the public whitelist before publishing")
         if args.github and index < MAX_ANNOTATIONS:
             print(f"::warning file={_escape(path, True)},line={number}::{_escape(message)}")
         else:
             print(f"WARNING {path}:{number}: {message}")
-    print(f"public boundary scan: {len(findings)} candidate(s) in added lines (warning only)")
+    print(f"public boundary scan: {sum(findings.values())} candidate(s) in added lines (warning only)")
     return 0
 
 

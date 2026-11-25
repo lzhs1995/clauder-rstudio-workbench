@@ -39,9 +39,9 @@ likelihood alone does not establish matching parameter identities or SEs.
 
 In the Chapter 4 pilot, `apimem_total_age-incc-clo_step1` had 9,121 records,
 4,073 couples and 110 free parameters. The R kernel differed from saved Mplus
-coefficients by at most 1.671e-5, with LL differing by -0.000228 from the
+coefficients by at most 1.671e-5, with LL differing by `见本机证据 <r1d-external-cluster-ll-difference-first>` from the
 three-decimal Mplus print. Independent lavaan BFGS gave maximum parameter
-difference 2.647e-7 and LL difference about 1.02e-10. Three whole-couple draws
+difference 2.647e-7 and LL difference about `见本机证据 <r1d-external-cluster-ll-difference-second>`. Three whole-couple draws
 (9,064, 9,197 and 9,124 rows) matched the independent solver within 2.586e-7.
 This is a one-model numerical validation, not a general replacement of Mplus.
 
@@ -76,7 +76,7 @@ inspect their actual terminal evidence before claiming bootstrap completion.
 The first 1,000-replicate run subsequently completed with 1,000 successes;
 all selected cluster identities were replayed from saved seeds. Its 32 effects
 included one BC-versus-delta 95% classification difference and two split-half
-classification differences. The smallest adjusted tail had only about 5.07
+classification differences. The smallest adjusted tail had only about `见本机证据 <r1c-external-bootstrap-smallest-adjusted-tail-count>`
 effective draws. Thus success counts and exact endpoint reconstruction do not
 establish adequate Monte Carlo precision. Increase draws and use an independent
 seed for the complete pilot effect set before deciding a boundary result.
