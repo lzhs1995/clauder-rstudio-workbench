@@ -6,8 +6,8 @@ the `son` within-family contrast and baseline education (`C3`) in the latent
 
 ## Contract and result
 
-- Isolated root example: `C:/research/pp_lgcm_review/charls_latent_h42_son_edu_full_20261022` (substitute the local research root).
-- N=2263, communities=433, education counts 1773/490.
+- Isolated root example: `<research-root>/<task-dir>` (substitute the local research root).
+- N=2263, communities=`见本机证据 <r1d-charls-son-community-count>`, education counts `见本机证据 <r1d-charls-son-education-frequencies>`.
 - Twenty A working-MI members plus one MI01 B start sensitivity; one Mplus
   process at a time; 21 real engine calls.
 - Every A member and MI01 B had usable normal termination. Independent
@@ -35,7 +35,7 @@ failure.
 
 1. Generate a new guard/task key and verify the native Windows contract uses
    `C:/...` paths, the correct indicator (`son`), N=2263 and community count
-   433.
+   `见本机证据 <r1d-charls-son-community-count>`.
 2. Start from empty member directories. Register the original native
    `execute_r_async(source(..., local=TRUE))` job id immediately.
 3. If ClaudeR still displays `started`, inspect `runtime/PROGRESS.jsonl`,

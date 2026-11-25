@@ -225,7 +225,7 @@ with independently validated matrix numbering. Preserve normal versus BC CIs.
 For the tested normal outputs, critical constants 1.645, 1.96 and 2.5758 reproduced
 all audited target intervals at printed precision. Full 143,160-row-endpoint
 checks retained one nuisance residual-variance boundary exception, and one
-nuisance Wald p exceeded the nominal half-print tolerance by 4.43e-7. Do not
+nuisance Wald p exceeded the nominal half-print tolerance by `见本机证据 <r1d-nuisance-wald-p-difference>`. Do not
 generalize these constants to every software version or disguise these exceptions.
 The direct models' printed P/Z sensitivity bounds retained a documented 1e-6
 numerical guard; they are not recovered exact engine probabilities.

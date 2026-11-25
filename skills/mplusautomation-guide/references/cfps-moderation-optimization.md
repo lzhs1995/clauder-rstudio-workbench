@@ -8,7 +8,7 @@
 会把历史规格变体误当成新的证据。
 
 type1 的教育和收入调节行在变体审计中各有 `见本机证据 <r1c-cfps-type1-education-income-hit-frequency>` 行 p<.05；type1 性别有 `见本机证据 <r1c-cfps-type1-sex-hit-frequency>`，
-城乡为 `见本机证据 <r1c-cfps-type1-residence-hit-frequency>`。type2 只有教育为 `见本机证据 <r1c-cfps-type2-education-hit-frequency>`；type3 城乡为 `见本机证据 <r1c-cfps-type2-residence-hit-frequency>`；type4 城乡为 `见本机证据 <r1c-cfps-type3-residence-hit-frequency>`。
+城乡为 `见本机证据 <r1c-cfps-type1-residence-hit-frequency>`。type2 只有教育为 `见本机证据 <r1c-cfps-type2-education-hit-frequency>`；type3 城乡为 `见本机证据 <r1c-cfps-type3-residence-hit-frequency>`；type4 城乡为 `见本机证据 <r1c-cfps-type4-residence-hit-frequency>`。
 这些比例是审计计数，不是显著性筛选规则。type3/4 的区间更宽，提示精度和样本
 信息量需要优先核查；城乡没有稳定的低 p 值聚集。
 

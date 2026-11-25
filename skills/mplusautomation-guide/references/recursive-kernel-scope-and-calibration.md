@@ -54,7 +54,7 @@ assumptions. Preserve the engine's finite-sample convention as a separate check.
 
 Seven native R chunks subsequently solved all 612 frozen systems, writing 59,058
 free-parameter records. Independent readback verified input/data binding, unique
-model coverage, positive residual blocks and average scores (maximum 1.044e-13).
+model coverage, positive residual blocks and average scores (maximum `见本机证据 <r1d-kernel-average-score-maximum>`).
 The 83 previously calibrated kernel vectors matched exactly. All 372 proposed
 likelihood groups matched by physical parameter and conditional LL; parameter
 and LL differences within the declared reuse groups were zero in this run.
@@ -101,7 +101,7 @@ labels. Do not loosen the threshold to turn those labels into passes.
 Independently optimize exception models and structurally important representatives.
 Here the 12 exceptions plus five completed conditional-mediation outputs received
 17 independent lavaan BFGS checks. Maximum parameter difference was 5.015e-6 and
-LL difference 1.528e-9. Kernel average scores were near zero (maximum 9.251e-14),
+LL difference `见本机证据 <r1d-kernel-single-ll-difference>`. Kernel average scores were near zero (maximum `见本机证据 <r1d-kernel-crosscheck-score-maximum>`),
 with slightly better unrounded LL than the saved Mplus point, consistent with
 optimizer stopping precision. Preserve the Mplus point and exception evidence.
 Differences in residual variances, covariance, intercepts or controls must not be
@@ -139,8 +139,8 @@ flags remain false at this checkpoint.
 The saved 110-parameter mediation pilot subsequently passed a separate score and
 covariance implementation check on 9,121 observations / 4,073 spouse clusters.
 Analytic conditional-density row scores agreed with unscaled lavaan scores to
-1.171e-13. A forward-difference Hessian had relative error 4.503e-5; central
-differences reduced this to 2.162e-9. Diagnose differentiation error before
+1.171e-13. A forward-difference Hessian had relative error `见本机证据 <r1d-forward-hessian-relative-error>`; central
+differences reduced this to `见本机证据 <r1d-central-hessian-relative-error>`. Diagnose differentiation error before
 changing model equations or loosening tolerances.
 
 With H the average observed negative Hessian and U_g the sum of row scores in

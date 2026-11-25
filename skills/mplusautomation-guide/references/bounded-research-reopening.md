@@ -84,7 +84,7 @@ one participant per household does not establish complex survey weighting.
 
 An independent pandas/Stata check must promote float32 columns to float64 before
 group means and SDs when comparing against R doubles. In the pilot, apparent
-differences of about 4e-7 disappeared at double precision; do not silently relax
+differences of about `见本机证据 <r1d-single-double-precision-difference>` disappeared at double precision; do not silently relax
 a substantive data tolerance or alter data to accommodate reader precision.
 
 ## Delivery

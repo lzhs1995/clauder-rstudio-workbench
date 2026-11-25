@@ -377,8 +377,8 @@ Scoring row and one Quasi-Newton row. Reading only the final EM rows would
 have missed the acceleration that had already occurred. Repeating that input
 with an explicit EMA label is not an evidenced improvement.
 
-The final printed likelihood changes were zero at the trace's display
-precision, while the largest printed derivative was about `1.2e-5` against
+The final printed likelihood changes were `见本机证据 <r1d-final-printed-likelihood-changes>` at the trace's display
+precision, while the largest printed derivative was about `见本机证据 <r1d-largest-printed-derivative>` against
 the requested `MCONVERGENCE=1e-6`. Rounded zero changes do not prove that the
 gradient criterion passed, and a slow numerical tail is different from a
 remote connection failure. The original timeout and engine cost remain part
