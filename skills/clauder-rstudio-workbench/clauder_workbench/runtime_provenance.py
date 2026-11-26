@@ -9,6 +9,8 @@ import math
 import os
 from pathlib import Path
 import re
+import sys
+import sysconfig
 from urllib.parse import unquote, urlparse
 
 from . import config
@@ -178,9 +180,18 @@ def inspect_package(python, dispatcher=None):
 
 
 def compatibility_manifest():
-    # 完整checkout与已安装单skill均可调用；缺manifest只报告未知，不伪造版本。
-    skill = Path(__file__).resolve().parent.parent
-    candidates = [skill / 'runtime-compatibility.json', skill.parent.parent / 'runtime-compatibility.json']
+    # 期望清单必须属于本次执行的harness；源码不能借用另一安装的清单。
+    package = Path(__file__).resolve().parent
+    installed_roots = {Path(sysconfig.get_path(key)).resolve() for key in ('purelib', 'platlib')}
+    if package.name == 'clauder_workbench' and package.parent in installed_roots:
+        candidates = [Path(sys.prefix) / 'share' / 'clauder-rstudio-workbench' / 'runtime-compatibility.json']
+    elif package.name == 'clauder_workbench' and package.parent.name == 'clauder-rstudio-workbench':
+        skill = package.parent
+        candidates = [skill / 'runtime-compatibility.json']
+        if skill.parent.name == 'skills':
+            candidates.append(skill.parent.parent / 'runtime-compatibility.json')
+    else:
+        candidates = []
     for path in candidates:
         if path.is_file():
             return json.loads(path.read_text()), path

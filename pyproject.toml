@@ -11,7 +11,7 @@ dependencies = ["mcp>=1.0,<2", "psutil>=5.9", "pyyaml>=6", "tomlkit>=0.13,<1", "
 
 [project.optional-dependencies]
 fanout = ["pyyaml>=6", "psutil>=5.9"]
-dev = ["pyyaml>=6", "psutil>=5.9", "jsonschema>=4.20", "pytest>=8"]
+dev = ["pyyaml>=6", "psutil>=5.9", "jsonschema>=4.20", "pytest>=8", "setuptools>=68", "wheel>=0.41"]
 
 [project.scripts]
 clauder-workbench = "clauder_workbench.cli:main"
@@ -19,3 +19,6 @@ clauder-workbench = "clauder_workbench.cli:main"
 [tool.setuptools.packages.find]
 where = ["skills/clauder-rstudio-workbench"]
 include = ["clauder_workbench*"]
+
+[tool.setuptools.data-files]
+"share/clauder-rstudio-workbench" = ["runtime-compatibility.json"]

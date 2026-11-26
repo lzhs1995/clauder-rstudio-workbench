@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install '.[dev]'
-      - run: python -m unittest tests.test_config_store tests.test_readiness tests.test_runtime_install_defaults tests.test_native_evidence_portability tests.test_connection_diagnostics tests.test_session_bootstrap tests.test_runtime_provenance -v
+      - run: python -m unittest tests.test_config_store tests.test_readiness tests.test_runtime_install_defaults tests.test_native_evidence_portability tests.test_connection_diagnostics tests.test_session_bootstrap tests.test_runtime_provenance tests.test_manifest_packaging -v
         env:
           PYTHONUTF8: '1'
       - name: Process ownership rejects stale intermediate parent PIDs
