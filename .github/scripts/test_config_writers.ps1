@@ -1,10 +1,9 @@
 # Exercise actual installer functions in an isolated directory, including PS 5.1.
 $ErrorActionPreference = "Stop"
 $repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
-$source = [System.IO.File]::ReadAllText((Join-Path $repo "install.ps1"), [System.Text.Encoding]::UTF8)
 $tokens = $null
 $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$errors)
+$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo "install.ps1"), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw "Installer PowerShell parse failed" }
 $names = @("Get-WorkbenchUvCacheDir", "Write-ScopedMcpConfig", "Write-CodexConfig", "Configure-ClaudeCode", "Write-CopilotConfig", "Write-WorkspaceMcpConfig")
 foreach ($fn in $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)) {

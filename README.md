@@ -6,15 +6,22 @@
 
 Portable skill **collection**, executable harness, and installer for using a patched ClaudeR build as an RStudio workbench through MCP.
 
-The `v0.6.7` release line targets the published ClaudeR
-[`v0.14.1.9002-lzhs.1`](https://github.com/lzhs1995/ClaudeR/releases/tag/v0.14.1.9002-lzhs.1)
-pair: R `0.14.1.9002` / bridge `0.14.5.post1`. Exact source identity and critical
-hashes are in [runtime-compatibility.json](runtime-compatibility.json).
+The **0.7.0 candidate** targets the maintained ClaudeR `0.16.6.9001` / MCP
+bridge `0.16.6.post1` pair, based on upstream development commit `3b56327` with local
+session-discovery, async progress, ownership and compatibility protections.
+The exact source commit and critical hashes are recorded in
+[runtime-compatibility.json](runtime-compatibility.json). A version declaration
+is not proof that a current client has loaded that pair.
 
-This maintained line derives from upstream ClaudeR `0.14.1`, with the
-`0.14.1.9001` progress/backpressure patches followed by `0.14.1.9002`
-discovery reliability fixes. Upstream main at `8a322717` is already `0.15.0`;
-it is a different compatibility target, not the installed paired runtime.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
+
+Start with the **[0.7.0 upgrade guide](docs/UPGRADE_0.7.0.md)** or
+**[繁體中文升級指南](docs/UPGRADE_0.7.0.zh-TW.md)**. The candidate adds an isolated
+`paired_release` stage/verify/select/rollback path; selection changes only a
+record, and client configuration must be switched explicitly afterwards.
+Full macOS/Windows candidate qualification and release publication remain
+**PENDING** until their actual receipts are recorded. Earlier release tests
+below remain historical evidence. No unverified tag is required by this guide.
 
 **Platform status:** Windows, macOS, and Linux are first-class supported
 targets. `install.sh` is used on macOS/Linux and `install.ps1` on Windows;
@@ -59,10 +66,9 @@ Both installers discover every `skills/<name>/` directory that contains a `SKILL
   resource-gated parallel model batches, readModels diagnostics, MI/LRT
   acceptance, CFPS/CHARLS provenance, and manuscript/NLM release boundaries.
 
-The table of contents above describes this source tree. The pinned `v0.6.7`
-release contains the first three skills; `mplusautomation-guide` is a later
-addition on `main`. Use a reviewed commit containing that directory when you
-need it, rather than assuming an older release includes every current skill.
+The 0.7.0 source tree contains all **four** skills above. The historical
+`v0.6.7` release contained the first three; this does not remove the current
+MplusAutomation entry or imply new model-family validation from this upgrade.
 
 ## Using the skills with different agents
 
@@ -109,7 +115,18 @@ by default. Long-soak contracts can override this with
 `resource_gate_max_age_min`; an explicit contract value takes precedence over
 the CLI default.
 
-## Quick Start
+## Quick Start for the 0.7.0 candidate
+
+Use the [isolated upgrade commands](docs/UPGRADE_0.7.0.md) from the reviewed
+0.7.0 checkout. Stage into a new release directory, verify actual loaded
+package versions/paths, then explicitly update the chosen client. Keep healthy
+research sessions and already-submitted jobs on their original runtimes.
+
+## Historical 0.6.7 installation examples
+
+The following commands install the previous published pair. They are retained
+for that version and do **not** perform the 0.7.0 upgrade.
+
 
 On macOS:
 
@@ -355,6 +372,11 @@ Installer prerequisites:
 
 ## Compatibility
 
+Current candidate: workbench `0.7.0`, ClaudeR R `0.16.6.9001`, bridge
+`0.16.6.post1`; complete platform qualification **PENDING**. Exact source
+pairing is required before staging. The table below describes earlier lines.
+
+
 | Skill | ClaudeR fork | Notes |
 |---|---|---|
 | `v0.6.1` | `v0.14.1.9002-lzhs.1` / bridge `0.14.5.post1` | Corrects table semantics/layout and adds atomic config merging, client-specific ensure-ready, process-bound native evidence, non-editable installs and the published discovery-safe runtime pair. |
@@ -557,6 +579,10 @@ Confirm all three layers:
 3. The MCP command points to the patched local bridge, not plain `uvx clauder-mcp`.
 
 ## Upgrade
+
+For 0.7.0 use [stage, verify, explicit client switch, and paired rollback](docs/UPGRADE_0.7.0.md).
+The commands below are retained only for the previous published 0.6.7 pair.
+
 
 To upgrade macOS/Linux and reinstall the paired ClaudeR worktree:
 

@@ -27,12 +27,14 @@ def _run(command: list[str], *, dry_run: bool = False) -> None:
 
 
 def _git_value(repo: Path, *args: str) -> str:
+    # 来源探测不可继承调用方的 Git 仓库或配置覆盖环境。
     try:
         result = subprocess.run(
             ["git", "-C", str(repo), *args],
             check=True,
             capture_output=True,
             text=True,
+            env={key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
         )
         return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
@@ -46,10 +48,38 @@ def _git_dirty(repo: Path) -> bool | None:
             check=True,
             capture_output=True,
             text=True,
+            env={key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
         )
         return bool(result.stdout.strip())
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+def _git_metadata(repo: Path) -> dict[str, Any]:
+    # 只有真实 Git 工作树顶层才可声明来源，防止目录继承父仓库身份。
+    empty: dict[str, Any] = {
+        "source_type": "directory", "commit": None, "ref": None,
+        "dirty": None, "url": None,
+    }
+    root = repo.resolve()
+    top = _git_value(root, "rev-parse", "--show-toplevel")
+    if top == "unknown":
+        return empty
+    try:
+        if Path(top).resolve() != root:
+            return empty
+    except (OSError, RuntimeError, ValueError):
+        return empty
+    def value(*args: str) -> str | None:
+        found = _git_value(root, *args)
+        return None if found in {"", "unknown"} else found
+    return {
+        "source_type": "git",
+        "commit": value("rev-parse", "HEAD"),
+        "ref": value("rev-parse", "--abbrev-ref", "HEAD"),
+        "dirty": _git_dirty(root),
+        "url": value("config", "--get", "remote.origin.url"),
+    }
 
 
 def _pyproject_version(path: Path) -> str:
@@ -125,7 +155,8 @@ def update_codex_config(
     return Path(result["backup"]) if result.get("backup") else None
 
 
-def _install_stable_bridge_launcher(runtime: Any, *, dry_run: bool = False) -> Path:
+def _install_stable_bridge_launcher(runtime: Any, *, dry_run: bool = False,
+                                   bridge_python: Path | None = None) -> Path:
     """Replace uv's symlink entry with a stable, directly executable launcher.
 
     Desktop app-server reports ENOENT when it follows a stale uv-generated
@@ -133,22 +164,22 @@ def _install_stable_bridge_launcher(runtime: Any, *, dry_run: bool = False) -> P
     invoking the embedded uv Python directly.
     """
     target = runtime.bridge_path
-    target.parent.mkdir(parents=True, exist_ok=True)
     if runtime.system == "windows":
-        content = (
-            "@echo off\r\n"
-            f'"{runtime.bridge_python_path}" -c "from clauder_mcp import main; raise SystemExit(main())" %*\r\n'
-        )
-    else:
-        content = (
-            "#!/bin/sh\n"
-            "set -eu\n"
-            f'PYTHON="${{CLAUDER_WORKBENCH_MCP_PYTHON:-{runtime.bridge_python_path}}}"\n'
-            'exec "$PYTHON" -c \'from clauder_mcp import main; raise SystemExit(main())\' "$@"\n'
-        )
+        # uv installs a genuine PE entry point. Never overwrite an .exe with
+        # batch text; versioned candidate installs use their own Scripts entry.
+        if not dry_run and not target.is_file():
+            raise RuntimeError(f"Windows persistent MCP executable is missing: {target}")
+        return target
+    python = bridge_python or runtime.bridge_python_path
+    content = (
+        "#!/bin/sh\n"
+        "set -eu\n"
+        f'exec {shlex.quote(str(python))} -c \'from clauder_mcp import main; raise SystemExit(main())\' "$@"\n'
+    )
     if dry_run:
         print(f"Would install stable bridge launcher: {target}")
         return target
+    target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_symlink():
         backup = target.with_name(target.name + ".uv-tool")
         if not backup.exists():
@@ -257,27 +288,29 @@ def _write_install_info(
     backup_retention: int,
     dry_run: bool,
 ) -> None:
+    workbench = _git_metadata(repo_root)
+    clauder = _git_metadata(clauder_dir)
     info: dict[str, Any] = {
         "schema_version": "0.4.0",
         "platform": sys.platform,
         "workbench_version": __version__,
-        "git_commit": _git_value(repo_root, "rev-parse", "HEAD"),
-        "git_branch_or_tag": _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD"),
-        "workbench_dirty": _git_dirty(repo_root),
-        "workbench_source_type": "git" if (repo_root / ".git").exists() else "directory",
-        "workbench_source_url": _git_value(repo_root, "config", "--get", "remote.origin.url"),
+        "git_commit": workbench["commit"],
+        "git_branch_or_tag": workbench["ref"],
+        "workbench_dirty": workbench["dirty"],
+        "workbench_source_type": workbench["source_type"],
+        "workbench_source_url": workbench["url"],
         "installed_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "installed_from": str(repo_root),
         "install_destination": str(destination),
         "configured_clients": configured_clients,
         "skill_backup_retention": backup_retention,
-        "claudeR_source_type": "git" if (clauder_dir / ".git").exists() else "directory",
-        "claudeR_source_url": _git_value(clauder_dir, "config", "--get", "remote.origin.url"),
-        "claudeR_ref": _git_value(clauder_dir, "rev-parse", "--abbrev-ref", "HEAD"),
-        "claudeR_commit": _git_value(clauder_dir, "rev-parse", "HEAD"),
-        "claudeR_dirty": _git_dirty(clauder_dir),
+        "claudeR_source_type": clauder["source_type"],
+        "claudeR_source_url": clauder["url"],
+        "claudeR_ref": clauder["ref"],
+        "claudeR_commit": clauder["commit"],
+        "claudeR_dirty": clauder["dirty"],
         "claudeR_version": _description_version(clauder_dir / "DESCRIPTION"),
-        "claudeR_git_origin": _git_value(clauder_dir, "config", "--get", "remote.origin.url"),
+        "claudeR_git_origin": clauder["url"],
         "clauder_mcp_version": _pyproject_version(clauder_dir / "clauder-mcp" / "pyproject.toml"),
         "clauder_mcp_source": str(clauder_dir / "clauder-mcp"),
         "clauder_mcp_command": str(mcp_command),
@@ -353,6 +386,15 @@ def main(argv: list[str] | None = None) -> int:
         if not r_command:
             raise SystemExit("R was not found on PATH")
         _run([r_command, "CMD", "INSTALL", str(clauder_dir)], dry_run=args.dry_run)
+        if not args.dry_run:
+            from .runtime_install import verify_r
+            rscript = shutil.which("Rscript")
+            if not rscript:
+                raise SystemExit("R was installed but Rscript is unavailable for installed-runtime verification")
+            installed_r = verify_r(json.loads(manifest.read_text(encoding="utf-8")), Path(rscript))
+            print(json.dumps({"installed_R_verification": installed_r}))
+            if not installed_r["ok"]:
+                raise SystemExit("Installed R package did not match the source pair; configuration was not changed")
 
     uv = shutil.which("uv")
     if not args.skip_mcp or not args.skip_harness:
@@ -363,8 +405,23 @@ def main(argv: list[str] | None = None) -> int:
             uv or "uv", "tool", "install", "--force", "--from",
             str(clauder_dir / "clauder-mcp"), "clauder-mcp",
         ], dry_run=args.dry_run)
+        if not args.dry_run:
+            from .runtime_install import verify_bridge
+            tools_root = Path(subprocess.check_output([uv or "uv", "tool", "dir"], text=True).strip())
+            bridge_python = tools_root / "clauder-mcp" / ("Scripts/python.exe" if runtime.system == "windows" else "bin/python")
+            installed_bridge = verify_bridge(json.loads(manifest.read_text(encoding="utf-8")), bridge_python)
+            print(json.dumps({"installed_bridge_verification": installed_bridge}))
+            if not installed_bridge["ok"]:
+                raise SystemExit("Installed MCP did not match the source pair; configuration was not changed")
+            if runtime.system == "windows":
+                tool_bin = Path(subprocess.check_output([uv or "uv", "tool", "dir", "--bin"], text=True).strip())
+                mcp_command = tool_bin / "clauder-mcp.exe"
+                if not mcp_command.is_file():
+                    raise SystemExit(f"Installed Windows MCP entry point is missing: {mcp_command}")
     # Keep the Codex/Claude/Copilot command path stable across uv upgrades.
-    _install_stable_bridge_launcher(runtime, dry_run=args.dry_run)
+    if not args.skip_mcp and runtime.system != "windows":
+        _install_stable_bridge_launcher(runtime, dry_run=args.dry_run,
+                                       bridge_python=None if args.dry_run else bridge_python)
     if not args.skip_harness:
         _run([uv or "uv", "tool", "install", "--force", str(repo_root)], dry_run=args.dry_run)
 

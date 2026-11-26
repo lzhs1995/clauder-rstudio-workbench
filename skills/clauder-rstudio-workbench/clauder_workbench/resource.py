@@ -521,7 +521,8 @@ class FanoutResourceProbe:
                 return {"ok": False, "reason": "worker resource sample required before submission"}
             if job_id is not None:
                 # 原 job_id 只在原目标轮询；资源余量不足不阻止观察已经提交的任务。
-                raw = await session.call_tool("get_async_result", {"job_id": job_id})
+                # 新配套默认可能等待300秒；轮询原 job 必须显式零等待。
+                raw = await session.call_tool("get_async_result", {"job_id": job_id, "wait_s": 0})
                 is_error = bool(getattr(raw, "isError", False) or getattr(raw, "is_error", False))
                 polled = {"ok": not is_error, "is_error": is_error, "text": mcp_client._result_text(raw),
                           "job_id": job_id, "transport_class": "MCP_STDIO_OK",

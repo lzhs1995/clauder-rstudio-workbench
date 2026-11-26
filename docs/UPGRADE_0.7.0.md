@@ -1,19 +1,16 @@
 # Workbench 0.7.0 candidate upgrade
 
-> **Status in this checkout:** this guide describes the 0.7.0 candidate. This
-> checkout still pins workbench 0.6.7 / ClaudeR 0.14.1.9002 / bridge
-> 0.14.5.post1 in `runtime-compatibility.json`, and does not yet contain
-> `clauder_workbench.paired_release`, the bridge's `wait_s` parameter or the
-> Python 3.14 CI jobs. Do not run these commands against this checkout.
-
 [繁體中文](UPGRADE_0.7.0.zh-TW.md) · [Project overview](../README.md)
 
-The candidate pairs workbench **0.7.0**, ClaudeR R **0.16.5.9001** and bridge
-**0.16.4.post1**. Read [runtime-compatibility.json](../runtime-compatibility.json)
-for the exact ClaudeR commit and critical-file hashes. The source incorporates
-the complete upstream 0.16.5 line and the maintained discovery, ownership,
+The candidate pairs workbench **0.7.0**, ClaudeR R **0.16.6.9001** and bridge
+**0.16.6.post1**. Read [runtime-compatibility.json](../runtime-compatibility.json)
+for the pinned ClaudeR commit `270efe5f600ce2b8366f22dc18a834bb2ab888b7`
+and critical-file hashes. The source incorporates
+upstream development commit `3b56327` and the maintained discovery, ownership,
 async-output and progress protections. Do not substitute an old reduced bridge
 or an unpinned PyPI package merely because its command still starts.
+
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
 All four skills remain available: [workbench](../skills/clauder-rstudio-workbench/SKILL.md),
 [compareGroups](../skills/comparegroups-guide/SKILL.md),

@@ -1,7 +1,7 @@
 param([string]$ReadmePath = (Join-Path $PSScriptRoot "../../README.md"))
 
 $ErrorActionPreference = "Stop"
-$markdown = Get-Content -LiteralPath $ReadmePath -Raw
+$markdown = Get-Content -LiteralPath $ReadmePath -Raw -Encoding UTF8
 $blocks = @([regex]::Matches($markdown, '(?ms)^```powershell\r?\n(.*?)^```') |
     Where-Object { $_.Groups[1].Value.Contains("Invoke-WebRequest") })
 if ($blocks.Count -ne 1) { throw "Expected one documented ZIP bootstrap" }
@@ -15,9 +15,10 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("bootstrap-test-" + [guid]::Ne
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 $script:fixtureZip = ""
 $script:installCalled = $false
-$projectText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "../../pyproject.toml") -Raw
-$releaseVersion = [regex]::Match($projectText, '(?m)^version = "([^"]+)"').Groups[1].Value
-if (-not $releaseVersion) { throw "Missing package release version" }
+$releaseVersion = "0.6.7"
+if (-not $markdown.Contains("Historical 0.6.7 installation examples")) {
+    throw "The documented bootstrap must remain explicitly historical while 0.7.0 is a candidate"
+}
 $script:expectedReleaseUrl = "https://github.com/lzhs1995/clauder-rstudio-workbench/releases/download/v$releaseVersion/clauder-rstudio-workbench-v$releaseVersion.zip"
 
 function Invoke-WebRequest {
@@ -61,7 +62,13 @@ function Test-BootstrapCase {
     try {
         # Substitute only environment inputs so the literal documented flow runs in a sandbox.
         $isolated = $Code.Replace('$env:USERPROFILE', '$caseProfile').Replace('$env:TEMP', '$caseRoot')
-        & ([scriptblock]::Create($isolated))
+        $scriptPath = Join-Path $caseRoot 'documented-bootstrap.ps1'
+        [IO.File]::WriteAllText($scriptPath, $isolated, [Text.UTF8Encoding]::new($true))
+        $caseTokens = $null; $caseErrors = $null
+        [void][Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$caseTokens, [ref]$caseErrors)
+        if ($caseErrors.Count) { throw 'Documented bootstrap file parsing failed' }
+        # Keep fixture mocks and their script-scoped state in this test scope.
+        . $scriptPath
     } catch {
         $failure = $_.Exception.Message
     } finally {

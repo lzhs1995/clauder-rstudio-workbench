@@ -13,6 +13,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python: ['3.10', '3.12']
+        # Keep all six existing jobs; cover the installation targets on 3.14
+        # without multiplying the entire OS/Python/PowerShell matrix.
+        include:
+          - os: macos-latest
+            python: '3.14'
+          - os: windows-latest
+            python: '3.14'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -20,11 +27,19 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install '.[dev]'
-      - run: python -m unittest tests.test_config_store tests.test_readiness tests.test_runtime_install_defaults tests.test_native_evidence_portability tests.test_connection_diagnostics tests.test_session_bootstrap -v
+      - run: python -m unittest tests.test_config_store tests.test_readiness tests.test_runtime_install_defaults tests.test_native_evidence_portability tests.test_connection_diagnostics tests.test_session_bootstrap tests.test_runtime_provenance tests.test_manifest_packaging -v
         env:
           PYTHONUTF8: '1'
       - name: Process ownership rejects stale intermediate parent PIDs
         run: python -m unittest tests.test_process_ownership -v
+        env:
+          PYTHONUTF8: '1'
+      - name: Concurrent queue initialization and WAL contention
+        run: python -m unittest tests.test_mplus_queue_wal_startup tests.test_mplus_queue_initialization tests.test_mplus_queue_init_concurrency -v
+        env:
+          PYTHONUTF8: '1'
+      - name: Failed upgrades preserve the existing installation
+        run: python -m unittest tests.test_full_upgrade_regressions tests.test_paired_full_upgrade -v
         env:
           PYTHONUTF8: '1'
       - name: POSIX installer entrypoint smoke
@@ -41,3 +56,19 @@ jobs:
         if: runner.os == 'Windows'
         run: ./.github/scripts/test_config_writers.ps1
         shell: pwsh
+      - name: PowerShell 5.1 rejects a failed candidate despite an old bridge
+        if: runner.os == 'Windows' && matrix.python == '3.14'
+        run: python -m unittest tests.test_full_upgrade_regressions.WindowsInstallerFailureTests -v
+        shell: powershell
+        env:
+          PYTHONUTF8: '1'
+          CLAUDER_TEST_POWERSHELL: powershell
+          CLAUDER_TEST_POWERSHELL_MAJOR: '5'
+      - name: PowerShell 7 rejects a failed candidate despite an old bridge
+        if: runner.os == 'Windows' && matrix.python == '3.14'
+        run: python -m unittest tests.test_full_upgrade_regressions.WindowsInstallerFailureTests -v
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          CLAUDER_TEST_POWERSHELL: pwsh
+          CLAUDER_TEST_POWERSHELL_MAJOR: '7'

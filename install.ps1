@@ -1,6 +1,6 @@
-param(
+﻿param(
     [string]$ClaudeRRepo = "https://github.com/lzhs1995/ClaudeR.git",
-    [string]$ClaudeRRef = "v0.14.1.9002-lzhs.1",
+    [string]$ClaudeRRef,
     [string]$ClaudeRDir = "$env:USERPROFILE\projects\ClaudeR",
     [string]$CodexHome = "$env:USERPROFILE\.codex",
     [string]$RExe = "",
@@ -30,8 +30,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:InstallerRoot = $PSScriptRoot
+if (-not $ClaudeRRef) {
+    $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot "runtime-compatibility.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $ClaudeRRef = $manifest.clauder_ref
+    if (-not $ClaudeRRef) { throw "ClaudeR ref missing from runtime-compatibility.json" }
+}
 $script:ClaudeRSourceType = "unknown"
 $script:ClaudeRSourceUrl = $ClaudeRRepo
+$script:VerifiedClaudeRMcpExe = $null
 $script:McpPrewarmResult = [ordered]@{
     attempted = $false
     decision = "not_run"
@@ -359,6 +365,9 @@ function Get-GitHubZipUrls($Repo, $Ref) {
     if ($Repo -match '^https://github\.com/([^/]+)/([^/.]+)(\.git)?/?$') {
         $owner = $Matches[1]
         $name = $Matches[2]
+        if ($Ref -match "^[0-9a-fA-F]{40}$") {
+            return @("https://github.com/$owner/$name/archive/$Ref.zip")
+        }
         return @(
             "https://github.com/$owner/$name/releases/download/$Ref/$name-$Ref.zip",
             "https://github.com/$owner/$name/archive/refs/tags/$Ref.zip"
@@ -443,6 +452,16 @@ function Set-ClaudeRExistingSourceInfo {
 
 
 function Get-ClaudeRMcpExe {
+    # 後續配置與回執必須沿用本次已驗證的入口，不能重新選取舊 PATH。
+    if ($script:VerifiedClaudeRMcpExe) {
+        if (-not (Test-Path -LiteralPath $script:VerifiedClaudeRMcpExe -PathType Leaf)) {
+            throw "Verified ClaudeR MCP entry disappeared: $script:VerifiedClaudeRMcpExe"
+        }
+        return $script:VerifiedClaudeRMcpExe
+    }
+    if (-not $DryRun -and ($ConfigureCodex -or $ConfigureClaudeCode -or $ConfigureCopilot -or $ConfigureWorkspaceMcp)) {
+        throw "MCP configuration requires this install's verified entry point."
+    }
     # Stable install path used by `uv tool install`. Prefer it over any PATH entry
     # so a stray PyPI/upstream `clauder-mcp` cannot shadow the lzhs fork install.
     $candidate = Join-Path $env:USERPROFILE ".local\bin\clauder-mcp.exe"
@@ -482,6 +501,7 @@ function Get-FileSha256($Path) {
 }
 
 function Install-ClaudeRMcpTool {
+    $script:VerifiedClaudeRMcpExe = $null
     Write-Step "Installing persistent ClaudeR MCP entry from lzhs fork"
     Test-PairedSource
     $bridge = Join-Path $ClaudeRDir "clauder-mcp"
@@ -502,14 +522,23 @@ function Install-ClaudeRMcpTool {
             $ErrorActionPreference = $oldErrorActionPreference
         }
         if ($uvExit -ne 0) {
-            $existing = Get-ClaudeRMcpExe
-            if ($existing -and (Test-Path -LiteralPath $existing)) {
-                Write-Warning "uv tool install clauder-mcp failed with exit code ${uvExit}; reusing existing persistent entry at $existing. This usually means the current agent MCP server has the exe open. Output: $($uvOutput | Out-String)"
-                return $existing
-            }
             throw "uv tool install clauder-mcp failed with exit code ${uvExit}. Output: $($uvOutput | Out-String)"
         }
         $uvOutput | Out-Host
+        $toolRoot = (& uv tool dir | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $toolRoot) {
+            throw "Cannot locate the installed uv tool environment for verification."
+        }
+        $bridgePython = Join-Path $toolRoot "clauder-mcp\Scripts\python.exe"
+        $probe = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench\clauder_workbench\runtime_install.py"
+        Invoke-Checked $bridgePython @("-I", "-B", $probe, "--manifest", (Join-Path $PSScriptRoot "runtime-compatibility.json"), "--python", $bridgePython)
+        $toolBin = (& uv tool dir --bin | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $toolBin) { throw "Cannot locate uv installed entry-point directory" }
+        $installedExe = Join-Path $toolBin "clauder-mcp.exe"
+        if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) { throw "Installed bridge entry point is missing: $installedExe" }
+        $script:VerifiedClaudeRMcpExe = (Get-Item -LiteralPath $installedExe).FullName
+        Write-Host "Verified installed ClaudeR MCP entry: $installedExe"
+        return $script:VerifiedClaudeRMcpExe
     }
     $exe = Get-ClaudeRMcpExe
     Write-Host "clauder-mcp persistent entry: $exe"
@@ -528,7 +557,12 @@ function Install-ClaudeR {
             Invoke-Checked "git" @("-C", $ClaudeRDir, "fetch", "--tags", "origin")
             Invoke-Checked "git" @("-C", $ClaudeRDir, "checkout", $ClaudeRRef)
         } else {
-            Invoke-Checked "git" @("clone", "--branch", $ClaudeRRef, $ClaudeRRepo, $ClaudeRDir)
+            if ($ClaudeRRef -match "^[0-9a-fA-F]{40}$") {
+                Invoke-Checked "git" @("clone", "--no-checkout", $ClaudeRRepo, $ClaudeRDir)
+                Invoke-Checked "git" @("-C", $ClaudeRDir, "checkout", "--detach", $ClaudeRRef)
+            } else {
+                Invoke-Checked "git" @("clone", "--branch", $ClaudeRRef, $ClaudeRRepo, $ClaudeRDir)
+            }
         }
         if (-not (Test-ClaudeRSource $ClaudeRDir)) {
             throw "git command finished but ClaudeR source directory is invalid: $ClaudeRDir"
@@ -542,6 +576,11 @@ function Install-ClaudeR {
     Test-PairedSource
     $resolvedR = Find-RExe
     Invoke-Checked $resolvedR @("CMD", "INSTALL", $ClaudeRDir)
+    if (-not $DryRun) {
+        $rscript = Join-Path (Split-Path -Parent $resolvedR) "Rscript.exe"
+        $probe = Join-Path $PSScriptRoot "skills\clauder-rstudio-workbench\clauder_workbench\runtime_install.py"
+        Invoke-Checked (Find-HarnessPython) @("-I", "-B", $probe, "--manifest", (Join-Path $PSScriptRoot "runtime-compatibility.json"), "--rscript", $rscript)
+    }
 }
 
 function Get-CollectionSkills {

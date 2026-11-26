@@ -5,6 +5,26 @@ description: Use when an agent needs to connect to a live RStudio session throug
 
 # ClaudeR RStudio Workbench
 
+## Workbench 0.7.0 runtime compatibility
+
+This collection contains four skills. Its candidate runtime pair is ClaudeR R
+`0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
+`runtime-compatibility.json`; complete macOS/Windows qualification is **PENDING**.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
+
+See the [English upgrade guide](../../docs/UPGRADE_0.7.0.md) or
+[繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) in the complete source checkout.
+If only this skill directory was installed, consult the same guide in its
+matching versioned source; do not assume a copied skill includes repository docs.
+
+`paired_release stage` installs an isolated candidate; `verify` probes new
+processes; `activate` only selects the pair record. Explicit client configuration
+and current native-call verification are separate. Keep the task's existing
+RStudio session, job IDs and scientific contract. For nonblocking polling of
+this bridge, use `get_async_result` with the original `job_id` and `wait_s=0`.
+Runtime upgrades do not rerun or revalidate domain models automatically.
+
+
 This skill is the operating protocol for using ClaudeR as a live RStudio workbench from Codex, Claude Code, GitHub Copilot CLI, or another MCP-capable agent. It is not a statistics reference; combine it with an R analysis skill for modeling decisions.
 
 For an agent on another computer controlling Windows RStudio, read
@@ -41,8 +61,10 @@ evidence class; native-MCP-only tasks keep the native smoke gate.
   and validated three-line DOCX exports.
 - Use `$cmaverse-paired-mval` for paired M=0/M=1 CMAverse bootstrap and Delta
   CDE validation.
+- Use `$mplusautomation-guide` for MplusAutomation/Mplus model workflows;
+  retain its licensed-engine, model-family and acceptance requirements.
 - This core skill supplies the RStudio/MCP execution, async identity, resource,
-  fan-out, monitoring, and completion discipline used by both domain skills.
+  fan-out, monitoring, and completion discipline used by all three domain skills.
 
 ## Executable Harness Layer
 
@@ -198,18 +220,17 @@ UV_CACHE_DIR = "/Users/<USER>/Library/Caches/uv"
 On macOS, `install.sh --configure-codex` installs that executable with
 `uv tool install --force --from <USER_HOME>/projects/ClaudeR/clauder-mcp
 clauder-mcp`. Windows uses `install.ps1 -ConfigureCodex`,
-`clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The published
-pair is based on upstream ClaudeR `0.14.1`, with R `0.14.1.9002`
-and MCP bridge `0.14.5.post1`. Never use bare `uvx clauder-mcp` or bare
+`clauder-mcp.exe`, `USERPROFILE`, and a Windows uv cache path. The 0.7.0
+candidate pairs upstream-derived R `0.16.6.9001` with bridge `0.16.6.post1`;
+see the exact source manifest and pending platform qualification above. Never use bare `uvx clauder-mcp` or bare
 `uv tool install clauder-mcp`; those can resolve to PyPI/upstream and drop the
 fork compatibility changes.
 
-The installer materializes the configured path as a stable launcher. It calls
-the embedded uv-tool Python directly and imports `clauder_mcp.main`, while
-preserving the original uv-generated entry point as `clauder-mcp.uv-tool`.
-This prevents Desktop app-server `ENOENT` failures after uv refreshes a
-symlink or shebang target. The configured path remains unchanged for Codex,
-Claude Code, and Copilot.
+The POSIX legacy installer materializes a stable launcher pointing to its
+verified uv-tool Python. Windows retains a native executable, never batch text
+under an `.exe` extension. The isolated release route instead exposes its own
+venv `bin/clauder-mcp` or `Scripts/clauder-mcp.exe`. Record the selected route
+and exact command; do not infer which runtime an already-open client uses.
 
 The macOS/Linux installer keeps all runtime skill backups by default. Use
 `--backup-retention 0` to make that policy explicit; pass a positive number only
@@ -318,8 +339,9 @@ documented in [warm-session-reuse.md](references/warm-session-reuse.md).
 NATIVE_TOOLS_OBSERVED → NATIVE_SMOKE_VERIFIED`. Configuration/stdio/HTTP
 success is not native readiness. If the current task has no
 `mcp__r_studio__*` tools, the stable diagnosis is
-`CODEX_NATIVE_TOOLS_NOT_REGISTERED` or `NATIVE_TOOLS_NOT_OBSERVED`; create a
-fresh Codex task context instead of sending an unsupported `SIGHUP`. If a
+`CODEX_NATIVE_TOOLS_NOT_REGISTERED` or `NATIVE_TOOLS_NOT_OBSERVED`; inspect the
+host's supported tool discovery or targeted reload while preserving the current
+task and session. Do not send an unsupported `SIGHUP`. If a
 target name is missing or stale, use the session name returned by discovery;
 never guess `default` or `chapter6_mac`.
 
@@ -353,13 +375,14 @@ registry snapshot after an MCP server reaches `ready`. Therefore:
 
 ## Compatible Release
 
-This skill collection release `v0.6.7` is paired with the
-`lzhs1995/ClaudeR` published tag `v0.14.1.9002-lzhs.1`, R package `0.14.1.9002`, and MCP
-bridge `0.14.5.post1`. See the collection's `runtime-compatibility.json` for exact
-commit and critical-file hashes. Installers verify the pair before replacing
-runtime code; disk installation is distinct from a process's loaded code.
-The collection includes this workbench skill and the companion
-`cmaverse-paired-mval` and `comparegroups-guide` skills.
+This collection's `0.7.0` candidate pairs R `0.16.6.9001` and MCP bridge
+`0.16.6.post1` from upstream development commit `3b56327`. The exact candidate
+commit, version declarations and critical hashes are in `runtime-compatibility.json`.
+All four skills remain included: this core plus `cmaverse-paired-mval`,
+`comparegroups-guide`, and `mplusautomation-guide`. Full platform qualification
+is PENDING; historical success does not certify this version. Installation,
+fresh-process verification, pair selection and current client loading are
+separate evidence layers.
 
 Do not use `v0.2.3` for `install.ps1 -ConfigureCodex`: it can corrupt
 `<USER_HOME>\.codex\config.toml` when existing Codex project entries contain

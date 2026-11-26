@@ -1,118 +1,35 @@
-"""Codex session-start preflight for the persistent ClaudeR/RStudio bridge.
-
-This command runs before a Codex task is created.  It validates the durable
-configuration and bridge provenance, but deliberately does *not* claim that
-the host injected native ``mcp__r_studio__*`` tools: that registry is owned by
-the Codex app-server and is only observable from the current task layer.
-"""
-from __future__ import annotations
-
-import os
-from datetime import datetime, timezone
+"""客户端配置与已安装文件预检；不访问客户端注册表或执行R/MCP。"""
 from pathlib import Path
-from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib
-
-from .config import BLOCK, CODEX_CONFIG, EVIDENCE_DIR, LOCAL_CLAUDER_BRIDGE, PASS, PERSISTENT_MCP, UV_CACHE_DIR
+from .config import BLOCK, EVIDENCE_DIR, PASS
 from .evidence import build_evidence, print_json, write_evidence
+from .runtime_provenance import inspect_client
 
-
-def _toml_ok() -> tuple[bool, str | None]:
-    if not CODEX_CONFIG.exists():
-        return False, f"Codex config missing: {CODEX_CONFIG}"
-    try:
-        raw = CODEX_CONFIG.read_bytes()
-        if raw.startswith(b"\xef\xbb\xbf"):
-            raw = raw[3:]
-        tomllib.loads(raw.decode("utf-8"))
-        return True, None
-    except Exception as exc:  # pragma: no cover - platform parser details
-        return False, f"Codex config is not valid TOML: {exc}"
-
-
-def _server_config() -> tuple[bool, list[str], dict[str, Any]]:
-    ok, error = _toml_ok()
-    reasons = [error] if error else []
-    details: dict[str, Any] = {"config_path": str(CODEX_CONFIG)}
-    if not ok:
-        return False, reasons, details
-    raw = CODEX_CONFIG.read_bytes()
-    if raw.startswith(b"\xef\xbb\xbf"):
-        raw = raw[3:]
-    data = tomllib.loads(raw.decode("utf-8"))
-    server = ((data.get("mcp_servers") or {}).get("r-studio") or {})
-    command = str(server.get("command") or "")
-    env = server.get("env") or {}
-    timeout = float(server.get("startup_timeout_sec") or 0)
-    details.update({"command": command, "startup_timeout_sec": timeout,
-                    "env_keys": sorted(str(k) for k in env)})
-    if Path(command).resolve() != PERSISTENT_MCP.resolve():
-        reasons.append(f"r-studio command is not persistent bridge: {command or '<missing>'}")
-    if not Path(command).exists():
-        reasons.append(f"persistent bridge executable missing: {command}")
-    if timeout < 180:
-        reasons.append("r-studio startup_timeout_sec must be at least 180")
-    if not env.get("HOME") and not os.name == "nt":
-        reasons.append("r-studio MCP env HOME is missing")
-    return not reasons, reasons, details
-
-
-def run(*, client: str = "codex", fail_closed: bool = True) -> int:
-    """Run the global startup contract and emit durable evidence.
-
-    Native registration is reported as ``UNKNOWN`` here by design.  A later
-    current-task native smoke is required to transition to ``READY``.
-    """
-    config_ok, reasons, details = _server_config()
-    bridge_ok = LOCAL_CLAUDER_BRIDGE.exists()
-    if not bridge_ok:
-        reasons.append(f"ClaudeR bridge source is missing: {LOCAL_CLAUDER_BRIDGE}")
-    decision = "PASS" if config_ok and bridge_ok else "BLOCK"
-    exit_code = PASS if decision == "PASS" else BLOCK
-    native_status = "UNKNOWN"
-    evidence = build_evidence(
-        "session_bootstrap",
-        decision,
-        reasons=(reasons or ["global Codex r-studio configuration and bridge preflight passed"]),
-        transport_class="NOT_VERIFIED",
-        exit_code=exit_code,
-        extra={
-            "client": client,
-            "scope": "global_session_start_preflight",
-            "persistent_bridge": str(PERSISTENT_MCP),
-            "uv_cache_dir": str(UV_CACHE_DIR),
-            "bridge_source": str(LOCAL_CLAUDER_BRIDGE),
-            "native_registration": native_status,
-            "native_registration_note": "Codex app-server task tool registry is not visible to a shell hook; current-task native smoke remains mandatory",
-            "fail_closed": fail_closed,
-            "recorded_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            **details,
-        },
-    )
+def run(*, client="codex", fail_closed=True, config_file=None):
+    check = inspect_client(client, config_file)
+    decision = "PASS" if check["ok"] else "BLOCK"
+    exit_code = PASS if check["ok"] else BLOCK
+    evidence = build_evidence("session_bootstrap", decision, exit_code=exit_code,
+        transport_class="NOT_VERIFIED", agent=client,
+        reasons=check["reasons"] + check["warnings"] or ["selected client configuration and installed bridge files passed"],
+        extra={"client": client, "client_check": check, "scope": "client_configuration_and_installed_bridge_files",
+               "native_registration": "UNKNOWN", "fail_closed": fail_closed,
+               "not_verified": ["current_native_tools", "loaded_bridge_process", "live_R_namespace"]})
     path = write_evidence(evidence, evidence_dir=EVIDENCE_DIR)
-    evidence.setdefault("extra", {})["evidence_path"] = str(path)
-    # Codex rejects unknown top-level fields in SessionStart output. Keep the
-    # detailed preflight receipt in its evidence file, not in a custom JSON key.
-    output: dict[str, Any] = {"continue": decision == "PASS"}
-    if decision != "PASS":
+    output = {"continue": check["ok"]}
+    if not check["ok"]:
         output["stopReason"] = "; ".join(evidence["reasons"])
-        output["systemMessage"] = f"ClaudeR startup preflight blocked; evidence: {path}"
+        output["systemMessage"] = f"ClaudeR {client} preflight blocked; evidence: {path}"
     print_json(output)
     return exit_code if fail_closed else PASS
 
-
-def main(argv: list[str] | None = None) -> int:
+def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(prog="session-bootstrap")
-    parser.add_argument("--client", default="codex")
+    parser.add_argument("--client", choices=["codex", "claude", "copilot"], default="codex")
+    parser.add_argument("--config-file", type=Path)
     parser.add_argument("--no-fail-closed", action="store_true")
     args = parser.parse_args(argv)
-    return run(client=args.client, fail_closed=not args.no_fail_closed)
+    return run(client=args.client, fail_closed=not args.no_fail_closed, config_file=args.config_file)
 
-
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     raise SystemExit(main())

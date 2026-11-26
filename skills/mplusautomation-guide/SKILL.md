@@ -5,22 +5,27 @@ description: Use when running, reproducing or porting Mplus models from R with M
 
 # MplusAutomation Guide
 
-## Workbench 0.7.0 runtime compatibility (candidate, not in this checkout)
+## Workbench 0.7.0 runtime compatibility
 
-This checkout pins workbench `0.6.7` with ClaudeR R `0.14.1.9002` / bridge
-`0.14.5.post1` in the collection's `runtime-compatibility.json`. A 0.7.0
-candidate that pairs ClaudeR R `0.16.5.9001` / bridge `0.16.4.post1` is
-qualified separately; complete macOS/Windows qualification is **PENDING**.
-The candidate's `paired_release stage/verify/activate` commands and the bridge's
-`get_async_result(..., wait_s=0)` polling are not available in this checkout.
+This collection contains four skills. Its candidate runtime pair is ClaudeR R
+`0.16.6.9001` / bridge `0.16.6.post1`, pinned by the collection's
+`runtime-compatibility.json` at ClaudeR commit
+`270efe5f600ce2b8366f22dc18a834bb2ab888b7`; complete macOS/Windows qualification
+is **PENDING**.
+Earlier candidate installation receipts on macOS and Windows verified both launchers and listed 42 MCP tools, including `wake_on_message` and `get_async_result(wait_s=0)`. Those receipts retain their recorded source identities; they do not qualify this merged candidate or prove that existing clients loaded it. Scientific qualification uses the version recorded with each run.
 
-The candidate's [English upgrade guide](../../docs/UPGRADE_0.7.0.md) and
-[繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) are in the complete source
-checkout. If only this skill directory was installed, these links do not
-resolve; do not assume a copied skill includes repository docs.
+See the [English upgrade guide](../../docs/UPGRADE_0.7.0.md) or
+[繁體中文升級指南](../../docs/UPGRADE_0.7.0.zh-TW.md) in the complete source checkout.
+If only this skill directory was installed, consult the same guide in its
+matching versioned source; do not assume a copied skill includes repository docs.
 
-Keep the task's existing RStudio session, job IDs and scientific contract.
+`paired_release stage` installs an isolated candidate; `verify` probes new
+processes; `activate` only selects the pair record. Explicit client configuration
+and current native-call verification are separate. Keep the task's existing
+RStudio session, job IDs and scientific contract. For nonblocking polling of
+this bridge, use `get_async_result` with the original `job_id` and `wait_s=0`.
 Runtime upgrades do not rerun or revalidate domain models automatically.
+
 
 Status: v1-compatible guide with a Chapter 4 APIM v2 route. Windows execution,
 recovery, resource admission and manuscript reconciliation remain documented
